@@ -36,6 +36,10 @@ interface ProviderEntry {
   quotaLabel: string
   keyCount: number
   isCustom?: boolean
+  // 'query' | 'passage' for a custom model bound to an asymmetric endpoint
+  // (NVIDIA Nemotron 3.5); null/absent means the endpoint is symmetric and no
+  // input_type is sent.
+  inputType?: string | null
 }
 
 interface Family {
@@ -114,6 +118,18 @@ function SortableProviderRow({
           {p.keyCount === 0 && (
             <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-amber-600/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-400">
               {t('models.noKey')}
+            </span>
+          )}
+          {/* The side an asymmetric model is registered for. It is not
+              editable here (the model is re-registered from the Keys page),
+              but an operator who cannot see it cannot tell why two models on
+              the same endpoint disagree. */}
+          {p.inputType && (
+            <span
+              className="text-[10px] rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground font-mono"
+              title={t('embeddings.inputTypeTitle')}
+            >
+              {p.inputType}
             </span>
           )}
         </div>

@@ -10,6 +10,7 @@ import {
   getDefaultFamily,
   probeEmbeddingDimensions,
   registerCustomEmbeddingModel,
+  asEmbeddingInputType,
   EmbeddingsError,
   type EmbeddingModelRow,
 } from '../services/embeddings.js';
@@ -57,6 +58,9 @@ embeddingsRouter.get('/', (_req: Request, res: Response) => {
           ? (customKeyIds.has(r.key_id) ? 1 : 0)
           : keyCounts.get(r.platform) ?? 0,
         isCustom: r.platform === 'custom',
+        // Only a custom endpoint can carry one: it is the operator's choice,
+        // made when the model was registered against an asymmetric provider.
+        inputType: r.platform === 'custom' ? r.input_type : null,
       })),
     })),
   });
@@ -71,6 +75,16 @@ const customEmbeddingSchema = z.object({
   label: z.string().optional(),
   quotaLabel: z.string().optional(),
   maxInputTokens: z.number().int().positive().optional(),
+  // Asymmetric models (NVIDIA Nemotron 3.5) refuse a request without an
+  // input_type, so the operator names the side here.
+  //
+  // Three states, because "the caller has no opinion" and "the caller says
+  // send no input_type" are different answers:
+  //   absent — no opinion: keep the input_type the model already has.
+  //   null   — send no input_type: the endpoint is symmetric. Clears a
+  //            stored value.
+  //   a value — send that input_type.
+  inputType: z.enum(['query', 'passage']).nullable().optional(),
 });
 
 function decryptExistingKey(row: { encrypted_key: string; iv: string; auth_tag: string } | undefined): string | null {
@@ -113,13 +127,39 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
   `).get(baseUrl) as { id: number; encrypted_key: string; iv: string; auth_tag: string } | undefined;
   const probeKey = providedKey ?? decryptExistingKey(existingKey) ?? 'no-key';
 
+  // A model that is already on record keeps the input_type it has, for the
+  // probe as well as for the stored row: the probe has to speak the same
+  // contract the request path will speak, or an asymmetric endpoint (NVIDIA
+  // Nemotron 3.5) answers it with 400 and a plain re-submit (a rename, a
+  // family change) looks like a broken endpoint.
+  const storedInputType = asEmbeddingInputType((db.prepare(`
+    SELECT input_type
+      FROM embedding_models
+     WHERE platform = 'custom' AND model_id = ?
+     LIMIT 1
+  `).get(modelId) as { input_type: string | null } | undefined)?.input_type);
+  // A named input_type is what the operator asked for; an explicit null means
+  // "this endpoint is symmetric" and overrides what is on record; an absent
+  // one means "no opinion" and keeps the stored value.
+  const submittedInputType = parsed.data.inputType === undefined
+    ? undefined
+    : asEmbeddingInputType(parsed.data.inputType);
+  const probeInputType = submittedInputType === undefined ? storedInputType : submittedInputType;
+
   let dimensions: number;
   try {
-    dimensions = await probeEmbeddingDimensions(baseUrl, probeKey, modelId);
+    dimensions = await probeEmbeddingDimensions(baseUrl, probeKey, modelId, probeInputType);
   } catch (err: any) {
     const status = err instanceof EmbeddingsError ? err.status : 502;
+    let message = `custom embedding probe failed: ${err?.message ?? 'unknown error'}`;
+    // The upstream 400 that broke this feature in the first place is a
+    // missing input_type, not a broken endpoint. Say so, instead of leaving
+    // the operator to decode an upstream error body.
+    if (!probeInputType && /input_type/i.test(err?.message ?? '')) {
+      message += " (this model looks asymmetric — set its input type to 'query' or 'passage')";
+    }
     res.status(status >= 400 && status < 600 ? status : 502).json({
-      error: { message: `custom embedding probe failed: ${err?.message ?? 'unknown error'}` },
+      error: { message },
     });
     return;
   }
@@ -136,6 +176,9 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
       dimensions,
       maxInputTokens: parsed.data.maxInputTokens ?? null,
       quotaLabel,
+      // Undefined keeps the stored input_type, null clears it, a value sets
+      // it — the same three states the schema accepts.
+      inputType: submittedInputType,
     });
     return { modelDbId, keyId, storedKeyForMask };
   });

@@ -26,6 +26,25 @@ function parseModelList(raw: string): string[] {
     .filter(s => s.length > 0 && !seen.has(s) && seen.add(s))
 }
 
+// Asymmetric embedding models (NVIDIA Nemotron 3.5) reject a request that
+// carries no input_type, so the operator names the side here.
+//
+// Three states, because "leave it alone" and "send no input_type" are
+// different answers:
+//   unset — not specified: send nothing, and keep whatever the model already
+//           has on record. The default, and the safe one: re-submitting an
+//           existing model (a rename, a family change) must not silently drop
+//           the input_type that makes an asymmetric endpoint answer at all.
+//   none — explicitly symmetric: send no input_type, and clear a stored
+//           value. What every symmetric model (bge-m3, text-embedding-3-*) wants.
+//   a side — send that input_type.
+//
+// 'unset' is a UI-only sentinel: it never reaches the API, which takes the
+// field's absence as "no opinion".
+const EMBEDDING_INPUT_TYPE_UNSET = 'unset'
+const EMBEDDING_INPUT_TYPE_NONE = 'none'
+const EMBEDDING_INPUT_TYPES = ['query', 'passage'] as const
+
 // Always rendered inside the Add key dialog: no outer section chrome/heading.
 // `onAdded` lets that dialog close (and surface a toast) once a custom model is
 // saved.
@@ -47,6 +66,11 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
   // "Fetch models" asks the endpoint itself what it serves instead of making the
   // user paste ids from a curl (#488).
   const [discoverOpen, setDiscoverOpen] = useState(false)
+  // Which side of an ASYMMETRIC embedding model this endpoint serves. Nemotron
+  // 3.5 keeps "query" and "passage" in different vector spaces and rejects a
+  // request that carries no input_type with a 400. Symmetric models (bge-m3,
+  // text-embedding-3-*) want no input_type at all.
+  const [embeddingInputType, setEmbeddingInputType] = useState<string>(EMBEDDING_INPUT_TYPE_UNSET)
 
   const models = customType === 'chat' ? parseModelList(model) : [model.trim()].filter(Boolean)
   const multiple = customType === 'chat' && models.length > 1
@@ -82,6 +106,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       setModel('')
       setDisplayName('')
       setFamily('')
+      setEmbeddingInputType(EMBEDDING_INPUT_TYPE_UNSET)
       setSupportsTools(true)
       setSupportsVision(false)
       if (onAdded) {
@@ -122,7 +147,16 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
     if (customType === 'embedding') {
       addCustom.mutate({
         path: '/api/embeddings/custom',
-        body: { ...common, family: family || undefined },
+        body: {
+          ...common,
+          family: family || undefined,
+          // Undefined leaves the model's stored input_type alone; null says
+          // "this endpoint is symmetric" and clears it. The field is only sent
+          // when the operator actually chose something.
+          ...(embeddingInputType === EMBEDDING_INPUT_TYPE_UNSET
+            ? {}
+            : { inputType: embeddingInputType === EMBEDDING_INPUT_TYPE_NONE ? null : embeddingInputType }),
+        },
       })
       return
     }
@@ -244,6 +278,34 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
               placeholder={embeddingsData?.families?.[0]?.family ?? t('keys.customFamilyPlaceholder')}
               className="w-[190px] font-mono text-xs"
             />
+          </div>
+        )}
+        {customType === 'embedding' && (
+          // Only asymmetric models need this, and only they can be told apart
+          // from the symmetric ones by trying: an endpoint that refuses a
+          // request without an input_type is the tell. The default is "not
+          // specified", which leaves the model's stored choice alone.
+          <div className="space-y-1.5">
+            <Label className="text-xs">{t('keys.customEmbeddingInputType')}</Label>
+            <Select
+              value={embeddingInputType}
+              onValueChange={(v) => setEmbeddingInputType(v)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMBEDDING_INPUT_TYPE_UNSET} label={t('keys.customEmbeddingInputTypeUnset')}>
+                  {t('keys.customEmbeddingInputTypeUnset')}
+                </SelectItem>
+                <SelectItem value={EMBEDDING_INPUT_TYPE_NONE} label={t('keys.customEmbeddingInputTypeNone')}>
+                  {t('keys.customEmbeddingInputTypeNone')}
+                </SelectItem>
+                {EMBEDDING_INPUT_TYPES.map(it => (
+                  <SelectItem key={it} value={it} label={it}>{it}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
         {customType === 'chat' && (

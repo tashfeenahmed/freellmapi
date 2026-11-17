@@ -41,6 +41,27 @@ export interface EmbeddingModelRow {
   enabled: number;
   quota_label: string;
   key_id: number | null;
+  /** 'query' | 'passage' for a custom model registered against an asymmetric
+   *  endpoint (NVIDIA Nemotron 3.5); null means "send no input_type", which is
+   *  what every symmetric model wants. */
+  input_type: string | null;
+}
+
+/** The `input_type` hint an asymmetric embedding endpoint needs.
+ *
+ *  NVIDIA's Nemotron 3.5 family is asymmetric: the "query" side and the
+ *  "passage" side live in different vector spaces, and the provider refuses to
+ *  guess — a request without `input_type` comes back 400. Symmetric models
+ *  (bge-m3, text-embedding-3-*) want no `input_type` at all, so this stays
+ *  optional everywhere. */
+export type EmbeddingInputType = 'query' | 'passage';
+
+/** Narrow a stored/parsed input_type to the two values the wire contract
+ *  defines. The column is TEXT, so a hand-edited row could hold anything; an
+ *  unrecognised value is treated as "no opinion" rather than forwarded, since
+ *  a bogus input_type is as fatal upstream as a missing one. */
+export function asEmbeddingInputType(value: string | null | undefined): EmbeddingInputType | null {
+  return value === 'query' || value === 'passage' ? value : null;
 }
 
 export interface EmbeddingsResult {
@@ -258,8 +279,26 @@ async function cloudflareEmbeddingGemma2(row: EmbeddingModelRow, accountId: stri
   return { vectors: ordered.map(d => d.embedding!), inputTokens: typeof tokens === 'number' && Number.isFinite(tokens) && tokens >= 0 ? tokens : null };
 }
 
-export async function probeEmbeddingDimensions(baseUrl: string, key: string, modelId: string): Promise<number> {
-  const out = await openAiStyleEmbed(`${baseUrl.trim().replace(/\/+$/, '')}/embeddings`, 'custom', key, modelId, ['dimension probe']);
+/** Probe a custom endpoint for its vector width.
+ *
+ *  `inputType` is forwarded verbatim: an asymmetric endpoint (NVIDIA Nemotron
+ *  3.5) rejects a probe that carries no `input_type` with 400, so the probe
+ *  has to speak the same contract the request path will speak. Omitting it
+ *  keeps the body byte-identical to the symmetric case. */
+export async function probeEmbeddingDimensions(
+  baseUrl: string,
+  key: string,
+  modelId: string,
+  inputType?: EmbeddingInputType | null,
+): Promise<number> {
+  const out = await openAiStyleEmbed(
+    `${baseUrl.trim().replace(/\/+$/, '')}/embeddings`,
+    'custom',
+    key,
+    modelId,
+    ['dimension probe'],
+    inputType ? { input_type: inputType } : {},
+  );
   const vector = out.vectors[0];
   if (!Array.isArray(vector) || vector.length === 0) {
     throw new EmbeddingsError('upstream returned malformed embeddings', 502);
@@ -275,6 +314,19 @@ export interface CustomEmbeddingRegistration {
   dimensions: number;
   maxInputTokens: number | null;
   quotaLabel: string;
+  /** 'query' | 'passage' for an endpoint that requires one (NVIDIA Nemotron
+   *  3.5 and friends).
+   *
+   *  Tri-state, because "the caller has no opinion" and "the caller says send
+   *  no input_type" are different answers:
+   *    undefined — no opinion: keep whatever is on record. Every caller that
+   *                predates this field (the bulk key importer included) lands
+   *                here, and none of them may clear a choice that is what
+   *                makes an asymmetric endpoint answer at all.
+   *    null      — send no input_type: the endpoint is symmetric. Clears a
+   *                stored value.
+   *    a value   — send that input_type. */
+  inputType?: EmbeddingInputType | null;
 }
 
 /**
@@ -319,6 +371,16 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
   // `display_name` is optional: a new model takes its id, and a model already
   // on record keeps the name it has instead of being reset by a submit that
   // simply left the field blank (#704).
+  //
+  // `input_type` follows the same rule, with one addition. A submit that names
+  // one sets it; a submit that stays silent (undefined) keeps the value on
+  // record, because dropping it would leave an asymmetric endpoint (NVIDIA
+  // Nemotron 3.5) unable to answer at all. An explicit null is the operator
+  // saying "this endpoint is symmetric" and does clear a stored value.
+  //
+  // The three states are carried as two bind parameters: a flag saying whether
+  // this submit had an opinion at all, and the value it had. A plain COALESCE
+  // could not tell "keep the old value" from "clear it".
   if (existingModel) {
     db.prepare(`
       UPDATE embedding_models
@@ -329,17 +391,39 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
              priority = ?,
              enabled = 1,
              quota_label = ?,
-             key_id = ?
+             key_id = ?,
+             input_type = CASE WHEN ? = 1 THEN ? ELSE input_type END
        WHERE id = ?
-    `).run(reg.family, reg.displayName, reg.dimensions, reg.maxInputTokens, priority, reg.quotaLabel, bindKeyId, existingModel.id);
+    `).run(
+      reg.family,
+      reg.displayName,
+      reg.dimensions,
+      reg.maxInputTokens,
+      priority,
+      reg.quotaLabel,
+      bindKeyId,
+      reg.inputType === undefined ? 0 : 1,
+      reg.inputType ?? null,
+      existingModel.id,
+    );
     return { modelDbId: existingModel.id, created: false };
   }
 
   const model = db.prepare(`
     INSERT INTO embedding_models
-      (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id)
-    VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?)
-  `).run(reg.family, reg.modelId, reg.displayName ?? reg.modelId, reg.dimensions, reg.maxInputTokens, priority, reg.quotaLabel, bindKeyId);
+      (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id, input_type)
+    VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?, ?)
+  `).run(
+    reg.family,
+    reg.modelId,
+    reg.displayName ?? reg.modelId,
+    reg.dimensions,
+    reg.maxInputTokens,
+    priority,
+    reg.quotaLabel,
+    bindKeyId,
+    reg.inputType ?? null,
+  );
   return { modelDbId: Number(model.lastInsertRowid), created: true };
 }
 
@@ -348,9 +432,23 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
   switch (row.platform) {
     case 'freeinference':
       return freeInferenceEmbed(row, key, inputs, dimensions);
-    case 'custom':
+    case 'custom': {
       if (!credential.baseUrl) throw new EmbeddingsError('custom embedding provider is missing base_url', 500);
-      return openAiStyleEmbed(`${credential.baseUrl}/embeddings`, row.platform, key, row.model_id, inputs, {}, dimensions);
+      // An asymmetric endpoint (NVIDIA Nemotron 3.5) rejects a request that
+      // carries no input_type with 400, so the operator's choice travels with
+      // the model row. A symmetric custom endpoint keeps the exact body it
+      // has always sent: no input_type field at all.
+      const inputType = asEmbeddingInputType(row.input_type);
+      return openAiStyleEmbed(
+        `${credential.baseUrl}/embeddings`,
+        row.platform,
+        key,
+        row.model_id,
+        inputs,
+        inputType ? { input_type: inputType } : {},
+        dimensions,
+      );
+    }
     case 'google':
       return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'nvidia':
