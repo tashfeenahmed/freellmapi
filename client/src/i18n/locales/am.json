@@ -1208,7 +1208,6 @@
       "writeError": "የፋይል ፈቃዶችንና ነባር ቅንብሮችን ያረጋግጡና እንደገና ይሞክሩ።",
       "missing": "CLIን ይጫኑ ወይም ወደ PATH ያክሉት።",
       "intro": "የኮድ አጻጻፍ መሣሪያዎችን በተፈጠረ እና ምትኬን በሚጠብቅ ውቅር ወደ አንድ የነፃ ሞዴል ጌትዌይ ያገናኙ።",
-      "showAll": "ተጨማሪ አሳይ ({count})",
       "all": "ወኪሎች",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

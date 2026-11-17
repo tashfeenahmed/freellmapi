@@ -1208,7 +1208,6 @@
       "writeError": "Comprueba los permisos de los archivos y la configuración actual y vuelve a intentarlo.",
       "missing": "Instala la CLI o añádela al PATH y vuelve a intentarlo.",
       "intro": "Conecta herramientas de programación a un único gateway de modelos gratuitos con configuración generada y respaldo seguro.",
-      "showAll": "Mostrar más ({count})",
       "all": "Agentes",
       "find": "Search",
       "cursor": "El editor centrado en la IA; pasa por la nube de Cursor, así que necesita una URL pública."

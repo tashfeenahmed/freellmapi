@@ -1208,7 +1208,6 @@
       "writeError": "ଫାଇଲ ଅନୁମତି ଓ ବର୍ତ୍ତମାନର ସେଟିଂ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "missing": "CLI ସ୍ଥାପନ କରନ୍ତୁ କିମ୍ବା PATH ରେ ଯୋଡ଼ନ୍ତୁ।",
       "intro": "କୋଡିଂ ଉପକରଣଗୁଡ଼ିକୁ ସୃଷ୍ଟି କରାଯାଇଥିବା, ବ୍ୟାକଅପ୍-ସୁରକ୍ଷିତ କନଫିଗରେସନ୍ ସହିତ ଗୋଟିଏ ମାଗଣା-ମଡେଲ ଗେଟୱେ ସହ ସଂଯୋଗ କରନ୍ତୁ।",
-      "showAll": "ଅଧିକ ଦେଖାନ୍ତୁ ({count})",
       "all": "ଏଜେଣ୍ଟଗୁଡ଼ିକ",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

@@ -1208,7 +1208,6 @@
       "writeError": "Lelee ikike faịlụ na ntọala dị ugbu a ma nwaa ọzọ.",
       "missing": "Wụnye CLI ma ọ bụ tinye ya na PATH.",
       "intro": "Jikọọ ngwaọrụ koodu na otu ọnụ ụzọ ụdị n'efu nwere nhazi emepụtara nke dị mma maka ndabere.",
-      "showAll": "Gosi ihe ọzọ ({count})",
       "all": "Ndị ejenti",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

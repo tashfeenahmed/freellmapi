@@ -1208,7 +1208,6 @@
       "writeError": "請檢查檔案權限與現有設定後重試。",
       "missing": "請安裝命令列工具或將其加入 PATH 後重試。",
       "intro": "透過產生的、可安全備份的設定，將程式開發工具連接到一個免費模型閘道。",
-      "showAll": "展開 ({count})",
       "all": "代理程式",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

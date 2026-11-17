@@ -1208,7 +1208,6 @@
       "writeError": "Vérifiez les permissions des fichiers et la configuration existante, puis réessayez.",
       "missing": "Installez la CLI ou ajoutez-la au PATH, puis réessayez.",
       "intro": "Connectez vos outils de codage à une passerelle unique de modèles gratuits, avec une configuration générée et sans risque pour vos sauvegardes.",
-      "showAll": "Afficher plus ({count})",
       "all": "Agents",
       "find": "Search",
       "cursor": "L'éditeur pensé pour l'IA ; il passe par le cloud de Cursor, il lui faut donc une URL publique."

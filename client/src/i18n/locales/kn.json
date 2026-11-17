@@ -1208,7 +1208,6 @@
       "writeError": "ಕಡತದ ಅನುಮತಿಗಳು ಮತ್ತು ಪ್ರಸ್ತುತ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "missing": "CLI ಸ್ಥಾಪಿಸಿ ಅಥವಾ ಅದನ್ನು PATH ಗೆ ಸೇರಿಸಿ.",
       "intro": "ರಚಿಸಲಾದ, ಬ್ಯಾಕಪ್-ಸುರಕ್ಷಿತ ಕಾನ್ಫಿಗರೇಶನ್‌ನೊಂದಿಗೆ ಕೋಡಿಂಗ್ ಉಪಕರಣಗಳನ್ನು ಒಂದು ಉಚಿತ-ಮಾದರಿ ಗೇಟ್‌ವೇಗೆ ಸಂಪರ್ಕಿಸಿ.",
-      "showAll": "ಹೆಚ್ಚು ತೋರಿಸು ({count})",
       "all": "ಏಜೆಂಟ್‌ಗಳು",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

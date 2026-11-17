@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, ChevronDown, ChevronUp, CircleArrowRight, Ellipsis, Plug, Search, Terminal } from 'lucide-react'
+import { Check, ChevronDown, CircleArrowRight, Ellipsis, Plug, Search, Terminal } from 'lucide-react'
 import { AgentIcon } from '@/components/agent-icons'
 import { CopyButton } from '@/components/copy-button'
 import { useI18n } from '@/i18n'
@@ -145,21 +145,18 @@ export function DesktopAgentsPage({ bridge }: { bridge: AgentSetupBridge }) {
   const seen = useRecentAgents()
   const [active, setActive] = useState<string>()
   const [query, setQuery] = useState('')
-  const [all, setAll] = useState(false)
   const [gateway, setGateway] = useState(false)
   const [states, setStates] = useState<Record<string, CardState>>({})
   const search = query.trim().toLowerCase()
-  const visible = search ? tools.filter(tool => (tool.name + ' ' + tool.id).toLowerCase().includes(search)) : all ? tools : tools.slice(0, featured.length)
+  const visible = search ? tools.filter(tool => (tool.name + ' ' + tool.id).toLowerCase().includes(search)) : tools
   return <div id="agent-connect-screen">
     <header className="heading"><div><h1>{t('agents.title')}</h1><p>{t('agents.connect.intro')}</p></div>
       <button className="gateway-btn" aria-expanded={gateway} onClick={() => setGateway(!gateway)}><span className="dot" />{t('agents.connect.gateway')}<ChevronDown /></button></header>
     {gateway && <section className="gateway-box"><b>{t('agents.endpoint')}</b><code>{window.location.origin}</code><b>{t('agents.apiKey')}</b><GatewayKey /></section>}
-    <div className="listbar"><h2>{t('agents.connect.all')} <span className="total">{tools.length}</span></h2>
+    <div className="listbar"><h2>{t('agents.connect.all')} <span className="total">{search ? `${visible.length} / ${tools.length}` : tools.length}</span></h2>
       <label className="find"><Search /><input type="search" aria-label={t('agents.connect.find')} placeholder={t('agents.connect.find')} value={query} onChange={e => setQuery(e.target.value)} /></label></div>
     <div className="deck">{visible.map(tool => <AgentCard key={tool.id} tool={tool} bridge={bridge} active={active === tool.id} activate={() => setActive(tool.id)} seen={!!seen(tool.id)} state={states[tool.id] ?? { panel: null }}
       update={patch => setStates(old => ({ ...old, [tool.id]: { ...(old[tool.id] ?? { panel: null }), ...patch } }))} />)}</div>
     {!visible.length && <p className="empty">{t('palette.empty')}</p>}
-    <div className="footline"><span className="count">{visible.length} / {tools.length}</span>
-      {!search && <button className="all" onClick={() => setAll(!all)}>{all ? t('logs.showLess') : t('agents.connect.showAll', { count: tools.length })} {all ? <ChevronUp /> : <ChevronDown />}</button>}</div>
   </div>
 }

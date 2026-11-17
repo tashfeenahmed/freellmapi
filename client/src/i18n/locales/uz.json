@@ -1208,7 +1208,6 @@
       "writeError": "Fayl ruxsatlari va joriy sozlamalarni tekshirib, qayta urinib ko‘ring.",
       "missing": "CLI’ni o‘rnating yoki PATH’ga qo‘shing.",
       "intro": "Kodlash vositalarini yaratilgan, zaxira nusxa uchun xavfsiz konfiguratsiya bilan yagona bepul model shlyuziga ulang.",
-      "showAll": "Koʻproq koʻrsatish ({count})",
       "all": "Agentlar",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

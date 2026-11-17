@@ -1208,7 +1208,6 @@
       "writeError": "فائلوں کی اجازتیں اور موجودہ ترتیبات چیک کر کے دوبارہ کوشش کریں۔",
       "missing": "CLI انسٹال کریں یا اسے PATH میں شامل کریں۔",
       "intro": "کوڈنگ ٹولز کو ایک ہی مفت ماڈل گیٹ وے سے جوڑیں، تیار کردہ اور بیک اپ محفوظ کنفیگریشن کے ساتھ۔",
-      "showAll": "مزید دکھائیں ({count})",
       "all": "ایجنٹس",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

@@ -1208,7 +1208,6 @@
       "writeError": "Fayl icazələrini və mövcud konfiqurasiyanı yoxlayıb yenidən cəhd edin.",
       "missing": "CLI quraşdırın və ya onu PATH dəyişəninə əlavə edin.",
       "intro": "Kodlaşdırma alətlərini generasiya olunmuş, ehtiyat nüsxə üçün təhlükəsiz konfiqurasiya ilə vahid pulsuz model şlüzünə qoşun.",
-      "showAll": "Daha çox göstər ({count})",
       "all": "Agentlər",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

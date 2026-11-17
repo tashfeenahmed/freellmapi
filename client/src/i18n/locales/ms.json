@@ -1208,7 +1208,6 @@
       "writeError": "Semak kebenaran fail dan konfigurasi semasa, kemudian cuba lagi.",
       "missing": "Pasang CLI atau tambahkannya pada PATH.",
       "intro": "Sambungkan alat pengekodan kepada satu gateway model percuma dengan konfigurasi terjana yang selamat untuk sandaran.",
-      "showAll": "Tunjukkan lagi ({count})",
       "all": "Ejen",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

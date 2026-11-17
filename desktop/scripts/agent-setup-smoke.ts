@@ -41,9 +41,14 @@ async function smoke() {
   const textAt = (selector: string) => js('document.querySelector(' + JSON.stringify(selector) + ')?.textContent');
   await window.loadURL(origin + '/agents');
   await wait(() => textAt('[data-agent=claude] .connect'), 'desktop agent cards did not render');
-  assert.equal(await js('document.querySelectorAll("[data-agent]").length'), 6);
-  await click('.footline .all');
-  assert.equal(await js('document.querySelectorAll("[data-agent]").length'), 21);
+  const cardCount = () => js('document.querySelectorAll("[data-agent]").length');
+  assert.equal(await cardCount(), catalog.length);
+  await js('document.querySelector("input[type=search]").focus()');
+  await window.webContents.insertText('hermes');
+  await wait(async () => await cardCount() === 1 && !!await textAt('[data-agent=hermes] h3'), 'search did not find Hermes');
+  window.webContents.selectAll();
+  window.webContents.delete();
+  await wait(async () => await cardCount() === catalog.length, 'clearing search did not restore the full catalog');
   fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
   const claude = path.join(home, '.claude/settings.json');
   fs.writeFileSync(claude, '{"unrelated":"keep"}');

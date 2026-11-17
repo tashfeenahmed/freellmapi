@@ -1208,7 +1208,6 @@
       "writeError": "Verifique as permissões dos arquivos e a configuração atual e tente novamente.",
       "missing": "Instale a CLI ou adicione-a ao PATH e tente novamente.",
       "intro": "Conecte ferramentas de codificação a um único gateway de modelos gratuitos com configuração gerada e segura para backup.",
-      "showAll": "Mostrar mais ({count})",
       "all": "Agentes",
       "find": "Search",
       "cursor": "O editor centrado em IA; ele passa pela nuvem da Cursor, então precisa de uma URL pública."

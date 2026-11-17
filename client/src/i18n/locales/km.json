@@ -1208,7 +1208,6 @@
       "writeError": "ពិនិត្យសិទ្ធិឯកសារ និងការកំណត់បច្ចុប្បន្ន រួចសាកល្បងម្តងទៀត។",
       "missing": "ដំឡើង CLI ឬបន្ថែមវាទៅ PATH។",
       "intro": "ភ្ជាប់ឧបករណ៍សរសេរកូដទៅ gateway ម៉ូដែលឥតគិតថ្លៃតែមួយ ជាមួយការកំណត់រចនាសម្ព័ន្ធដែលបង្កើតដោយស្វ័យប្រវត្តិ និងមានសុវត្ថិភាពសម្រាប់ការបម្រុងទុក។",
-      "showAll": "បង្ហាញបន្ថែម ({count})",
       "all": "ភ្នាក់ងារ",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

@@ -1208,7 +1208,6 @@
       "writeError": "फाइलका अनुमतिहरू र हालका सेटिङहरू जाँचेर फेरि प्रयास गर्नुहोस्।",
       "missing": "CLI स्थापना गर्नुहोस् वा PATH मा थप्नुहोस्।",
       "intro": "कोडिङ उपकरणहरूलाई स्वतः सिर्जना गरिएको, ब्याकअप-सुरक्षित कन्फिगरेसनसहित एउटै नि:शुल्क-मोडेल गेटवेमा जोड्नुहोस्।",
-      "showAll": "थप देखाउनुहोस् ({count})",
       "all": "एजेन्टहरू",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

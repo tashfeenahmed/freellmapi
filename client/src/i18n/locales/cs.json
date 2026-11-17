@@ -1208,7 +1208,6 @@
       "writeError": "Zkontrolujte oprávnění souborů a stávající konfiguraci a zkuste to znovu.",
       "missing": "Nainstalujte CLI nebo ji přidejte do PATH.",
       "intro": "Připojte kódovací nástroje k jedné bráně bezplatných modelů s generovanou konfigurací a bezpečným zálohováním.",
-      "showAll": "Zobrazit více ({count})",
       "all": "Agenti",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

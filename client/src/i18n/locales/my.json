@@ -1208,7 +1208,6 @@
       "writeError": "ဖိုင်ခွင့်ပြုချက်များနှင့် လက်ရှိဆက်တင်များကို စစ်ပြီး ပြန်ကြိုးစားပါ။",
       "missing": "CLI ကို ထည့်သွင်းပါ သို့မဟုတ် PATH ထဲ ထည့်ပါ။",
       "intro": "ကုဒ်ရေးကိရိယာများကို အလိုအလျောက်ထုတ်ပေးထားပြီး အရန်သိမ်းရန် စိတ်ချရသော configuration ဖြင့် အခမဲ့မော်ဒယ် gateway တစ်ခုတည်းသို့ ချိတ်ဆက်ပါ။",
-      "showAll": "ပိုမိုပြပါ ({count})",
       "all": "အေးဂျင့်များ",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

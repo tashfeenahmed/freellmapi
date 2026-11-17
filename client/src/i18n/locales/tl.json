@@ -1208,7 +1208,6 @@
       "writeError": "Suriin ang mga pahintulot ng file at kasalukuyang configuration at subukan muli.",
       "missing": "I-install ang CLI o idagdag ito sa PATH.",
       "intro": "Ikonekta ang mga coding tool sa iisang free-model gateway gamit ang nabuong, backup-safe na configuration.",
-      "showAll": "Ipakita ang higit pa ({count})",
       "all": "Mga Agent",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

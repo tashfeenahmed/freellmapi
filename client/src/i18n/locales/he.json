@@ -1208,7 +1208,6 @@
       "writeError": "יש לבדוק את הרשאות הקבצים ואת ההגדרות הקיימות ולנסות שוב.",
       "missing": "יש להתקין את כלי ה־CLI או להוסיף אותו ל־PATH.",
       "intro": "חבר כלי תכנות לשער אחד של מודלים חינמיים עם תצורה שנוצרת אוטומטית ובטוחה לגיבוי.",
-      "showAll": "הצג עוד ({count})",
       "all": "סוכנים",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

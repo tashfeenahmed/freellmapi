@@ -1208,7 +1208,6 @@
       "writeError": "Duba izinin fayiloli da saitunan yanzu, sannan ka sake gwadawa.",
       "missing": "Shigar da CLI ko ƙara shi cikin PATH.",
       "intro": "Haɗa kayan aikin rubuta kod zuwa gateway ɗaya na samfura kyauta tare da saitin da aka ƙirƙira, mai kiyaye madadin.",
-      "showAll": "Nuna ƙari ({count})",
       "all": "Wakilai",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

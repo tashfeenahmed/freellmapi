@@ -1208,7 +1208,6 @@
       "writeError": "ফাইলের অনুমতি ও বর্তমান সেটিংস যাচাই করে আবার চেষ্টা করুন।",
       "missing": "CLI ইনস্টল করুন বা PATH-এ যোগ করুন।",
       "intro": "জেনারেট করা, ব্যাকআপ-নিরাপদ কনফিগারেশন সহ কোডিং টুলগুলিকে একটি ফ্রি-মডেল গেটওয়েতে সংযুক্ত করুন।",
-      "showAll": "আরও দেখান ({count})",
       "all": "এজেন্ট",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

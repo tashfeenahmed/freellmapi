@@ -1208,7 +1208,6 @@
       "writeError": "Controlla i permessi dei file e la configurazione esistente, poi riprova.",
       "missing": "Installa la CLI o aggiungila al PATH e riprova.",
       "intro": "Collega gli strumenti di coding a un unico gateway di modelli gratuiti con configurazione generata e sicura per il backup.",
-      "showAll": "Mostra di più ({count})",
       "all": "Agenti",
       "find": "Search",
       "cursor": "L'editor pensato per l'IA; passa dal cloud di Cursor, quindi serve un URL pubblico."

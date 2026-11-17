@@ -1208,7 +1208,6 @@
       "writeError": "Periksa izin berkas dan konfigurasi yang ada, lalu coba lagi.",
       "missing": "Pasang CLI atau tambahkan ke PATH.",
       "intro": "Hubungkan alat coding ke satu gateway model gratis dengan konfigurasi yang dihasilkan otomatis dan aman untuk dicadangkan.",
-      "showAll": "Tampilkan lebih banyak ({count})",
       "all": "Agen",
       "find": "Search",
       "cursor": "Penyunting yang mengutamakan AI; lewat awan Cursor, jadi perlu URL publik."

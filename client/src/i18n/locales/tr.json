@@ -1208,7 +1208,6 @@
       "writeError": "Dosya izinlerini ve mevcut yapılandırmayı kontrol edip yeniden deneyin.",
       "missing": "CLI’yi yükleyin veya PATH’e ekleyin.",
       "intro": "Kodlama araçlarını, otomatik oluşturulan ve yedeklemeye uygun bir yapılandırmayla tek bir ücretsiz model ağ geçidine bağlayın.",
-      "showAll": "Daha fazla göster ({count})",
       "all": "Ajanlar",
       "find": "Search",
       "cursor": "Yapay zekâ odaklı düzenleyici; Cursor bulutundan geçtiği için herkese açık bir URL ister."

@@ -1208,7 +1208,6 @@
       "writeError": "مجوز فایل‌ها و تنظیمات کنونی را بررسی و دوباره تلاش کنید.",
       "missing": "ابزار CLI را نصب کنید یا آن را به PATH بیفزایید.",
       "intro": "ابزارهای کدنویسی را با پیکربندی تولیدشده و دارای پشتیبان گیری امن به یک دروازه مدل های رایگان متصل کنید.",
-      "showAll": "نمایش بیشتر ({count})",
       "all": "عامل ها",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

@@ -1208,7 +1208,6 @@
       "writeError": "Kiểm tra quyền truy cập tệp và cấu hình hiện tại rồi thử lại.",
       "missing": "Cài đặt CLI hoặc thêm vào PATH rồi thử lại.",
       "intro": "Kết nối các công cụ lập trình với một cổng mô hình miễn phí duy nhất bằng cấu hình được tạo sẵn, an toàn khi sao lưu.",
-      "showAll": "Xem thêm ({count})",
       "all": "Tác nhân",
       "find": "Search",
       "cursor": "Trình soạn thảo lấy AI làm gốc; đi qua đám mây của Cursor nên cần URL công khai."
