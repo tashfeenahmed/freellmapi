@@ -567,6 +567,19 @@ describe('safe config writes', () => {
     expect(fs.readFileSync(target, 'utf8')).toContain('model = "auto"');
   });
 
+  it('merges Cordis profile overlays by id and keeps other providers and comments', () => {
+    const file = { format: 'yaml-entries' as const, path: 'cordis.patch.yml',
+      value: { 'llm-pi-ai': { providers: { freellmapi: { apiKeyEnv: 'FREELLMAPI_API_KEY' } } } } };
+    const existing = '# user overlay\n- id: llm-pi-ai\n  config:\n    providers:\n      existing: {apiKeyEnv: KEEP}\n- id: hmr\n  disabled: true\n';
+    const rendered = renderFile(file, existing);
+    expect(rendered).toContain('# user overlay');
+    expect(rendered).toContain('KEEP');
+    expect(rendered).toContain('disabled: true');
+    expect(rendered).toContain('FREELLMAPI_API_KEY');
+    expect(renderFile(file, rendered)).toBe(rendered);
+    expect(() => renderFile(file, 'other: mapping')).toThrow('Expected a YAML patch sequence');
+  });
+
   it('restores earlier files if a later replacement fails, and a retry succeeds', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'freellmapi-cli-'));
     temporary.push(directory);

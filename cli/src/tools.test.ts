@@ -403,7 +403,10 @@ describe('tool generators', () => {
   it('declares a complete DeepSeek Harness route and claims the default model', () => {
     const dsh = tools.find(tool => tool.id === 'dsh')!;
     const generation = dsh.generate(context);
-    const [settings, env] = generation.files;
+    const [settings, env, patch] = generation.files;
+    expect(asPosix(patch.path)).toBe('/home/tester/.dsh/cordis.patch.yml');
+    expect(patch.format).toBe('yaml-entries');
+    expect(patch.value).toEqual(settings.value);
     expect(asPosix(settings.path)).toBe('/home/tester/.dsh/settings.yaml');
     expect(settings.format).toBe('yaml');
     const value = settings.value as {

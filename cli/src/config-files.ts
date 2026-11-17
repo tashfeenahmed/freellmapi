@@ -7,7 +7,7 @@ import {
   parse,
   type ParseError,
 } from 'jsonc-parser';
-import { Document, isMap, parseDocument } from 'yaml';
+import { Document, isMap, isSeq, parseDocument } from 'yaml';
 import type { GeneratedFile, JsonArrayMerge } from './types.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -78,19 +78,23 @@ function mergeJson(existing: string, value: Record<string, unknown>, arrays: Rec
 // a settings.yaml shared with other providers (DeepSeek Harness keeps every
 // route under one `llm-pi-ai` key) must not lose its siblings just because
 // ours changed.
-function mergeYamlDocument(existing: string, value: Record<string, unknown>): string {
+function mergeYamlDocument(existing: string, value: Record<string, unknown>, entries = false): string {
+  // Cordis patch files hold an ordered list of {id, config} overlays. Keep
+  // unrelated entries (including insert/remove operations) in their order.
+  const freshValue = entries ? Object.entries(value).map(([id, config]) => ({ id, config })) : value;
   if (!existing.trim()) {
-    const fresh = new Document(JSON.parse(JSON.stringify(value)));
+    const fresh = new Document(JSON.parse(JSON.stringify(freshValue)));
     return fresh.toString({ lineWidth: 0 });
   }
-  const doc = parseDocument(existing);
+  const doc: Document = parseDocument(existing);
   if (doc.errors.length) {
     throw new Error(`Existing YAML cannot be parsed safely: ${doc.errors[0].message}`);
   }
-  if (doc.contents !== null && !isMap(doc.contents)) {
-    throw new Error('Existing YAML is not a mapping at the top level');
+  if (doc.contents === null) doc.contents = doc.createNode(entries ? [] : {});
+  if (entries ? !isSeq(doc.contents) : !isMap(doc.contents)) {
+    throw new Error(entries ? 'Expected a YAML patch sequence' : 'Existing YAML is not a mapping at the top level');
   }
-  const applyPatch = (patch: Record<string, unknown>, parentPath: string[] = []) => {
+  const applyPatch = (patch: Record<string, unknown>, parentPath: (string | number)[] = []) => {
     for (const [key, next] of Object.entries(patch)) {
       const propertyPath = [...parentPath, key];
       if (next === undefined) {
@@ -105,7 +109,15 @@ function mergeYamlDocument(existing: string, value: Record<string, unknown>): st
       doc.setIn(propertyPath, next);
     }
   };
-  applyPatch(value);
+  if (entries && isSeq(doc.contents)) {
+    for (const [id, config] of Object.entries(value)) {
+      const index = doc.contents.items.map(item => isMap(item) ? item.get('id') : undefined).lastIndexOf(id);
+      if (index < 0) doc.add(JSON.parse(JSON.stringify({ id, config })));
+      else applyPatch({ config }, [index]);
+    }
+  } else {
+    applyPatch(value);
+  }
   const rendered = doc.toString({ lineWidth: 0 });
   return rendered.endsWith('\n') ? rendered : `${rendered}\n`;
 }
@@ -362,6 +374,7 @@ function mergeEnv(existing: string, generated: string): string {
 export function renderFile(file: GeneratedFile, existing = ''): string {
   if (file.format === 'json') return mergeJson(existing, file.value ?? {}, file.arrays);
   if (file.format === 'env') return mergeEnv(existing, file.content ?? '');
+  if (file.format === 'yaml-entries') return mergeYamlDocument(existing, file.value ?? {}, true);
   if (file.format === 'yaml') {
     return file.value
       ? mergeYamlDocument(existing, file.value)
