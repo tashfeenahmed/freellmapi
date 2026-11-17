@@ -947,6 +947,8 @@
     "dictationStop": "ჩაწერის შეწყვეტა",
     "dictationTranscribing": "ტრანსკრიფცია…",
     "dictationUnavailable": "კარნახის გამოსაყენებლად დაამატეთ აუდიო მოდელების პროვაიდერები.",
+    "dictationMacShortcut": "დააჭირეთ მიკროფონის კლავიშს ან გამოიყენეთ კლავიატურის პარამეტრებში მითითებული კარნახის მალსახმობი.",
+    "dictationWindowsShortcut": "ხმით აკრეფის დასაწყებად დააჭირეთ Win + H კომბინაციას.",
     "dictationModel": "კარნახის მოდელი",
     "dictationFailed": "ტრანსკრიფცია ვერ შესრულდა: {reason}",
     "artifactOpen": "გადახედვის გახსნა",

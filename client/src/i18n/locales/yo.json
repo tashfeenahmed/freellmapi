@@ -947,6 +947,8 @@
     "dictationStop": "Dá gbigbasilẹ dúró",
     "dictationTranscribing": "Ń kọ sílẹ̀…",
     "dictationUnavailable": "Fi àwọn olùpèsè àwòṣe ohùn kún un láti lè lo sísọ kí a kọ.",
+    "dictationMacShortcut": "Tẹ bọ́tìnì gbohùngbohùn tàbí lo ọ̀nà àbáyọ fún kíkọ̀wé pẹ̀lú ohùn tí o ṣètò nínú àwọn ètò àtẹ bọ́tìnì.",
+    "dictationWindowsShortcut": "Tẹ Win + H láti bẹ̀rẹ̀ sí í fi ohùn tẹ̀wé.",
     "dictationModel": "Àwòṣe sísọ kí a kọ",
     "dictationFailed": "Kíkọ sílẹ̀ kùnà: {reason}",
     "artifactOpen": "Ṣí àwòrán àkọ́kọ́",

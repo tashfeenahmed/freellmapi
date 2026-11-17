@@ -947,6 +947,8 @@
     "dictationStop": "Остановить запись",
     "dictationTranscribing": "Расшифровка…",
     "dictationUnavailable": "Добавьте провайдеров аудиомоделей, чтобы использовать диктовку.",
+    "dictationMacShortcut": "Нажмите клавишу микрофона или используйте сочетание клавиш для диктовки из настроек клавиатуры.",
+    "dictationWindowsShortcut": "Нажмите Win + H, чтобы начать голосовой ввод.",
     "dictationModel": "Модель диктовки",
     "dictationFailed": "Ошибка расшифровки: {reason}",
     "artifactOpen": "Открыть предпросмотр",

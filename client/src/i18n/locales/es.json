@@ -947,6 +947,8 @@
     "dictationStop": "Detener grabación",
     "dictationTranscribing": "Transcribiendo…",
     "dictationUnavailable": "Añade proveedores de modelos de audio para poder usar el dictado.",
+    "dictationMacShortcut": "Pulsa la tecla del micrófono o usa el atajo de Dictado definido en los ajustes del teclado.",
+    "dictationWindowsShortcut": "Pulsa Win + H para iniciar la escritura por voz.",
     "dictationModel": "Modelo de dictado",
     "dictationFailed": "La transcripción falló: {reason}",
     "artifactOpen": "Abrir vista previa",

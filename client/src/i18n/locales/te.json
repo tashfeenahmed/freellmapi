@@ -947,6 +947,8 @@
     "dictationStop": "రికార్డింగ్ ఆపు",
     "dictationTranscribing": "లిఖితం చేస్తోంది…",
     "dictationUnavailable": "డిక్టేషన్ ఉపయోగించడానికి ఆడియో మోడల్ ప్రొవైడర్లను జోడించండి.",
+    "dictationMacShortcut": "మైక్రోఫోన్ కీని నొక్కండి లేదా కీబోర్డ్ సెట్టింగ్‌లలో సెట్ చేసిన డిక్టేషన్ షార్ట్‌కట్‌ను ఉపయోగించండి.",
+    "dictationWindowsShortcut": "మాట్లాడి టైప్ చేయడం ప్రారంభించడానికి Win + H నొక్కండి.",
     "dictationModel": "డిక్టేషన్ మోడల్",
     "dictationFailed": "లిఖితం విఫలమైంది: {reason}",
     "artifactOpen": "ప్రివ్యూ తెరువు",

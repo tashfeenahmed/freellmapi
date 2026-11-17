@@ -947,6 +947,8 @@
     "dictationStop": "Oprește înregistrarea",
     "dictationTranscribing": "Se transcrie…",
     "dictationUnavailable": "Adaugă furnizori de modele audio pentru a putea folosi dictarea.",
+    "dictationMacShortcut": "Apasă tasta microfonului sau folosește scurtătura pentru dictare din configurările tastaturii.",
+    "dictationWindowsShortcut": "Apasă Win + H pentru a începe tastarea vocală.",
     "dictationModel": "Model de dictare",
     "dictationFailed": "Transcrierea a eșuat: {reason}",
     "artifactOpen": "Deschide previzualizarea",

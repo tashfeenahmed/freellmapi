@@ -986,6 +986,8 @@
     "dictationStop": "Stop recording",
     "dictationTranscribing": "Transcribing…",
     "dictationUnavailable": "Add providers for audio models to be able to use dictation.",
+    "dictationMacShortcut": "Press the microphone key or the Dictation shortcut set in Keyboard settings.",
+    "dictationWindowsShortcut": "Press Win + H to start voice typing.",
     "dictationModel": "Dictation model",
     "dictationFailed": "Transcription failed: {reason}",
     "artifactOpen": "Open preview",

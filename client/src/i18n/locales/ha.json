@@ -947,6 +947,8 @@
     "dictationStop": "Dakatar da rikodi",
     "dictationTranscribing": "Ana rubutawa…",
     "dictationUnavailable": "Ƙara masu samar da samfuran sauti don amfani da faɗa a rubuta.",
+    "dictationMacShortcut": "Danna maɓallin makirufo ko ka yi amfani da gajeriyar hanyar rubutu da murya da aka saita a saitunan madannai.",
+    "dictationWindowsShortcut": "Danna Win + H don fara rubutu da murya.",
     "dictationModel": "Samfurin faɗa a rubuta",
     "dictationFailed": "Rubutawa ta gaza: {reason}",
     "artifactOpen": "Buɗe samfoti",

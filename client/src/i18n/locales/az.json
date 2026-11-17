@@ -947,6 +947,8 @@
     "dictationStop": "Yazmağı dayandır",
     "dictationTranscribing": "Transkripsiya edilir…",
     "dictationUnavailable": "Diktədən istifadə etmək üçün audio model təminatçıları əlavə edin.",
+    "dictationMacShortcut": "Mikrofon düyməsini və ya klaviatura ayarlarında təyin edilmiş imla qısayolunu basın.",
+    "dictationWindowsShortcut": "Səslə yazmağa başlamaq üçün Win + H düymələrini basın.",
     "dictationModel": "Diktə modeli",
     "dictationFailed": "Transkripsiya alınmadı: {reason}",
     "artifactOpen": "Önizləməni aç",

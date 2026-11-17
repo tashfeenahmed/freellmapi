@@ -947,6 +947,8 @@
     "dictationStop": "Lopeta tallennus",
     "dictationTranscribing": "Litteroidaan…",
     "dictationUnavailable": "Lisää äänimallien tarjoajia, jotta voit käyttää sanelua.",
+    "dictationMacShortcut": "Paina mikrofoninäppäintä tai käytä näppäimistöasetuksissa määritettyä sanelun oikotietä.",
+    "dictationWindowsShortcut": "Aloita äänikirjoitus painamalla Win + H.",
     "dictationModel": "Sanelumalli",
     "dictationFailed": "Litterointi epäonnistui: {reason}",
     "artifactOpen": "Avaa esikatselu",

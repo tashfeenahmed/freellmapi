@@ -947,6 +947,8 @@
     "dictationStop": "បញ្ឈប់ការថត",
     "dictationTranscribing": "កំពុងបំលែងជាអត្ថបទ…",
     "dictationUnavailable": "បន្ថែមអ្នកផ្តល់ម៉ូដែលសំឡេង ដើម្បីប្រើការនិយាយវាយអត្ថបទ។",
+    "dictationMacShortcut": "ចុចគ្រាប់ចុចមីក្រូហ្វូន ឬប្រើផ្លូវកាត់សម្រាប់ការសរសេរតាមសំឡេងដែលបានកំណត់ក្នុងការកំណត់ក្ដារចុច។",
+    "dictationWindowsShortcut": "ចុច Win + H ដើម្បីចាប់ផ្ដើមវាយអក្សរដោយសំឡេង។",
     "dictationModel": "ម៉ូដែលនិយាយវាយអត្ថបទ",
     "dictationFailed": "ការបំលែងបរាជ័យ: {reason}",
     "artifactOpen": "បើកការមើលជាមុន",

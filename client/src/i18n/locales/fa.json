@@ -947,6 +947,8 @@
     "dictationStop": "توقف ضبط",
     "dictationTranscribing": "در حال رونویسی…",
     "dictationUnavailable": "برای استفاده از دیکته، ارائه‌دهندگان مدل‌های صوتی را اضافه کنید.",
+    "dictationMacShortcut": "کلید میکروفون را فشار دهید یا از میان‌بر دیکته در تنظیمات صفحه‌کلید استفاده کنید.",
+    "dictationWindowsShortcut": "برای شروع تایپ صوتی، Win + H را فشار دهید.",
     "dictationModel": "مدل دیکته",
     "dictationFailed": "رونویسی ناموفق بود: {reason}",
     "artifactOpen": "باز کردن پیش‌نمایش",

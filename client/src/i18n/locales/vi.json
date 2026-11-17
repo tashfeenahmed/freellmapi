@@ -947,6 +947,8 @@
     "dictationStop": "Dừng ghi âm",
     "dictationTranscribing": "Đang chuyển thành văn bản…",
     "dictationUnavailable": "Thêm nhà cung cấp mô hình âm thanh để dùng đọc chính tả.",
+    "dictationMacShortcut": "Nhấn phím micrô hoặc dùng phím tắt Đọc chính tả đã đặt trong phần cài đặt bàn phím.",
+    "dictationWindowsShortcut": "Nhấn Win + H để bắt đầu nhập bằng giọng nói.",
     "dictationModel": "Mô hình đọc chính tả",
     "dictationFailed": "Chuyển văn bản thất bại: {reason}",
     "artifactOpen": "Mở bản xem trước",

@@ -947,6 +947,8 @@
     "dictationStop": "録音を停止",
     "dictationTranscribing": "文字起こし中…",
     "dictationUnavailable": "音声入力を使うには、音声モデルのプロバイダーを追加してください。",
+    "dictationMacShortcut": "マイクキーを押すか、キーボード設定で指定した音声入力のショートカットを使ってください。",
+    "dictationWindowsShortcut": "Win + H を押すと音声入力が始まります。",
     "dictationModel": "音声入力モデル",
     "dictationFailed": "文字起こしに失敗しました: {reason}",
     "artifactOpen": "プレビューを開く",

@@ -947,6 +947,8 @@
     "dictationStop": "Заустави снимање",
     "dictationTranscribing": "Транскрибовање…",
     "dictationUnavailable": "Додајте провајдере аудио модела да бисте могли да диктирате.",
+    "dictationMacShortcut": "Притисните тастер микрофона или користите пречицу за диктирање из подешавања тастатуре.",
+    "dictationWindowsShortcut": "Притисните Win + H да бисте започели гласовни унос.",
     "dictationModel": "Модел диктирања",
     "dictationFailed": "Транскрипција није успела: {reason}",
     "artifactOpen": "Отвори преглед",

@@ -947,6 +947,8 @@
     "dictationStop": "Kaydı durdur",
     "dictationTranscribing": "Yazıya dökülüyor…",
     "dictationUnavailable": "Dikteyi kullanabilmek için ses modellerini destekleyen sağlayıcılar ekleyin.",
+    "dictationMacShortcut": "Mikrofon tuşuna basın veya klavye ayarlarında belirlenen dikte kestirmesini kullanın.",
+    "dictationWindowsShortcut": "Sesle yazmaya başlamak için Win + H tuşlarına basın.",
     "dictationModel": "Dikte modeli",
     "dictationFailed": "Yazıya dökme başarısız: {reason}",
     "artifactOpen": "Önizlemeyi aç",

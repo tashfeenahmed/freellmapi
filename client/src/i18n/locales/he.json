@@ -947,6 +947,8 @@
     "dictationStop": "עצירת ההקלטה",
     "dictationTranscribing": "מתמלל…",
     "dictationUnavailable": "הוסיפו ספקים למודלי שמע כדי להשתמש בהכתבה.",
+    "dictationMacShortcut": "יש ללחוץ על מקש המיקרופון או להשתמש בקיצור ההכתבה שהוגדר בהגדרות המקלדת.",
+    "dictationWindowsShortcut": "כדי להתחיל בהקלדה קולית, יש ללחוץ על Win + H.",
     "dictationModel": "מודל הכתבה",
     "dictationFailed": "התמלול נכשל: {reason}",
     "artifactOpen": "פתיחת תצוגה מקדימה",

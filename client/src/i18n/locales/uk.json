@@ -947,6 +947,8 @@
     "dictationStop": "Зупинити запис",
     "dictationTranscribing": "Розшифрування…",
     "dictationUnavailable": "Додайте провайдерів аудіомоделей, щоб використовувати диктування.",
+    "dictationMacShortcut": "Натисніть клавішу мікрофона або скористайтеся сполученням клавіш для диктування з параметрів клавіатури.",
+    "dictationWindowsShortcut": "Натисніть Win + H, щоб почати голосове введення.",
     "dictationModel": "Модель диктування",
     "dictationFailed": "Помилка розшифрування: {reason}",
     "artifactOpen": "Відкрити перегляд",

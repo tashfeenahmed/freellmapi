@@ -947,6 +947,8 @@
     "dictationStop": "ਰਿਕਾਰਡਿੰਗ ਰੋਕੋ",
     "dictationTranscribing": "ਲਿਖਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
     "dictationUnavailable": "ਬੋਲ ਕੇ ਲਿਖਣ ਲਈ ਆਡੀਓ ਮਾਡਲ ਪ੍ਰਦਾਤਾ ਸ਼ਾਮਲ ਕਰੋ।",
+    "dictationMacShortcut": "ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਕੁੰਜੀ ਦਬਾਓ ਜਾਂ ਕੀਬੋਰਡ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਸੈੱਟ ਕੀਤਾ ਡਿਕਟੇਸ਼ਨ ਸ਼ਾਰਟਕੱਟ ਵਰਤੋ।",
+    "dictationWindowsShortcut": "ਬੋਲ ਕੇ ਟਾਈਪ ਕਰਨਾ ਸ਼ੁਰੂ ਕਰਨ ਲਈ Win + H ਦਬਾਓ।",
     "dictationModel": "ਬੋਲ ਕੇ ਲਿਖਣ ਦਾ ਮਾਡਲ",
     "dictationFailed": "ਲਿਖਣਾ ਅਸਫਲ: {reason}",
     "artifactOpen": "ਪੂਰਵਦਰਸ਼ਨ ਖੋਲ੍ਹੋ",

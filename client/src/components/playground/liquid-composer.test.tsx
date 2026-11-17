@@ -30,7 +30,7 @@ function render(over: Partial<LiquidComposerProps> = {}) {
     value: '', onChange: () => {}, onKeyDown: () => {}, onPaste: () => {},
     placeholder: 'Type a message', hasContent: false, loading: false, onSend: () => {}, onAttach: () => {},
     labels: { add: 'Add files and tools', attach: 'Attach files', send: 'Send', sending: 'Sending' },
-    dictation: { available: false, model: 'auto', apiKey: null, onText: () => {} },
+    dictation: { model: 'auto', apiKey: null, onText: () => {} },
     ...over,
   }
   act(() => root.render(<LiquidComposer {...props} />))

@@ -947,6 +947,8 @@
     "dictationStop": "ରେକର୍ଡିଂ ବନ୍ଦ କରନ୍ତୁ",
     "dictationTranscribing": "ଲେଖା ହେଉଛି…",
     "dictationUnavailable": "କହି ଲେଖିବା ପାଇଁ ଅଡିଓ ମଡେଲ ପ୍ରଦାନକାରୀ ଯୋଡ଼ନ୍ତୁ।",
+    "dictationMacShortcut": "ମାଇକ୍ରୋଫୋନ୍ କି ଦବାନ୍ତୁ କିମ୍ବା କିବୋର୍ଡ ସେଟିଂସରେ ଧାର୍ଯ୍ୟ ହୋଇଥିବା ଡିକ୍ଟେସନ୍ ସର୍ଟକଟ୍ ବ୍ୟବହାର କରନ୍ତୁ।",
+    "dictationWindowsShortcut": "କହି ଟାଇପ୍ କରିବା ଆରମ୍ଭ କରିବାକୁ Win + H ଦବାନ୍ତୁ।",
     "dictationModel": "ଶ୍ରୁତଲେଖ ମଡେଲ",
     "dictationFailed": "ଲେଖା ବିଫଳ: {reason}",
     "artifactOpen": "ପ୍ରିଭ୍ୟୁ ଖୋଲନ୍ତୁ",

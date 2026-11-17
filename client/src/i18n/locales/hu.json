@@ -947,6 +947,8 @@
     "dictationStop": "Felvétel leállítása",
     "dictationTranscribing": "Átírás…",
     "dictationUnavailable": "Adjon hozzá hangmodell-szolgáltatókat a diktálás használatához.",
+    "dictationMacShortcut": "Nyomja meg a mikrofonbillentyűt, vagy használja a billentyűzet beállításaiban megadott diktálási gyorsbillentyűt.",
+    "dictationWindowsShortcut": "A hangalapú gépelés indításához nyomja meg a Win + H billentyűkombinációt.",
     "dictationModel": "Diktálási modell",
     "dictationFailed": "Az átírás nem sikerült: {reason}",
     "artifactOpen": "Előnézet megnyitása",
