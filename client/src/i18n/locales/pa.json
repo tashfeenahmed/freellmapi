@@ -1208,7 +1208,6 @@
       "writeError": "ਫਾਈਲਾਂ ਦੀਆਂ ਇਜਾਜ਼ਤਾਂ ਅਤੇ ਮੌਜੂਦਾ ਸੈਟਿੰਗਾਂ ਦੀ ਜਾਂਚ ਕਰ ਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "missing": "CLI ਇੰਸਟਾਲ ਕਰੋ ਜਾਂ ਇਸ ਨੂੰ PATH ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ।",
       "intro": "ਕੋਡਿੰਗ ਟੂਲਾਂ ਨੂੰ ਤਿਆਰ ਕੀਤੀ, ਬੈਕਅੱਪ-ਸੁਰੱਖਿਅਤ ਸੰਰਚਨਾ ਨਾਲ ਇੱਕੋ ਮੁਫ਼ਤ-ਮਾਡਲ ਗੇਟਵੇ ਨਾਲ ਜੋੜੋ।",
-      "showAll": "ਹੋਰ ਦਿਖਾਓ ({count})",
       "all": "ਏਜੰਟ",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

@@ -1208,7 +1208,6 @@
       "writeError": "फायलींच्या परवानग्या आणि सध्याची सेटिंग्ज तपासून पुन्हा प्रयत्न करा.",
       "missing": "CLI स्थापित करा किंवा ते PATH मध्ये जोडा.",
       "intro": "जनरेट केलेल्या, बॅकअप-सुरक्षित कॉन्फिगरेशनसह कोडिंग साधने एका मोफत-मॉडेल गेटवेशी जोडा.",
-      "showAll": "अधिक दाखवा ({count})",
       "all": "एजंट",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

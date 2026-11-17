@@ -1208,7 +1208,6 @@
       "writeError": "ફાઇલ પરવાનગીઓ અને હાલની સેટિંગ્સ તપાસીને ફરી પ્રયાસ કરો.",
       "missing": "CLI ઇન્સ્ટોલ કરો અથવા તેને PATH માં ઉમેરો.",
       "intro": "જનરેટ કરેલી, બેકઅપ-સુરક્ષિત ગોઠવણી સાથે કોડિંગ ટૂલ્સને એક ફ્રી-મોડેલ ગેટવે સાથે જોડો.",
-      "showAll": "વધુ બતાવો ({count})",
       "all": "એજન્ટ્સ",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

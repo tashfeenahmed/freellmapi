@@ -1208,7 +1208,6 @@
       "writeError": "Sprawdź uprawnienia plików i bieżącą konfigurację i spróbuj ponownie.",
       "missing": "Zainstaluj CLI lub dodaj je do PATH.",
       "intro": "Połącz narzędzia programistyczne z jedną bramą darmowych modeli dzięki generowanej konfiguracji bezpiecznej dla kopii zapasowych.",
-      "showAll": "Pokaż więcej ({count})",
       "all": "Agenci",
       "find": "Search",
       "cursor": "Edytor pisany pod AI; działa przez chmurę Cursora, więc potrzebuje publicznego adresu URL."

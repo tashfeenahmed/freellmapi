@@ -1208,7 +1208,6 @@
       "writeError": "Verifică permisiunile fișierelor și configurația existentă și încearcă din nou.",
       "missing": "Instalează CLI sau adaugă-l în PATH.",
       "intro": "Conectează instrumentele de codare la un singur gateway de modele gratuite, cu configurație generată, sigură pentru backup.",
-      "showAll": "Afișează mai mult ({count})",
       "all": "Agenți",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

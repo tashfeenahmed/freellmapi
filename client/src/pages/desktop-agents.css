@@ -6,7 +6,7 @@
   color: var(--foreground);
 }
 #agent-connect-screen .heading, #agent-connect-screen .idline, #agent-connect-screen .listbar,
-#agent-connect-screen .footline, #agent-connect-screen .tileactions {
+#agent-connect-screen .tileactions {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
 #agent-connect-screen .heading { padding-bottom: 22px; border-bottom: 1px solid var(--rule); }
@@ -17,7 +17,7 @@
 #agent-connect-screen button:focus-visible, #agent-connect-screen summary:focus-visible,
 #agent-connect-screen .find:focus-within { outline: 2px solid var(--ring); outline-offset: 2px; }
 #agent-connect-screen button svg, #agent-connect-screen .find svg { width: 15px; height: 15px; flex: none; }
-#agent-connect-screen .gateway-btn, #agent-connect-screen .subbutton, #agent-connect-screen .all {
+#agent-connect-screen .gateway-btn, #agent-connect-screen .subbutton {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   background: var(--surface); border: 1px solid var(--rule); border-radius: 9px; padding: 7px 10px; font-size: 12px;
 }
@@ -30,8 +30,7 @@
 #agent-connect-screen .subbutton { padding: 4px 8px; border-radius: 7px; }
 #agent-connect-screen .listbar { margin: 20px 0 14px; }
 #agent-connect-screen h2 { font-size: 16px; font-weight: 600; letter-spacing: -.02em; }
-#agent-connect-screen .total, #agent-connect-screen .count { color: var(--sub); font-size: 12px; font-weight: 450; font-variant-numeric: tabular-nums; }
-#agent-connect-screen .total { margin-inline-start: 5px; }
+#agent-connect-screen .total { margin-inline-start: 5px; color: var(--sub); font-size: 12px; font-weight: 450; font-variant-numeric: tabular-nums; }
 #agent-connect-screen .find { display: flex; align-items: center; gap: 7px; width: 210px; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 9px; background: var(--surface); color: var(--sub); }
 #agent-connect-screen .find input { min-width: 0; width: 100%; height: 20px; font-size: 12px; color: var(--foreground); outline: 0; }
 #agent-connect-screen .deck { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
@@ -58,7 +57,6 @@
 #agent-connect-screen .detail a { text-decoration: underline; text-underline-offset: 3px; }
 #agent-connect-screen .detail .minor { display: block; color: var(--sub); font-size: 11px; }
 #agent-connect-screen .detail .value { display: block; border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; padding: 5px 7px; margin: 4px 0 8px; user-select: all; }
-#agent-connect-screen .footline { padding-top: 17px; }
 #agent-connect-screen .empty { padding: 14px 0; color: var(--sub); }
 @media (max-width: 880px) { #agent-connect-screen .deck { gap: 10px; } #agent-connect-screen .tilebody { padding: 14px; } }
 @media (max-width: 760px) { #agent-connect-screen .deck { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

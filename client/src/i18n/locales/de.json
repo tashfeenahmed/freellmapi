@@ -1208,7 +1208,6 @@
       "writeError": "Prüfe die Dateirechte und die vorhandene Konfiguration und versuche es erneut.",
       "missing": "Installiere die CLI oder füge sie zum PATH hinzu.",
       "intro": "Verbinden Sie Coding-Tools mit einem einzigen Gateway für kostenlose Modelle – mit generierter, backupsicherer Konfiguration.",
-      "showAll": "Mehr anzeigen ({count})",
       "all": "Agenten",
       "find": "Search",
       "cursor": "Der KI-zentrierte Editor; er läuft über Cursors Cloud und braucht daher eine öffentliche URL."

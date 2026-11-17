@@ -1208,7 +1208,6 @@
       "writeError": "Verifique as permissões dos ficheiros e a configuração atual e tente novamente.",
       "missing": "Instale a CLI ou adicione-a ao PATH e tente novamente.",
       "intro": "Ligue ferramentas de programação a um único gateway de modelos gratuitos com configuração gerada e segura para cópias de segurança.",
-      "showAll": "Mostrar mais ({count})",
       "all": "Agentes",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

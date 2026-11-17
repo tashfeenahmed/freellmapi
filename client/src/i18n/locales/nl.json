@@ -1208,7 +1208,6 @@
       "writeError": "Controleer de bestandsrechten en de bestaande configuratie en probeer het opnieuw.",
       "missing": "Installeer de CLI of voeg deze toe aan PATH.",
       "intro": "Verbind codeertools met één gateway voor gratis modellen, met gegenereerde, back-upveilige configuratie.",
-      "showAll": "Meer tonen ({count})",
       "all": "Agenten",
       "find": "Search",
       "cursor": "De AI-gerichte editor; hij loopt via de cloud van Cursor en heeft dus een publieke URL nodig."

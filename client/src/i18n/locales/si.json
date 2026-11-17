@@ -1208,7 +1208,6 @@
       "writeError": "ගොනු අවසර සහ පවතින සැකසුම් පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
       "missing": "CLI ස්ථාපනය කරන්න හෝ PATH වෙත එක් කරන්න.",
       "intro": "ජනනය කළ, උපස්ථ-ආරක්ෂිත වින්‍යාසයක් සමඟ කේතන මෙවලම් එක් නොමිලේ-ආකෘති ද්වාරයකට සම්බන්ධ කරන්න.",
-      "showAll": "වැඩිපුර පෙන්වන්න ({count})",
       "all": "නියෝජිතයන්",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

@@ -1208,7 +1208,6 @@
       "writeError": "Ṣàyẹ̀wò ìgbaniláàyè fáìlì àti ìṣètò tó wà, kí o sì tún gbìyànjú.",
       "missing": "Fi CLI sí ẹ̀rọ tàbí fi kún PATH.",
       "intro": "So awọn irinṣẹ kikọ koodu pọ mọ ẹnu-ọna awoṣe ọfẹ kan pẹlu iṣeto ti a ṣẹda, ti o ni aabo afẹyinti.",
-      "showAll": "Ṣe afihan diẹ sii ({count})",
       "all": "Awọn aṣoju",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

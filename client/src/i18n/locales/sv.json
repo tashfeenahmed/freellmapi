@@ -1208,7 +1208,6 @@
       "writeError": "Kontrollera filbehörigheter och befintlig konfiguration och försök igen.",
       "missing": "Installera CLI:t eller lägg till det i PATH.",
       "intro": "Anslut kodningsverktyg till en gemensam gateway för gratismodeller med genererad konfiguration som säkerhetskopieras tryggt.",
-      "showAll": "Visa mer ({count})",
       "all": "Agenter",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

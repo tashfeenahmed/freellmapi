@@ -1208,7 +1208,6 @@
       "writeError": "Patikrinkite failų leidimus ir dabartinę konfigūraciją, tada bandykite dar kartą.",
       "missing": "Įdiekite CLI arba įtraukite į PATH.",
       "intro": "Prijunkite kodavimo įrankius prie vieno nemokamų modelių šliuzo su sugeneruota, atsarginėms kopijoms saugia konfigūracija.",
-      "showAll": "Rodyti daugiau ({count})",
       "all": "Agentai",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

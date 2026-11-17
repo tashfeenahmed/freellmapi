@@ -1208,7 +1208,6 @@
       "writeError": "Provjerite dozvole datoteka i postojeću konfiguraciju pa pokušajte ponovno.",
       "missing": "Instalirajte CLI ili ga dodajte u PATH.",
       "intro": "Povežite alate za kodiranje s jednim gatewayem besplatnih modela uz generiranu konfiguraciju sigurnu za backup.",
-      "showAll": "Prikaži više ({count})",
       "all": "Agenti",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

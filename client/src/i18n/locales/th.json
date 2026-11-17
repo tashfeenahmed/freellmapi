@@ -1208,7 +1208,6 @@
       "writeError": "ตรวจสอบสิทธิ์ของไฟล์และการตั้งค่าปัจจุบัน แล้วลองอีกครั้ง",
       "missing": "ติดตั้ง CLI หรือเพิ่มลงใน PATH",
       "intro": "เชื่อมต่อเครื่องมือเขียนโค้ดกับเกตเวย์โมเดลฟรีเดียวด้วยการกำหนดค่าที่สร้างให้และปลอดภัยต่อการสำรองข้อมูล",
-      "showAll": "แสดงเพิ่มเติม ({count})",
       "all": "เอเจนต์",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

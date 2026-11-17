@@ -1208,7 +1208,6 @@
       "writeError": "Kagua ruhusa za faili na mipangilio iliyopo, kisha ujaribu tena.",
       "missing": "Sakinisha CLI au uiongeze kwenye PATH.",
       "intro": "Unganisha zana za usimbaji na lango moja la miundo ya bure kwa usanidi ulioundwa na ulio salama kwa hifadhi rudufu.",
-      "showAll": "Onyesha zaidi ({count})",
       "all": "Mawakala",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

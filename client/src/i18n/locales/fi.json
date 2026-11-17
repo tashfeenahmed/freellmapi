@@ -1208,7 +1208,6 @@
       "writeError": "Tarkista tiedosto-oikeudet ja nykyiset asetukset ja yritä uudelleen.",
       "missing": "Asenna CLI tai lisää se PATH-muuttujaan.",
       "intro": "Yhdistä koodaustyökalut yhteen ilmaisten mallien yhdyskäytävään generoidulla, varmuuskopiot turvaavalla kokoonpanolla.",
-      "showAll": "Näytä lisää ({count})",
       "all": "Agentit",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."

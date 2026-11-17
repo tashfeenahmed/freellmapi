@@ -818,7 +818,6 @@
       "writeError": "Check the file permissions and the existing configuration, then try again.",
       "missing": "Install the CLI or add it to your PATH, then try again.",
       "intro": "Connect your coding tools to your FreeLLMAPI gateway.",
-      "showAll": "Show all {count} agents",
       "all": "All agents",
       "find": "Find an agent…",
       "cursor": "Cursor reaches your gateway from its cloud service. Enter your own publicly reachable HTTPS endpoint."

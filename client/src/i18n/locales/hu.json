@@ -1208,7 +1208,6 @@
       "writeError": "Ellenőrizze a fájljogosultságokat és a beállításokat, majd próbálja újra.",
       "missing": "Telepítse a CLI-t vagy adja hozzá a PATH változóhoz.",
       "intro": "Kösd össze a kódolóeszközöket egyetlen ingyenes modellátjáróval, generált, mentésbiztos konfigurációval.",
-      "showAll": "Több megjelenítése ({count})",
       "all": "Ügynökök",
       "find": "Search",
       "cursor": "The AI-first editor; it calls through Cursor's cloud, so it needs a public URL."
