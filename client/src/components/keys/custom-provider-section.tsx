@@ -307,7 +307,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
             <Label className="text-xs">{t('keys.customEmbeddingInputType')}</Label>
             <Select
               value={embeddingInputType}
-              onValueChange={(v) => setEmbeddingInputType(v)}
+              onValueChange={(v) => setEmbeddingInputType(v ?? EMBEDDING_INPUT_TYPE_UNSET)}
             >
               <SelectTrigger className="w-[150px]">
                 <SelectValue />
