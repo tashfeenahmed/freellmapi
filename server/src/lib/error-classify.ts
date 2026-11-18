@@ -22,6 +22,12 @@ export function isRetryableError(err: any): boolean {
   // rejection: fail over to another provider, but if the whole chain rejects it
   // exhaustedRetryError renders a client-facing 400 via isProviderBadRequestError.
   const status = typeof err?.status === 'number' ? err.status : 0;
+  // 405 (Method Not Allowed): the relay or the gateway in front of it refused
+  // the POST outright — a login page, a WAF, a wrong base path. That is a fact
+  // about THIS upstream's entrance, not about the request payload, so another
+  // provider in the chain can serve it. Before this rule the ladder stopped on
+  // the dead entrance and the client got a 502.
+  if (isMethodNotAllowedError(err)) return true;
   if (status === 404 || status === 408 || status === 409 || status === 410 || status === 413 || status === 422 || status === 429 || status >= 500) return true;
   const codeInMessage = status === 0 && /\b(?:404|410|413|429|500|503)\b/.test(msg);
   return codeInMessage || msg.includes('rate limit') || msg.includes('too many requests')
@@ -110,6 +116,20 @@ export function isRetryableError(err: any): boolean {
     // above is unchanged, and this is a second, structured signal for the
     // errors whose real cause never reaches the text we match on.
     || isTransportError(err);
+}
+
+/**
+ * HTTP 405 (Method Not Allowed) from an upstream chat endpoint: the relay or
+ * the gateway in front of it refused the POST itself — a login page, a WAF, a
+ * wrong base path, an HTML error page. Distinct from a bad request: the payload
+ * was never judged, so another candidate can serve the same request. Adapters
+ * that attach `status` (providerHttpError) are matched structurally; the text
+ * rules cover adapters that only format the number into the message.
+ */
+export function isMethodNotAllowedError(err: any): boolean {
+  if (typeof err?.status === 'number' && err.status === 405) return true;
+  const msg = String(err?.message ?? '');
+  return /(?:api error|status|http)\s*:?\s*405\b/i.test(msg) || /method not allowed/i.test(msg);
 }
 
 // ── Transport failures hidden in the cause chain (undici) ────────────────────

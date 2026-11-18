@@ -53,6 +53,7 @@ import {
   isContextTooLargeError,
   isTimeoutErrorText,
   isStreamTruncatedError,
+  isMethodNotAllowedError,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
 import { benchForTools, clearToolRejections, noteToolRejection, toolCapabilityKey } from './tool-capability.js';
@@ -533,6 +534,38 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   if (isProviderLevelError(err)) {
     state.skipPlatforms.add(route.platform);
   }
+  // 405 Method Not Allowed: the relay's gate refused the POST (login page, WAF,
+  // wrong base path) — a fact about that ENTRANCE, not about the model's health
+  // and not about the payload. Rule the entrance out for the rest of the
+  // request without widening the routing API: for a custom endpoint, expand the
+  // relay into the existing per-model skip set (every model row behind that
+  // endpoint would answer the POST the same way, and every relay shares the one
+  // 'custom' platform id, so a platform-wide skip would take the healthy relays
+  // with it); for a catalog platform, the whole provider, since it exposes a
+  // single entrance. A custom row with no endpoint scope cannot name its relay,
+  // so it skips only itself. No cooldown and exempt from the breaker: a 405 is
+  // deterministic about THIS entrance, it says nothing about the model's health
+  // or the rest of the pool — keeping the relay out of the NEXT request is
+  // endpoint-level cooling, a separate follow-up.
+  if (isMethodNotAllowedError(err)) {
+    if (route.endpointScope) {
+      // The row that just failed is always skipped, even when the listing below
+      // comes back empty (row deleted mid-request) or the DB read fails.
+      state.skipModels.add(route.modelDbId);
+      try {
+        const sameRelay = getDb().prepare('SELECT id FROM models WHERE platform = ? AND endpoint_scope = ?')
+          .all(route.platform, route.endpointScope) as { id: number }[];
+        for (const row of sameRelay) state.skipModels.add(row.id);
+      } catch (dbErr: any) {
+        console.warn(`[FallbackLoop] could not list ${route.platform} models for endpoint ${route.endpointScope}: ${dbErr?.message ?? dbErr}`);
+      }
+    } else if (route.platform === 'custom') {
+      state.skipModels.add(route.modelDbId);
+    } else {
+      state.skipPlatforms.add(route.platform);
+    }
+    return true;
+  }
   // An adapter's own "cannot serve this" rejection (#1876: Gizmo asked for
   // tools or images, a catalog id outside an adapter's tested allow-list) is a
   // fact about the request or the model id, not the key's health. Skip the
@@ -750,6 +783,7 @@ export type AttemptErrorClass =
   | 'forbidden'
   | 'context_too_large'
   | 'provider_bad_request'
+  | 'method_not_allowed'
   | 'empty_completion'
   | 'format_ignored'
   | 'invalid_tool_arguments'
@@ -778,6 +812,10 @@ export function classifyAttemptError(err: any): AttemptErrorClass {
   // A DEGRADED-function 400 (NVIDIA NIM, #522) is provider health, not request
   // shape — keep it out of provider_bad_request so the trail reads honestly.
   if (isProviderDegradedError(err)) return 'upstream_error';
+  // Before the bad-request check: a 405 is the upstream's ENTRANCE refusing the
+  // POST (login page / WAF / wrong base path), not a shape rejection of the
+  // payload — the trail must name it as such instead of a bare 'error'.
+  if (isMethodNotAllowedError(err)) return 'method_not_allowed';
   if (isProviderBadRequestError(err)) return 'provider_bad_request';
   const msg = (err?.message ?? '').toLowerCase();
   if (msg.includes('empty completion')) return 'empty_completion';
@@ -1096,6 +1134,25 @@ export function exhaustedRetryError(lastError: any, maxRetries?: number, ctx?: E
       type: 'invalid_request_error',
       code: 'provider_rejected_request',
       message: `All routed providers rejected the request as invalid${budgetNote}.${trail} Last error: ${safeLastError}`,
+    };
+  }
+
+  // Every attempt was refused with 405 Method Not Allowed: the upstream
+  // ENTRANCES refused the POST itself (login page / WAF / wrong base path), so
+  // the request payload was never judged. The terminal status stays the generic
+  // 502 `upstream_failed` — the upstream pool failed us — but the body must not
+  // tell the caller to "retry" a deterministic entrance refusal, nor imply the
+  // request shape was at fault; the trail already names the class.
+  if (everyAttempt('method_not_allowed')) {
+    return {
+      kind: 'upstream',
+      status: 502,
+      type: 'provider_error',
+      code: 'upstream_failed',
+      message: `All ${attempts.length} routed attempt(s) were refused with HTTP 405 (Method Not Allowed) by their ` +
+        `upstream entrance${budgetNote}. The relay's chat endpoint — or a gateway in front of it — does not accept ` +
+        `this POST (a login/WAF page or a wrong base path), not a problem with the request payload. ` +
+        `Switch the relay or check its base URL.${trail} Last error: ${safeLastError}`,
     };
   }
 
