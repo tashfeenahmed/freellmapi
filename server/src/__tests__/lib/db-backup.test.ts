@@ -3,7 +3,7 @@ import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { backupDbNow, parseHuggingFaceTarget, restoreDbBackupIfNeeded } from '../../lib/db-backup.js';
+import { _resetDbBackupStateForTesting, backupDbNow, parseHuggingFaceTarget, restoreDbBackupIfNeeded } from '../../lib/db-backup.js';
 import { aclEntries } from '../helpers/acl.js';
 
 const ORIGINAL_BACKUP_PATH = process.env.FREEAPI_DB_BACKUP_PATH;
@@ -54,6 +54,39 @@ describe('encrypted SQLite backup', () => {
     const restored = new Database(dbPath);
     expect((restored.prepare('SELECT name FROM items').get() as { name: string }).name).toBe('survived');
     restored.close();
+  });
+
+  it('never overwrites a backup that appears after a boot that found none', async () => {
+    // The NAS holding the backup is mounted after the server starts: at boot
+    // the path is missing, so the server starts on an empty database. When the
+    // real backup shows up, the pump must not replace it with that empty one.
+    _resetDbBackupStateForTesting();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'freeapi-db-backup-late-'));
+    const dbPath = path.join(dir, 'freeapi.db');
+    const backupPath = path.join(dir, 'nas', 'backup.bin');
+    process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+    process.env.FREEAPI_DB_BACKUP_PATH = backupPath;
+    try {
+      expect((await restoreDbBackupIfNeeded(dbPath)).skipped).toBe('no backup found');
+
+      const fresh = new Database(dbPath);
+      fresh.exec('CREATE TABLE items (name TEXT NOT NULL)');
+      // Its own uploads keep working while the target holds only its own blob.
+      expect((await backupDbNow(fresh, dbPath)).ok).toBe(true);
+      expect((await backupDbNow(fresh, dbPath)).ok).toBe(true);
+
+      // The real backup arrives (the mount covers the path).
+      const realBlob = Buffer.from(fs.readFileSync(backupPath)).fill(7, 20);
+      fs.writeFileSync(backupPath, realBlob);
+      const tick = await backupDbNow(fresh, dbPath);
+      fresh.close();
+
+      expect(tick.ok).toBe(false);
+      expect(fs.readFileSync(backupPath).equals(realBlob)).toBe(true);
+    } finally {
+      _resetDbBackupStateForTesting();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
