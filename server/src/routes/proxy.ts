@@ -1,3 +1,4 @@
+import { listSpecialists, serveSpecialist } from '../services/specialist-text.js';
 import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -1070,6 +1071,18 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
       },
     });
   }
+}
+
+proxyRouter.get('/text/models', (req, res) => {
+  if (requireInferenceAuth(req, res)) res.json({object:'list', data:listSpecialists()});
+});
+for (const [path, task] of [['translate','translation'], ['summarize','summarization']] as const) {
+  proxyRouter.post('/text/'+path, async (req, res) => {
+    const auth = requireInferenceAuth(req, res);
+    if (!auth) return;
+    if (auth.systemPrompt) { res.status(403).json({error:{message:'A profile requiring a system prompt cannot use a fixed-task specialist.'}}); return; }
+    await serveSpecialist(task, req, res);
+  });
 }
 
 proxyRouter.post('/decisions', handleDecision);

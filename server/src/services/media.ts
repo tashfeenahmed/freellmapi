@@ -245,7 +245,7 @@ export function listMediaModels(modality: MediaModality): MediaModelRow[] {
  *  out here. */
 export function listAllMediaModels(): MediaModelRow[] {
   return getDb()
-    .prepare("SELECT * FROM media_models WHERE modality NOT IN ('search', 'decision') ORDER BY modality, priority, id")
+    .prepare("SELECT * FROM media_models WHERE modality NOT IN ('search', 'decision', 'translation', 'summarization') ORDER BY modality, priority, id")
     .all() as MediaModelRow[];
 }
 
