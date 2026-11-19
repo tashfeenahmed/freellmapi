@@ -22,7 +22,7 @@ export async function serveSpecialist(task:'translation'|'summarization',req:Req
   try {
     const upstream=await fetch('https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions',{method:'POST',redirect:'error',
       headers:{'Content-Type':'application/json'},signal:AbortSignal.any([controller.signal,AbortSignal.timeout(90000)]),
-      body:JSON.stringify({model,messages:[{role:'user',content:input}],stream,...('source_language' in parsed.data&&'target_language' in parsed.data?{source_language:parsed.data.source_language,target_language:parsed.data.target_language}:{})})});
+      body:JSON.stringify({model,messages:[...(task==='summarization'?[{role:'system',content:'Summarize the supplied text concisely in its original language. Return only the summary, with no greeting, commentary, or follow-up.'}]:[]),{role:'user',content:input}],stream,...('source_language' in parsed.data&&'target_language' in parsed.data?{source_language:parsed.data.source_language,target_language:parsed.data.target_language}:{})})});
     if(!upstream.ok){await upstream.body?.cancel();res.status(upstream.status===429?429:502).json({error:{message:'OVH specialist returned HTTP '+upstream.status}});return;}
     if(stream){
       if(!upstream.body||!upstream.headers.get('content-type')?.includes('text/event-stream'))throw new Error('Invalid event stream');
