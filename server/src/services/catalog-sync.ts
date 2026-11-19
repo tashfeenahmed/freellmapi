@@ -1,3 +1,4 @@
+import { specialistTask, type SpecialistRow } from './specialist-text.js';
 import crypto from 'crypto';
 import type { Db } from '../db/types.js';
 import { getDb, getSetting, setSetting } from '../db/index.js';
@@ -234,6 +235,7 @@ interface CatalogDecisionModel {
 }
 
 interface Catalog {
+  specialistTextModels?: SpecialistRow[];
   version: string;
   generatedAt: string;
   tier: 'live' | 'monthly';
@@ -384,6 +386,7 @@ export function catalogShapeProblems(value: unknown): string[] {
     if (!optStr(m?.premiumSince)) return 'premiumSince is not a string';
     return null;
   });
+  each('specialistTextModels', (m) => !str(m?.platform) || !str(m?.modelId) || !str(m?.displayName) || typeof m?.enabled !== 'boolean' || !['translation','summarization'].includes(m?.task) ? 'invalid specialist model' : null);
   each('decisionModels', (m) => {
     if (!str(m?.platform)) return 'platform is not a string';
     if (!str(m?.modelId)) return 'modelId is not a string';
@@ -451,6 +454,7 @@ function catalogPlatforms(catalog: Catalog): Set<string> {
   for (const m of catalog.videoModels ?? []) platforms.add(m.platform);
   for (const e of catalog.searchEngines ?? []) platforms.add(e.platform);
   for (const m of catalog.decisionModels ?? []) platforms.add(m.platform);
+  for (const m of catalog.specialistTextModels ?? []) platforms.add(m.platform);
   for (const p of catalog.managedPlatforms ?? []) platforms.add(p);
   return platforms;
 }
@@ -620,7 +624,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         continue;
       }
 
-      if (m.platform === 'custom' || !hasProvider(m.platform as Platform)) {
+      if ((m.platform === 'ovh' && specialistTask(m.modelId)) || m.platform === 'custom' || !hasProvider(m.platform as Platform)) {
         // An older binary may receive models for providers it cannot route yet;
         // skip them — they will appear after the user updates the app.
         counts.skippedUnknownPlatform++;
@@ -753,6 +757,22 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
           counts.inserted++;
         }
       }
+    }
+
+    // A separate registry: older binaries ignore it rather than treating it as chat.
+    const specialistIds = new Set<string>();
+    for (const m of catalog.specialistTextModels ?? []) {
+      if (m.platform !== 'ovh' || specialistTask(m.modelId) !== m.task) { counts.skippedUnknownPlatform++; continue; }
+      if (isCatalogModelTombstoned(db, 'media', m.platform, m.modelId)) continue;
+      specialistIds.add(m.modelId);
+      const row = selectMedia.get(m.platform, m.modelId) as {id:number;enabled:number}|undefined;
+      const fields = {displayName:m.displayName, modality:m.task, priority:0, quotaLabel:m.quotaLabel ?? '', metaJson:null};
+      if (row) { updateMedia.run({...fields, id:row.id, enabled:m.enabled ? row.enabled : 0}); counts.updated++; }
+      else { insertMedia.run({...fields, platform:m.platform, modelId:m.modelId, enabled:m.enabled ? 1 : 0}); counts.inserted++; }
+    }
+    // A downgrade to a free snapshot lacking the registry must revoke these rows.
+    for (const row of db.prepare("SELECT id,model_id FROM media_models WHERE platform='ovh' AND modality IN ('translation','summarization')").all() as {id:number;model_id:string}[]) {
+      if (!specialistIds.has(row.model_id)) { db.prepare('DELETE FROM media_models WHERE id=?').run(row.id); counts.removed++; }
     }
 
     // Decision models: their own optional full snapshot, like search engines.
