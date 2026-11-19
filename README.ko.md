@@ -260,12 +260,13 @@ client = OpenAI(
     api_key="freellmapi-your-unified-key",
 )
 
-resp = client.chat.completions.create(
+response = client.chat.completions.with_raw_response.create(
     model="auto",  # 라우터가 모델을 고릅니다. "auto:fast", "auto:smart", 프로필, 모델 ID도 지정할 수 있습니다.
     messages=[{"role": "user", "content": "로마 제국의 몰락을 한 문장으로 요약해 주세요."}],
 )
-print(resp.choices[0].message.content)
-print("Routed via:", resp.headers.get("x-routed-via"))
+completion = response.parse()
+print(completion.choices[0].message.content)
+print("Routed via:", response.headers.get("x-routed-via"))
 ```
 
 API 문서에는 스트리밍, `auto:*` 라우팅 전략, 도구 호출, 이미지 입력, Gemini의 Google 검색 그라운딩, 임베딩, Anthropic Messages API를 curl과 Python으로 호출하는 예제가 있습니다. 모든 응답의 `X-Routed-Via: <platform>/<model>` 헤더를 보면 어느 제공자의 어떤 모델이 요청을 처리했는지 알 수 있습니다. **[API 레퍼런스](docs/en/api/01-rest-api.md)**
