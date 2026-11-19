@@ -34,6 +34,7 @@ import { geminiRouter } from './routes/gemini.js';
 import { ollamaRouter } from './routes/ollama.js';
 import { urlTokenRouter } from './routes/url-tokens.js';
 import { updateRouter } from './routes/update.js';
+import { seezOrdersRouter } from './routes/seez-orders.js';
 import { moderationRouter } from './routes/moderation.js';
 import { requireAuth } from './middleware/requireAuth.js';
 import { createHostGuard } from './middleware/allowed-hosts.js';
@@ -258,6 +259,9 @@ export function createApp(config?: Config) {
   // session; everything else under /api/* requires a logged-in dashboard user.
   // The /v1 proxy keeps its own unified-API-key auth and is NOT gated here.
   app.use('/api/auth', authRouter);
+  // Storefront customers may submit orders, but reading the saved customer
+  // details requires a dashboard session (enforced on the router's GET route).
+  app.use('/api/seez/orders', seezOrdersRouter);
 
   // Key export re-verifies the dashboard password, which makes it the one admin
   // endpoint a guesser can attack. The broad limiter above is sized for normal
