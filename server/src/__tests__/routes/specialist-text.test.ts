@@ -38,6 +38,10 @@ describe('explicit OVH text specialists',()=>{
       expect(JSON.parse(String(req.body))).toMatchObject({model:ids[0],source_language:'en',target_language:'fr'});
       expect(req.headers).not.toHaveProperty('Authorization');
       expect(await (await http('summarize',{model:ids[1],input:'Hi',stream:true})).text()).toContain('[DONE]');
+      expect(JSON.parse(String(upstream.mock.calls[1][1].body)).messages).toEqual([
+        {role:'system',content:expect.stringMatching(/Summarize the supplied text/)},{role:'user',content:'Hi'}
+      ]);
+      expect(JSON.parse(String(req.body)).messages).toEqual([{role:'user',content:'The moon.'}]);
       getDb().prepare('UPDATE media_models SET enabled=0 WHERE model_id=?').run(ids[0]);
       applyCatalog(getDb(),{...cat,specialistTextModels:specialists});
       expect((await http('translate',data)).status).toBe(404);
