@@ -287,6 +287,22 @@ export class CloudflareNeuronCapError extends Error {
   }
 }
 
+/** One call that would not fit in what is left of today's cap, on an account
+ *  that still has room for smaller ones. A fact about the request: the
+ *  failover loop skips this model for this request only (providerRejection),
+ *  with no cooldown. Deliberately not worded as Cloudflare's "daily free
+ *  allocation" 429, which would bench the whole account. */
+export class CloudflareRequestTooLargeError extends Error {
+  readonly providerRejection = 'request' as const;
+  constructor(estimated: number, left: number) {
+    super(
+      `Cloudflare neuron budget: this call may use up to ${Math.round(estimated)} neurons and `
+      + `${Math.max(0, Math.round(left))} are left under today's cap. Lower max_tokens or the prompt size to use Cloudflare for it.`,
+    );
+    this.name = 'CloudflareRequestTooLargeError';
+  }
+}
+
 // ── Metering ────────────────────────────────────────────────────────────────
 
 export interface CloudflareCallEstimate extends NeuronUsage {
@@ -326,8 +342,12 @@ export function startCloudflareCall(
 
   const usage: NeuronUsage = { ...estimate };
   if (generatesTokens(modelId) && estimate.outputTokens === undefined) {
-    const max = n(estimate.maxOutputTokens) || Infinity;
-    usage.outputTokens = Math.min(averageOutputTokens(day, account, modelId) ?? DEFAULT_OUTPUT_ESTIMATE, max);
+    // Charge the most the call may generate. The average is no bound: a
+    // reasoning model that writes its whole max_tokens costs several times it,
+    // and on Workers Paid that overshoot past the free 10K is billed. settle()
+    // gives back what the call did not use.
+    usage.outputTokens = n(estimate.maxOutputTokens)
+      || (averageOutputTokens(day, account, modelId) ?? DEFAULT_OUTPUT_ESTIMATE);
   }
   const estimated = neuronsFor(modelId, usage);
 
@@ -335,10 +355,14 @@ export function startCloudflareCall(
   if (cap !== null) {
     maybeRefreshRemote(apiKey, account, now);
     const used = cloudflareNeuronsUsedToday(account, now);
-    if (used + estimated > cap) {
+    if (used >= cap) {
       benchCloudflareAccountId(account, msUntilUtcMidnight(now), 'authoritative');
       throw new CloudflareNeuronCapError(used, cap, now);
     }
+    // Room is left, just not for THIS call: refuse it alone. Benching the
+    // account here took every Cloudflare route down until midnight for one
+    // large prompt while most of the day's allowance was still unused.
+    if (used + estimated > cap) throw new CloudflareRequestTooLargeError(estimated, cap - used);
   }
 
   charge(day, account, modelId, { calls: 1, neurons: estimated });
