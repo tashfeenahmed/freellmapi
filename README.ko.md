@@ -15,7 +15,7 @@ FreeLLMAPI는 여러 제공자의 무료 플랜을 하나의 `/v1` API로 묶습
 
 모델 계열 736개와 무료 엔드포인트 1,313개가 담긴 전체 카탈로그를 둘러보세요. **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)**
 
-[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · **한국어**
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · **한국어** · [日本語](README.ja.md)
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="macOS용 다운로드"></a>

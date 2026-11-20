@@ -15,7 +15,7 @@ Aggregate free tiers from dozens of providers, plus custom OpenAI-compatible cha
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · browse the full catalog: 736 model families, 1,313 free endpoints
 
-**English** · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md)
+**English** · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="Download for macOS"></a>
@@ -345,7 +345,7 @@ Contributors very welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev lo
 
 ### Contributors
 
-Thanks to [@mamehi](https://github.com/mamehi) for translating the [README into Korean](README.ko.md).
+Thanks to [@mamehi](https://github.com/mamehi) for translating the [README into Korean](README.ko.md), and to [@eltociear](https://github.com/eltociear) for translating it [into Japanese](README.ja.md).
 
 <a href="https://github.com/moaaz12-web"><img src="https://images.weserv.nl/?url=github.com/moaaz12-web.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@moaaz12-web" /></a>
 <a href="https://github.com/AdityaxDeore"><img src="https://images.weserv.nl/?url=github.com/AdityaxDeore.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@AdityaxDeore" /></a>
@@ -523,6 +523,7 @@ Thanks to [@mamehi](https://github.com/mamehi) for translating the [README into 
 <a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
 <a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
 <a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
+<a href="https://github.com/eltociear"><img src="https://images.weserv.nl/?url=github.com/eltociear.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@eltociear" /></a>
 
 ## Disclaimer
 
