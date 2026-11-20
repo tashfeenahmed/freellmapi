@@ -37,6 +37,13 @@ function DecisionModelCard({
   pending: boolean
 }) {
   const { t } = useI18n()
+  // Same one-click proof the chat and search tables have: send one decision to
+  // this row and say which model actually answered.
+  const test = useMutation({
+    mutationFn: () => apiFetch<{ model: string; latencyMs: number }>(`/api/decisions/models/${m.id}/test`, {
+      method: 'POST',
+    }),
+  })
   return (
     <section className={`rounded-3xl border bg-card p-5 ${m.enabled ? '' : 'opacity-60'}`}>
       <div className="flex items-center gap-3">
@@ -57,8 +64,22 @@ function DecisionModelCard({
         <span className="text-xs text-muted-foreground tabular-nums">
           {t('decision.thisMonth', { count: m.decisionsThisMonth })}
         </span>
+        <button
+          type="button"
+          className="text-xs underline disabled:opacity-50"
+          onClick={() => test.mutate()}
+          disabled={!m.enabled || m.keyCount === 0 || test.isPending}
+        >
+          {test.isPending ? t('decision.tryRunning') : t('keys.testModel')}
+        </button>
         <Switch checked={m.enabled} onCheckedChange={onToggle} disabled={pending} aria-label={m.displayName} />
       </div>
+      {test.isSuccess && (
+        <p role="status" className="mt-2 text-xs text-muted-foreground">
+          {t('decision.tryServedBy', { model: test.data.model, latency: test.data.latencyMs })}
+        </p>
+      )}
+      {test.isError && <p role="alert" className="mt-2 text-xs text-destructive">{test.error.message}</p>}
     </section>
   )
 }

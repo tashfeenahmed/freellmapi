@@ -35,6 +35,9 @@ async function flush() { for (let i = 0; i < 4; i++) await act(async () => { awa
 async function mount(models: DecisionModel[]) {
   vi.mocked(apiFetch).mockReset().mockImplementation(async (path: string) => {
     if (path === '/api/decisions/models') return models
+    if (path.endsWith('/test')) {
+      return { success: true, model: '@cf/cloudflare/clef-flash', provider: 'cloudflare', latencyMs: 812, answer: 'positive' }
+    }
     if (path === '/api/decisions/try') {
       return {
         model: '@cf/cloudflare/clef-flash', provider: 'cloudflare', usage: { input_tokens: 10, output_tokens: 0 },
@@ -90,6 +93,21 @@ it('runs a test decision and shows the answer with probabilities', async () => {
   expect(text).toContain('Answer: code')
   expect(text).toContain('91% confident')
   expect(text).toContain('93%')
+})
+
+it('tests one decision model from its card', async () => {
+  await mount([model({})])
+  const test = [...container.querySelectorAll('button')].find(b => b.textContent === 'Test') as HTMLButtonElement
+  await act(async () => { test.click() })
+  await flush()
+  expect(vi.mocked(apiFetch)).toHaveBeenCalledWith('/api/decisions/models/1/test', { method: 'POST' })
+  expect(container.textContent).toContain('@cf/cloudflare/clef-flash · 812 ms')
+})
+
+it('does not offer a test for a model with no key', async () => {
+  await mount([model({ keyCount: 0, healthyKeyCount: 0 })])
+  const test = [...container.querySelectorAll('button')].find(b => b.textContent === 'Test') as HTMLButtonElement
+  expect(test.disabled).toBe(true)
 })
 
 it('shows the empty state before the catalog syncs', async () => {
