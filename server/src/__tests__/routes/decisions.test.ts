@@ -6,6 +6,7 @@ import { encrypt } from '../../lib/crypto.js';
 import { clearAllCooldowns } from '../../services/ratelimit.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 import { seedDecisionModels } from '../helpers/decision-models.js';
+import { stubPublicDns } from '../helpers/dns.js';
 
 // HTTP surface of decision models: POST /v1/decisions (and the /v1/systemone
 // alias) and GET /v1/decisions/models for API callers, /api/decisions/* for the
@@ -183,6 +184,8 @@ describe('decision routes', () => {
   // entry (#1777). Pinning by model id would let the test pass on the row nobody
   // clicked, so the endpoint pins by row id.
   it('pins the test to the row that was clicked', async () => {
+    // The made-up relay host must resolve for the URL guard (#1875).
+    stubPublicDns();
     const created = await call(app, 'POST', '/api/media/custom', {
       body: { baseUrl: 'https://relay.example.com/v1', model: '@cf/cloudflare/clef-flash', modality: 'decision', apiKey: 'relay-secret' },
     });
