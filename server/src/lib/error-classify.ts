@@ -472,7 +472,27 @@ export function isProviderMomentFailure(err: any): boolean {
 // injecting a filter verdict in place of the model's reply belong here.
 const CLASSIFICATION_RELAY_PLATFORMS = new Set(['kilo']);
 
+// In-band relay quota notices: HTTP 200 whose entire "completion" is a
+// quota/abuse-prevention message instead of a model reply, with 0 output
+// tokens. Observed from aihubmix `*-free` models (platform 'custom'):
+//   "Sorry, to prevent abuse of free resources, accounts that have not been
+//    recharged can only try 10 times..."
+// Treated like an empty completion so the fallback loop fails over (and the
+// route is benched) instead of serving the notice as the answer. Kept narrow:
+// anchored to the START of the reply (optionally after "Sorry,"), using the
+// relay's own distinctive phrasing, and only for short replies — a real answer
+// that merely quotes or discusses such a notice is never caught.
+const IN_BAND_QUOTA_NOTICE = /^(?:sorry[\s,.!:;-]*)?(?:to prevent abuse of free resources|accounts that have not been recharged)\b/i;
+const IN_BAND_QUOTA_NOTICE_MAX_LEN = 600;
+
+export function isInBandQuotaNotice(text: unknown): boolean {
+  const t = (typeof text === 'string' ? text : '').trim();
+  if (t.length === 0 || t.length > IN_BAND_QUOTA_NOTICE_MAX_LEN) return false;
+  return IN_BAND_QUOTA_NOTICE.test(t);
+}
+
 export function isUpstreamClassificationOutput(text: unknown, platform?: string): boolean {
+  if (isInBandQuotaNotice(text)) return true;
   if (!platform || !CLASSIFICATION_RELAY_PLATFORMS.has(platform.toLowerCase())) return false;
   const t = (typeof text === 'string' ? text : '').trim().toLowerCase();
   return t === 'safe' || t === 'unsafe';
