@@ -15,11 +15,13 @@
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · 全カタログを閲覧: 736 のモデルファミリー、1,313 の無料エンドポイント
 
-[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · **日本語**
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · **日本語**
+
+この翻訳は英語版より遅れることがあります。最新の内容は英語の README を参照してください。
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="macOS 版をダウンロード"></a>
-  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows.svg" height="48" alt="Windows 版をダウンロード"></a>
+  <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store.svg" height="48" alt="Microsoft Store から入手"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker.svg" height="48" alt="Docker でセルフホスト"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store.svg" height="48" alt="Google Play で手に入れよう"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store.svg" height="48" alt="App Store でダウンロード"></a>
@@ -173,7 +175,7 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 http://localhost:3001 を開き、**キー**ページでプロバイダーのキーを追加し、**Fallback Chain** をお好みに並べ替えて、**キー**ページのヘッダーから統合 API キーを取得します。この統合キーが、OpenAI SDK の向け先になります。
 
-Windows では、デスクトップ版の **[Releases にある `.exe` インストーラー](https://github.com/tashfeenahmed/freellmapi/releases/latest)**(下記)がもっとも簡単です。Android については、実験的な [Termux ガイド](docs/en/install/02-android-termux.md)をご覧ください。
+Windows では、**[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** のデスクトップアプリがもっとも簡単です。署名済みなので Smart App Control でも実行でき、自動で更新されます。[Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest) にある `.exe` インストーラーは同じアプリの未署名版です(下記)。Android については、実験的な [Termux ガイド](docs/en/install/02-android-termux.md)をご覧ください。
 
 それ以外のすべて(Docker Compose、ローカル開発、宣言的な起動設定、本番ビルド、LAN アクセス、バックアップ)は **[docs/en/install/01-install.md](docs/en/install/01-install.md)** にあります。
 
@@ -183,7 +185,7 @@ Windows では、デスクトップ版の **[Releases にある `.exe` インス
 
 ![FreeLLMAPI デスクトップアプリ](repo-assets/desktop.png)
 
-**[Releases からダウンロード](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — macOS の `.dmg` と Windows の `.exe` インストーラーが、すべてのリリースに添付されています。アカウントもパスワードも設定不要で、必要な認証情報はトレイのポップオーバーにある統合 API キーだけです。ソースからのビルド手順とデータの保存場所は [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app) をご覧ください。
+**[Releases からダウンロード](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — macOS の `.dmg` と Windows の `.exe` インストーラーが、すべてのリリースに添付されています。Windows では **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** 版をお勧めします。署名済みなので Smart App Control にブロックされず、Store が自動で更新します。アカウントもパスワードも設定不要で、必要な認証情報はトレイのポップオーバーにある統合 API キーだけです。ソースからのビルド手順とデータの保存場所は [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app) をご覧ください。
 
 macOS 12 Monterey 以降では、**arm64 (Apple Silicon)** か **x64 (Intel)** を選んでください。どちらの Mac 向けビルドにも ZIP のダウンロードがあります。
 
@@ -272,12 +274,13 @@ client = OpenAI(
     api_key="freellmapi-your-unified-key",
 )
 
-resp = client.chat.completions.create(
+response = client.chat.completions.with_raw_response.create(
     model="auto",  # let the router pick; or "auto:fast", "auto:smart", a profile, or a model id
     messages=[{"role": "user", "content": "Summarise the fall of Rome in one sentence."}],
 )
-print(resp.choices[0].message.content)
-print("Routed via:", resp.headers.get("x-routed-via"))
+completion = response.parse()
+print(completion.choices[0].message.content)
+print("Routed via:", response.headers.get("x-routed-via"))
 ```
 
 ストリーミング、`auto:*` ルーティング戦略、ツール呼び出し、ビジョン入力、Gemini の Google 検索グラウンディング、埋め込み、Anthropic Messages インターフェースは、それぞれに curl と Python の例を付けて、すべて **[docs/en/api/01-rest-api.md](docs/en/api/01-rest-api.md)** にまとめられています。すべてのレスポンスには `X-Routed-Via: <platform>/<model>` ヘッダーが付くので、実際にどのプロバイダーが処理したかを確認できます。
@@ -343,6 +346,8 @@ print("Routed via:", resp.headers.get("x-routed-via"))
 `npm install && npm run dev` で、サーバーが :3001、ダッシュボードが :5173 で起動し、どちらも HMR に対応しています。再現性のあるセットアップには、Bash では `./scripts/dev-bootstrap.sh`、PowerShell では `.\scripts\dev-bootstrap.ps1` を使ってください。どちらも既存の `.env` を保持します。PR にはテストを含め、既存のスイートを通し(`npm test`)、リポジトリにすでにある `.editorconfig` / tsconfig のデフォルトに合わせてください。データベースマイグレーションのワークフローとコントリビューターの全体的な流れは [CONTRIBUTING.md](./CONTRIBUTING.md) にあります。
 
 ### コントリビューター
+
+[@mamehi](https://github.com/mamehi) さんには [README の韓国語訳](README.ko.md)を、[@eltociear](https://github.com/eltociear) さんには [README の日本語訳](README.ja.md)をしていただきました。ありがとうございます。
 
 <a href="https://github.com/moaaz12-web"><img src="https://images.weserv.nl/?url=github.com/moaaz12-web.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@moaaz12-web" /></a>
 <a href="https://github.com/AdityaxDeore"><img src="https://images.weserv.nl/?url=github.com/AdityaxDeore.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@AdityaxDeore" /></a>
@@ -517,6 +522,10 @@ print("Routed via:", resp.headers.get("x-routed-via"))
 <a href="https://github.com/zhangkom"><img src="https://images.weserv.nl/?url=github.com/zhangkom.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@zhangkom" /></a>
 <a href="https://github.com/noahkhomer18"><img src="https://images.weserv.nl/?url=github.com/noahkhomer18.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@noahkhomer18" /></a>
 <a href="https://github.com/mentallyunstable-lab"><img src="https://images.weserv.nl/?url=github.com/mentallyunstable-lab.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mentallyunstable-lab" /></a>
+<a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
+<a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
+<a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
+<a href="https://github.com/eltociear"><img src="https://images.weserv.nl/?url=github.com/eltociear.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@eltociear" /></a>
 
 ## 免責事項
 

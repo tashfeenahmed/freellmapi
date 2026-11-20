@@ -49,8 +49,8 @@ export async function rimeSpeech(model: string, key: string | null, p: SpeechPar
 /** Decode PCM16 WAV without an external ffmpeg dependency on desktop/Docker.
  * Reject compressed or malformed input before opening a paid-capable socket.
  * Stereo is downmixed and common sample rates resampled to native 16k mono. */
-export function rimePcm(file: Buffer): Buffer {
-  const invalid = () => new RimeMediaError('Rime transcription requires a PCM16 WAV file (mono/stereo, 8–48 kHz)', 400);
+export function rimePcm(file: Buffer, provider = 'Rime'): Buffer {
+  const invalid = () => new RimeMediaError(provider + ' transcription requires a PCM16 WAV file (mono/stereo, 8–48 kHz)', 400);
   if (file.length < 44 || file.toString('ascii', 0, 4) !== 'RIFF' || file.toString('ascii', 8, 12) !== 'WAVE') throw invalid();
   let fmt: Buffer | undefined, data: Buffer | undefined;
   for (let offset = 12; offset + 8 <= file.length;) {
@@ -68,7 +68,7 @@ export function rimePcm(file: Buffer): Buffer {
   const channels = fmt.readUInt16LE(2), rate = fmt.readUInt32LE(4), align = fmt.readUInt16LE(12);
   if (![1, 2].includes(channels) || rate < 8000 || rate > 48000 || align !== channels * 2 || data.length % align) throw invalid();
   const frames = data.length / align, outputFrames = Math.floor(frames * 16000 / rate);
-  if (outputFrames < 1 || outputFrames * 2 > 16 * 1024 * 1024) throw new RimeMediaError('Rime transcription exceeds the 16 MiB decoded-audio limit', 413);
+  if (outputFrames < 1 || outputFrames * 2 > 16 * 1024 * 1024) throw new RimeMediaError(provider + ' transcription exceeds the 16 MiB decoded-audio limit', 413);
   const output = Buffer.alloc(outputFrames * 2);
   const sample = (index: number) => {
     const start = Math.min(index, frames - 1) * align;

@@ -211,8 +211,13 @@
 
     <div class="actions">
       <button class="primary" id="open">Open Dashboard</button>
-      <button class="ghost" id="copyurl">Copy URL</button>
       <button class="ghost" id="copykey">Copy Key</button>
+    </div>
+    <!-- Two base URLs (#1956): OpenAI clients want /v1, Claude / Anthropic
+         clients want the bare origin and append /v1 themselves. -->
+    <div class="actions">
+      <button class="ghost" id="copyurl-openai" title="Base URL ending in /v1, for OpenAI-compatible clients">Copy OpenAI URL</button>
+      <button class="ghost" id="copyurl-claude" title="Base URL without /v1, for Claude Desktop, Claude Code and Anthropic SDKs">Copy Claude URL</button>
     </div>
 
     <div class="foot">
@@ -269,7 +274,10 @@
     setText('l-tokens', S.tokensToday);
     setText('lastmodel-label', S.lastModel);
     setText('open', S.openDashboard);
-    setText('copyurl', S.copyUrl);
+    setText('copyurl-openai', S.copyOpenAiUrl);
+    setText('copyurl-claude', S.copyClaudeUrl);
+    if (S.openAiUrlHint) $('copyurl-openai').title = S.openAiUrlHint;
+    if (S.claudeUrlHint) $('copyurl-claude').title = S.claudeUrlHint;
     setText('copykey', S.copyKey);
     setText('login-label', S.startAtLogin);
     setText('quit', S.quit);
@@ -293,7 +301,8 @@
   }
 
   $('open').addEventListener('click', () => window.freeapi.openDashboard());
-  $('copyurl').addEventListener('click', (e) => { window.freeapi.copyBaseUrl(); flash(e.target, S.copied || 'Copied ✓'); });
+  $('copyurl-openai').addEventListener('click', (e) => { window.freeapi.copyBaseUrl('openai'); flash(e.target, S.copied || 'Copied ✓'); });
+  $('copyurl-claude').addEventListener('click', (e) => { window.freeapi.copyBaseUrl('anthropic'); flash(e.target, S.copied || 'Copied ✓'); });
   $('copykey').addEventListener('click', (e) => { window.freeapi.copyApiKey(); flash(e.target, S.copied || 'Copied ✓'); });
   $('quit').addEventListener('click', () => window.freeapi.quit());
   $('login').addEventListener('click', () => {

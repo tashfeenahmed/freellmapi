@@ -4,6 +4,7 @@ import { NovaiProvider } from '../../providers/novai.js';
 
 const thinking = 'glm-4.1v-thinking-flash';
 const flash = 'glm-4.6v-flash';
+const flash47 = 'glm-4.7-flash';
 const messages = [{ role: 'user' as const, content: 'Reply OK' }];
 const json = (body: unknown, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers });
 const response = (content: string, model = thinking) => ({
@@ -20,7 +21,7 @@ beforeEach(() => { process.env.ENCRYPTION_KEY = '0'.repeat(64); initDb(':memory:
 afterEach(() => { vi.restoreAllMocks(); getDb().close(); });
 
 describe('NovAI daily-free chat', () => {
-  it.each([flash, thinking])('forwards %s through the fixed authenticated endpoint', async model => {
+  it.each([flash, thinking, flash47])('forwards %s through the fixed authenticated endpoint', async model => {
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json(response('OK', model)));
     const result = await new NovaiProvider().chatCompletion('unit-test-key', messages, model, { max_tokens: 128 });
     expect(fetch.mock.calls[0][0]).toBe('https://aiapi-pro.com/v1/chat/completions');
@@ -30,11 +31,20 @@ describe('NovAI daily-free chat', () => {
     expect(result.usage).toMatchObject({ total_tokens: 6 });
   });
 
-  it.each(['paid-model', 'cogvideox-flash', 'glm-4.7-flash'])('rejects unapproved chat route %s without a request', async model => {
+  it.each(['paid-model', 'cogvideox-flash', 'glm-4.7-flashx'])('rejects unapproved chat route %s without a request', async model => {
     const fetch = vi.spyOn(global, 'fetch'); const provider = new NovaiProvider();
     await expect(provider.chatCompletion('test', messages, model)).rejects.toMatchObject({ status: 400 });
     await expect(provider.streamChatCompletion('test', messages, model).next()).rejects.toMatchObject({ status: 400 });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('streams the tested GLM 4.7 Flash route without changing its identity or content', async () => {
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(sse([frame('O', flash47), frame('K', flash47), frame('', flash47, 'stop')]));
+    const output = []; for await (const chunk of new NovaiProvider().streamChatCompletion('test', messages, flash47)) output.push(chunk);
+    expect(output.map(c => c.choices[0]?.delta.content ?? '').join('')).toBe('OK');
+    expect(output.every(c => c.model === flash47)).toBe(true);
+    expect(output.at(-1)?.choices[0].finish_reason).toBe('stop');
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toMatchObject({ model: flash47, stream: true });
   });
 
   it.each([['<answer>', '</answer>'], ['<|begin_of_box|>', '<|end_of_box|>']])('separates reasoning and normalizes %s', async (open, close) => {
@@ -90,11 +100,11 @@ describe('NovAI daily-free chat', () => {
     expect(output.map(c => c.choices[0]?.delta.content ?? '').join('')).toBe('OK');
   });
 
-  it('rejects substituted identities in both modes before forwarding content', async () => {
+  it.each([thinking, flash, flash47])('rejects substituted %s identities in both modes before forwarding content', async model => {
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValueOnce(json(response('wrong', 'another-model'))).mockResolvedValueOnce(sse([frame('wrong', 'another-model')]));
     const provider = new NovaiProvider();
-    await expect(provider.chatCompletion('test', messages, thinking)).rejects.toMatchObject({ status: 502 });
-    await expect(provider.streamChatCompletion('test', messages, thinking).next()).rejects.toMatchObject({ status: 502 });
+    await expect(provider.chatCompletion('test', messages, model)).rejects.toMatchObject({ status: 502 });
+    await expect(provider.streamChatCompletion('test', messages, model).next()).rejects.toMatchObject({ status: 502 });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 

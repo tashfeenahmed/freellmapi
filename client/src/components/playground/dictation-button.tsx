@@ -11,14 +11,13 @@ import { pickRecordingMimeType, recordingFilename } from '@/lib/transcription'
 // they do for an API client. The text comes back into the composer; nothing
 // is sent to the chat model until the user presses send.
 //
-// With no usable transcription model the button still shows, so the feature
-// is discoverable, and a click explains what to add instead of failing.
+// Without a usable provider, the composer handles the click before audio capture.
 
 export type DictationPhase = 'idle' | 'recording' | 'transcribing'
 
 export interface DictationButtonProps {
-  /** Whether at least one enabled transcription model has a key. */
-  available: boolean
+  /** Handles the mic click when no provider can transcribe. */
+  onUnavailable?: () => void
   /** `auto` or a transcription model id, already resolved against availability. */
   model: string
   /** The unified API key, for the /v1 route. */
@@ -32,7 +31,7 @@ export interface DictationButtonProps {
   className?: string
 }
 
-export function DictationButton({ available, model, apiKey, disabled, onText, onPhaseChange, onStreamChange, className }: DictationButtonProps) {
+export function DictationButton({ onUnavailable, model, apiKey, disabled, onText, onPhaseChange, onStreamChange, className }: DictationButtonProps) {
   const { t } = useI18n()
   const [phase, setPhaseState] = useState<DictationPhase>('idle')
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -47,8 +46,8 @@ export function DictationButton({ available, model, apiKey, disabled, onText, on
   }, [])
 
   async function start() {
-    if (!available) {
-      toast.info(t('playground.dictationUnavailable'))
+    if (onUnavailable) {
+      onUnavailable()
       return
     }
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {

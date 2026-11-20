@@ -1,3 +1,4 @@
+import { speechFlowCredentials } from '../providers/speechflow.js';
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
@@ -36,6 +37,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
 import { isLoopbackRequest } from '../lib/loopback.js';
+import { availableKeylessProviders, dismissAvailableKeylessProviders, enableAvailableKeylessProviders } from '../services/keyless-defaults.js';
 
 export const keysRouter = Router();
 
@@ -73,7 +75,12 @@ const PLATFORMS = [
   'zro',
   'novai',
   'varosity',
+  'speechflow',
+  'meldport',
   'rime',
+  'typecast',
+  'cartesia',
+  'silvr',
   'freetts',
   'freeinference',
   'freemodel',
@@ -519,6 +526,11 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       // request) — distinct from lastCheckedAt, which a transport error also
       // refreshes.
       lastHealthyAt: row.last_healthy_at ?? null,
+      // #1516 (display-only): what the healthy verdict rests on — a /models
+      // probe ('models_only') or a served request ('inference_verified').
+      // Null = never verified. Exposed so the dashboard can say which it is;
+      // it changes no routing.
+      verificationBasis: row.verification_basis ?? null,
       lastHealthError: row.last_health_error ?? null,
       // The model_id list this key is limited to; null = serves everything (#657).
       modelScope: scope ? [...scope] : null,
@@ -773,6 +785,20 @@ keysRouter.post('/:id/reveal', (req: Request, res: Response) => {
   }
 });
 
+// #1870: no-key providers this install's catalog offers but it has not added.
+keysRouter.get('/keyless-available', (_req: Request, res: Response) => {
+  res.json({ providers: availableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/enable', (_req: Request, res: Response) => {
+  res.json({ enabled: enableAvailableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/dismiss', (_req: Request, res: Response) => {
+  dismissAvailableKeylessProviders();
+  res.json({ ok: true });
+});
+
 // Add a key
 keysRouter.post('/', (req: Request, res: Response) => {
   const parsed = addKeySchema.safeParse(req.body);
@@ -786,6 +812,10 @@ keysRouter.post('/', (req: Request, res: Response) => {
   const isKeyless = resolveProvider(platform)?.keyless === true;
   const rawKey = parsed.data.key?.trim() ?? '';
 
+  if (platform === 'speechflow' && !speechFlowCredentials(rawKey)) {
+    res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+    return;
+  }
   if (!isKeyless && !rawKey) {
     res.status(400).json({ error: { message: 'key is required' } });
     return;
@@ -1936,6 +1966,10 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     // Key-optional platforms (Kilo, OVH, AI Horde) accept a real key here like
     // any other provider: it replaces the anonymous sentinel (#1331).
 
+    if (stored.platform === 'speechflow' && !speechFlowCredentials(key)) {
+      res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+      return;
+    }
     if (stored.platform === 'cloudflare') {
       const separator = key.indexOf(':');
       if (separator < 1 || !key.slice(0, separator).trim() || !key.slice(separator + 1).trim()) {

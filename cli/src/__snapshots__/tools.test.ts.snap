@@ -337,11 +337,46 @@ exports[`tool generators > setup-dsh has stable golden output 1`] = `
       "path": "/home/tester/.dsh/.env",
       "sensitive": true,
     },
+    {
+      "format": "yaml-entries",
+      "path": "/home/tester/.dsh/cordis.patch.yml",
+      "value": {
+        "agent-default-model": {
+          "model": "fast-coder",
+          "provider": "freellmapi",
+          "reasoningEffort": undefined,
+        },
+        "llm-pi-ai": {
+          "providers": {
+            "freellmapi": {
+              "api": "openai-completions",
+              "apiKeyEnv": "FREELLMAPI_API_KEY",
+              "baseURL": "http://localhost:3000/v1",
+              "displayName": "FreeLLMAPI",
+              "models": [
+                {
+                  "contextWindow": 131072,
+                  "id": "fast-coder",
+                  "maxTokens": 8192,
+                  "name": "Fast Coder",
+                },
+                {
+                  "contextWindow": 262144,
+                  "id": "reasoning-model",
+                  "maxTokens": 8192,
+                  "name": "Reasoning Model",
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
   ],
   "notes": [
     "Start DeepSeek Harness with: npx @deepseek-ai/dsh web — freellmapi/fast-coder is the default model.",
     "One-shot check: npx @deepseek-ai/dsh --profile headless "Say hello"",
-    "Settings are hot-reloaded, so a running dsh picks this up on its next request.",
+    "New sessions use the selected model. Restart a running profile if hot reload is disabled.",
     "Models are declared text-only; give a vision model \`input: [text, image]\` under freellmapi.models in settings.yaml to send it images.",
   ],
 }

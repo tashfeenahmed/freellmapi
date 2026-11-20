@@ -18,6 +18,7 @@ import { BackupsSection } from '@/components/keys/backups-section'
 import { AnthropicSection } from '@/components/keys/anthropic-section'
 import { ProviderList } from '@/components/keys/provider-list'
 import { ProviderChecklistSection } from '@/components/keys/provider-checklist-section'
+import { KeylessNotice } from '@/components/keys/keyless-notice'
 import { AddKeyDialog } from '@/components/keys/add-key-dialog'
 import { ExportKeysDialog } from '@/components/keys/export-keys-dialog'
 import { AgentCompatibilitySection } from '@/components/keys/agent-compatibility-section'
@@ -131,7 +132,10 @@ export default function KeysPage() {
 
         {tab === 'providers' && (
           <>
-            <ProviderChecklistSection onAddKey={platform => openAddKey(platform as Platform)} />
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <ProviderChecklistSection onAddKey={platform => openAddKey(platform as Platform)} />
+              <KeylessNotice />
+            </div>
             <ProviderList onAddKey={() => openAddKey()} />
           </>
         )}

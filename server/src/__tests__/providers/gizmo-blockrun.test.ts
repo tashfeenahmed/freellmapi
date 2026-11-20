@@ -78,7 +78,7 @@ describe('Gizmo strict text payload', () => {
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(json(completion('model')));
     await new GizmoProvider().chatCompletion('key', [{ role: 'assistant', content: 'OK', reasoning_content: 'private', name: 'bot' }], 'model',
       { max_tokens: 100_000, seed: 7, reasoning_effort: 'high', response_format: { type: 'json_object' }, parallel_tool_calls: false });
-    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ model: 'model', messages: [{ role: 'assistant', content: 'OK' }], max_tokens: 32768 });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({ model: 'model', messages: [{ role: 'assistant', content: 'OK' }], max_tokens: 32768, stream: false });
     expect(platformDropsResponseFormat('gizmo')).toBe(true);
     expect(extendedBodyParams('gizmo', { seed: 7, reasoning_effort: 'high' })).toEqual({});
   });

@@ -72,6 +72,31 @@ win:
         - x64
   # electron-builder converts a >=256px PNG to .ico at build time.
   icon: assets/appicon_1024.png
+# Microsoft Store package (#1933). Windows Smart App Control blocks the
+# unsigned NSIS .exe outright; an MSIX submitted to the Store is signed by
+# Microsoft, so Store installs run with Smart App Control on. Built only by
+# `npm run dist:store` / the release workflow's Store step, never alongside the
+# NSIS target. The identity values must match Partner Center's Product
+# identity page for product 9PBN6G8K2B7F exactly, or the Store rejects the
+# upload. Tile images live in store-assets/appx (the store build points
+# buildResources there, because build/ here is compiled app code).
+appx:
+  identityName: TashAhmed.FreeLLMAPI
+  publisher: CN=157744EA-1B8F-40BE-9B6E-1FE92036B40F
+  publisherDisplayName: Tash Ahmed
+  applicationId: FreeLLMAPI
+  displayName: FreeLLMAPI
+  backgroundColor: transparent
+  languages:
+    - en-US
+  # electron-builder defaults to MinVersion 10.0.14316 (1607), which Partner
+  # Center rejects for MSIX ("MinVersion <= 10.0.17134.0"). Electron 38 needs
+  # Windows 10 1809+ anyway.
+  minVersion: 10.0.17763.0
+  maxVersionTested: 10.0.26100.0
+  # .msix, not .appx: same package format, and `msstore publish` only picks up
+  # .msix / .msixupload files.
+  artifactName: "${productName}-Store-${version}.msix"
 linux:
   category: Development;Utility;
   icon: assets/appicon_1024.png # electron-builder can automatically scale PNGs
@@ -95,4 +120,6 @@ nsis:
   # no spaces is the same string in all three places.
   artifactName: "${productName}-Setup-${version}.${ext}"
   oneClick: true
+  # Grants the GPU sandbox read access to the install folder (#1759).
+  include: installer/installer.nsh
   deleteAppDataOnUninstall: false

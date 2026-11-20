@@ -383,30 +383,32 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
 
   const q = search.trim().toLowerCase()
 
-  function matchStatus(group: (typeof grouped)[number]): boolean {
-    const enabled = group.keys.some(k => k.enabled)
-    const hasIssue = group.keys.some(k => isIssue(statusOf(k)))
+  // Same idea as the search below: narrow the keys inside a group, rather
+  // than keeping every key once the group matches (#1907). "all" is a no-op.
+  function keyMatchesStatus(key: ApiKey): boolean {
     switch (statusFilter) {
-      case 'healthy': return enabled && !hasIssue
-      case 'issues': return hasIssue
-      case 'disabled': return !enabled
+      case 'healthy': return key.enabled && !isIssue(statusOf(key))
+      case 'issues': return isIssue(statusOf(key))
+      case 'disabled': return !key.enabled
       default: return true
     }
   }
 
   // Search narrows either whole groups (label match) or the keys within them
-  // (label / masked-key / endpoint-URL match); the status filter then trims
-  // the result set. The baseUrl term is #1056's lesson applied here: a custom
-  // row renders "api.unorouter.com" on screen, so searching that host must
-  // find the row the same way the fallback table's search does.
+  // (label / masked-key / endpoint-URL match); the status filter then narrows
+  // those keys the same way. The baseUrl term is #1056's lesson applied here:
+  // a custom row renders "api.unorouter.com" on screen, so searching that host
+  // must find the row the same way the fallback table's search does.
   const visibleGroups = grouped
     .map(group => {
-      if (!q) return group
-      if (group.label.toLowerCase().includes(q)) return group
-      const matchingKeys = group.keys.filter(k => keyMatchesQuery(k, q))
-      return { ...group, keys: matchingKeys }
+      let keys = group.keys
+      if (q && !group.label.toLowerCase().includes(q)) {
+        keys = keys.filter(k => keyMatchesQuery(k, q))
+      }
+      if (statusFilter !== 'all') keys = keys.filter(keyMatchesStatus)
+      return keys === group.keys ? group : { ...group, keys }
     })
-    .filter(group => group.keys.length > 0 && matchStatus(group))
+    .filter(group => group.keys.length > 0)
 
   function isGroupExpanded(group: (typeof grouped)[number]): boolean {
     if (q) return true // an active search auto-expands every matching group

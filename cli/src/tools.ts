@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { clientNotes, detectChatGptClient } from './detect.js';
 import type {
   CatalogModel,
@@ -302,6 +303,11 @@ function opencode(ctx: GenerateContext): Generation {
 }
 
 function goose(ctx: GenerateContext): Generation {
+  const dir = process.env.GOOSE_PATH_ROOT && path.isAbsolute(process.env.GOOSE_PATH_ROOT)
+    ? path.join(process.env.GOOSE_PATH_ROOT, 'config')
+    : process.platform === 'win32'
+      ? path.join(process.env.APPDATA || path.join(ctx.homeDir, 'AppData', 'Roaming'), 'Block', 'goose', 'config')
+      : path.join(ctx.homeDir, '.config', 'goose');
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   // GOOSE_MODEL names the default, so it belongs in the provider's list too;
   // `auto` is filtered out of the plain roster and goes back at the front.
@@ -314,9 +320,7 @@ function goose(ctx: GenerateContext): Generation {
     files: [
       {
         path: path.join(
-          ctx.homeDir,
-          '.config',
-          'goose',
+          dir,
           'custom_providers',
           'freellmapi.json',
         ),
@@ -336,7 +340,7 @@ function goose(ctx: GenerateContext): Generation {
         },
       },
       {
-        path: path.join(ctx.homeDir, '.config', 'goose', 'config.yaml'),
+        path: path.join(dir, 'config.yaml'),
         format: 'yaml',
         content: [
           '# freellmapi:start',
@@ -594,50 +598,53 @@ function dsh(ctx: GenerateContext): Generation {
       contextWindow: contextWindow(entry),
       maxTokens: outputLimit(entry),
     }));
-  return {
-    files: [
-      {
-        path: path.join(home, 'settings.yaml'),
-        format: 'yaml',
-        value: {
-          'llm-pi-ai': {
-            providers: {
-              [route]: {
-                displayName: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
-                apiKeyEnv: 'FREELLMAPI_API_KEY',
-                api: 'openai-completions',
-                baseURL: v1Url(ctx.url),
-                models: entries,
-              },
-            },
-          },
-          // The default model is only claimed for the default profile; a
-          // named route is an extra option in the picker, not a takeover.
-          // A previous default's `reasoningEffort` must go with it: DSH
-          // refuses a request naming a level the selected model cannot
-          // take, and a hand-declared model declares none.
-          ...(ctx.profile === 'default'
-            ? {
-              'agent-default-model': {
-                provider: route,
-                model: model.id,
-                reasoningEffort: undefined,
-              },
-            }
-            : {}),
+  const settings = {
+    'llm-pi-ai': {
+      providers: {
+        [route]: {
+          displayName: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
+          apiKeyEnv: 'FREELLMAPI_API_KEY',
+          api: 'openai-completions',
+          baseURL: v1Url(ctx.url),
+          models: entries,
         },
       },
+    },
+    // The default model is only claimed for the default profile; a
+    // named route is an extra option in the picker, not a takeover.
+    // A previous default's `reasoningEffort` must go with it: DSH
+    // refuses a request naming a level the selected model cannot
+    // take, and a hand-declared model declares none.
+    ...(ctx.profile === 'default'
+      ? {
+        'agent-default-model': {
+          provider: route,
+          model: model.id,
+          reasoningEffort: undefined,
+        },
+      }
+      : {}),
+  };
+  // Current DSH applies this home-level Cordis patch to every profile before
+  // its first request. Older releases read settings.yaml. Once DSH migrates
+  // that file, recreating it would re-import it over the user's next profile.
+  const legacy = path.join(home, 'settings.yaml');
+  const includeLegacy = existsSync(legacy) || !existsSync(legacy + '.imported');
+  return {
+    files: [
+      ...(includeLegacy ? [{ path: legacy, format: 'yaml' as const, value: settings }] : []),
       {
         path: path.join(home, '.env'),
         format: 'env',
         sensitive: true,
         content: `FREELLMAPI_API_KEY=${ctx.apiKey}\n`,
       },
+      { path: path.join(home, 'cordis.patch.yml'), format: 'yaml-entries', value: settings },
     ],
     notes: [
       `Start DeepSeek Harness with: npx @deepseek-ai/dsh web — ${route}/${model.id} is ${ctx.profile === 'default' ? 'the default model' : 'in the model picker'}.`,
       'One-shot check: npx @deepseek-ai/dsh --profile headless "Say hello"',
-      'Settings are hot-reloaded, so a running dsh picks this up on its next request.',
+      'New sessions use the selected model. Restart a running profile if hot reload is disabled.',
       `Models are declared text-only; give a vision model \`input: [text, image]\` under ${route}.models in settings.yaml to send it images.`,
     ],
   };
@@ -808,7 +815,9 @@ function openclaw(ctx: GenerateContext): Generation {
 // default model alone.
 function hermes(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
-  const home = process.env.HERMES_HOME?.trim() || path.join(ctx.homeDir, '.hermes');
+  const home = process.env.HERMES_HOME?.trim() || (process.platform === 'win32'
+    ? path.join(process.env.LOCALAPPDATA || path.join(ctx.homeDir, 'AppData', 'Local'), 'hermes')
+    : path.join(ctx.homeDir, '.hermes'));
   const provider = `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
   // Hermes only identifies itself to hosts it knows; a custom endpoint gets the
   // bare openai-python user agent. `default_headers` is its documented way to

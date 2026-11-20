@@ -28,6 +28,7 @@ describe('tray per platform (#1353)', () => {
       iconFile: 'trayTemplate.png',
       templateImage: true,
       leftClick: 'popover',
+      menu: 'popup',
     });
   });
 
@@ -36,6 +37,7 @@ describe('tray per platform (#1353)', () => {
       iconFile: 'tray.ico',
       templateImage: false,
       leftClick: 'dashboard',
+      menu: 'popup',
     });
   });
 
@@ -80,12 +82,40 @@ describe('opening the dashboard at launch (#1353)', () => {
   });
 });
 
-describe('the compact popover keeps an entry point (#1412)', () => {
-  it('names the panel in the tray menu only where left-click does not toggle it', () => {
-    expect(trayMenuOffersPopover('win32')).toBe(true);
-    for (const platform of ['darwin', 'linux'] as const) {
-      expect(trayMenuOffersPopover(platform)).toBe(false);
+// #1804: Electron emits 'right-click' and supports popUpContextMenu on macOS
+// and Windows only, so on Linux the popped-up menu never appeared and the app
+// could not be quit from the tray. Linux attaches the menu instead.
+describe('the tray menu opens on every platform (#1804)', () => {
+  it('attaches the menu on Linux and pops it up on macOS and Windows', () => {
+    expect(trayPlatform('linux').menu).toBe('attached');
+    expect(trayPlatform('darwin').menu).toBe('popup');
+    expect(trayPlatform('win32').menu).toBe('popup');
+  });
+
+  it('only pops a menu up where Electron supports right-click and popUpContextMenu', () => {
+    const dts = readFileSync(join(desktopRoot, 'node_modules/electron/electron.d.ts'), 'utf8');
+    const platformsOf = (signature: string) => {
+      const at = dts.indexOf(signature);
+      expect(at, `${signature} not found in electron.d.ts`).toBeGreaterThan(0);
+      const doc = dts.slice(dts.lastIndexOf('/**', at), at);
+      return /@platform ([\w,]+)/.exec(doc)?.[1].split(',') ?? ['darwin', 'win32', 'linux'];
+    };
+    const rightClick = platformsOf("on(event: 'right-click'");
+    const popUp = platformsOf('popUpContextMenu(menu');
+    for (const platform of ['darwin', 'win32', 'linux'] as const) {
+      if (trayPlatform(platform).menu !== 'popup') continue;
+      expect(rightClick, `${platform}: no right-click event`).toContain(platform);
+      expect(popUp, `${platform}: no popUpContextMenu`).toContain(platform);
     }
+  });
+});
+
+describe('the compact popover keeps an entry point (#1412)', () => {
+  it('names the panel in the tray menu where left-click may not toggle it', () => {
+    expect(trayMenuOffersPopover('win32')).toBe(true);
+    // Linux panels often open the attached menu on left-click (#1804).
+    expect(trayMenuOffersPopover('linux')).toBe(true);
+    expect(trayMenuOffersPopover('darwin')).toBe(false);
   });
 
   // What #1412 broke: Windows gave left-click to the dashboard and nothing else

@@ -48,6 +48,11 @@ it('omits Waterfall and ACLIDE from the add-key provider picker', async () => {
   expect(options).toContain('rime')
   expect(options).toContain('freetts')
   expect(options).toContain('zro')
+  expect(options).toContain('typecast')
+  expect(options).toContain('cartesia')
+  expect(options).toContain('silvr')
+  expect(PLATFORMS.find(p => p.value === 'typecast')?.label).toMatch(/non-commercial, attribution required/i)
+  expect(PLATFORMS.find(p => p.value === 'cartesia')?.label).toMatch(/non-commercial/i)
   expect(PLATFORMS.find(p => p.value === 'zro')).toMatchObject({
     label: 'Zro / MoonMath.ai (shared daily free usage)', url: 'https://zro.moonmath.ai/api-keys',
   })
