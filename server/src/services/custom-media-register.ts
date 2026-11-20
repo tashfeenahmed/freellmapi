@@ -11,7 +11,10 @@ import { endpointScopeOfKey } from '../lib/endpoint-scope.js';
 
 // 'search' registers a custom web search relay speaking Tavily's wire shape at
 // POST {base_url}/search (#1174); services/search.ts routes it first.
-export type CustomMediaModality = 'image' | 'audio' | 'transcription' | 'search';
+// 'decision' registers a custom decision endpoint speaking the proposed
+// generic contract at POST {base_url}/decide (#1777); services/decision.ts
+// routes it.
+export type CustomMediaModality = 'image' | 'audio' | 'transcription' | 'search' | 'decision';
 
 export interface CustomMediaEntry {
   modelId: string;

@@ -1,3 +1,4 @@
+import { listSpecialists, serveSpecialist } from '../services/specialist-text.js';
 import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -37,7 +38,8 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { advertisedContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { buildCodexCatalog } from '../services/codex-catalog.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { applyDecisionRouting, routingStrategyHeader } from '../services/routing-decision.js';
@@ -258,6 +260,24 @@ function restoreSessionReasoning(messages: ChatMessage[], reasoning: string, pla
   return restored ?? messages;
 }
 
+/**
+ * The messages that identify a conversation for sticky routing, context
+ * handoff and reasoning replay. Take it BEFORE compression: the aging and
+ * budget engines rewrite or drop old user turns, and the session key hashes
+ * the first one, so a compressed request would otherwise look like a new
+ * conversation (#1889). The first user turn is snapshotted as text so an
+ * in-place rewrite of its content cannot change the key either.
+ */
+export function sessionIdentityMessages(messages: ChatMessage[]): ChatMessage[] {
+  const out = messages.slice();
+  const firstUserIndex = out.findIndex(message => message.role === 'user');
+  if (firstUserIndex !== -1) {
+    const firstUser = out[firstUserIndex]!;
+    out[firstUserIndex] = { ...firstUser, content: contentToString(firstUser.content ?? '') };
+  }
+  return out;
+}
+
 function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): string {
   if (sessionIdHeader) {
     return strategyKey ? `hdr:${sessionIdHeader}::${strategyKey}` : `hdr:${sessionIdHeader}`;
@@ -269,6 +289,16 @@ function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string, strate
   if (!text) return '';
   const payload = strategyKey ? `${text}::${strategyKey}` : text;
   return crypto.createHash('sha1').update(payload).digest('hex');
+}
+
+// #1890: the reasoning memory (#797) and the context-handoff store replay what
+// one request left behind into a later one. Their key comes from the session
+// header or the first user message, which two callers can share, so prefix it
+// with the caller's credential: a client-profile key must never read state that
+// another profile's (or the unified key's) traffic wrote.
+function callerScopedSessionKey(auth: ResolvedAuth, sessionKey: string): string {
+  if (!sessionKey) return '';
+  return auth.kind === 'profile' ? `profile:${auth.profileId}:${sessionKey}` : `unified:${sessionKey}`;
 }
 
 export function getStickyModel(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): number | undefined {
@@ -338,6 +368,15 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
     object: 'list',
     data: buildCatalogEntries({ onlyAvailable, executionStatus: es }),
   });
+});
+
+// GET /v1/codex/models: the model catalog in Codex CLI's format, for
+// `model_catalog_url` in ~/.codex/config.toml. Lists only models that can serve
+// a request right now, same as `?available=true` on /v1/models.
+proxyRouter.get('/codex/models', (req, res) => {
+  if (!requireInferenceAuth(req, res)) return;
+  const visionById = new Map(buildModelListing().models.map(m => [m.id, m.supportsVision]));
+  res.json(buildCodexCatalog(buildCatalogEntries({ onlyAvailable: true }), visionById));
 });
 
 // GET /v1/models/:id — OpenAI's `models.retrieve` (single-model lookup).
@@ -487,7 +526,7 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
     },
     ...claudeFamilyEntries,
     ...profileRows.map(p => {
-      const ctx = servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]);
+      const ctx = advertisedContextWindow(servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]));
       return {
         id: `auto:${p.name.toLowerCase()}`,
         object: 'model',
@@ -995,7 +1034,7 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
   if (!requireInferenceAuth(req, res)) return;
   const parsed = DecisionBody.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors.map(e => `${e.path.join('.') || 'body'}: ${e.message}`).join('; ');
+    const detail = parsed.error.issues.map(e => `${e.path.join('.') || 'body'}: ${e.message}`).join('; ');
     res.status(400).json({ error: { message: `Invalid request: ${detail}`, type: 'invalid_request_error' } });
     return;
   }
@@ -1032,6 +1071,18 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
       },
     });
   }
+}
+
+proxyRouter.get('/text/models', (req, res) => {
+  if (requireInferenceAuth(req, res)) res.json({object:'list', data:listSpecialists()});
+});
+for (const [path, task] of [['translate','translation'], ['summarize','summarization']] as const) {
+  proxyRouter.post('/text/'+path, async (req, res) => {
+    const auth = requireInferenceAuth(req, res);
+    if (!auth) return;
+    if (auth.systemPrompt) { res.status(403).json({error:{message:'A profile requiring a system prompt cannot use a fixed-task specialist.'}}); return; }
+    await serveSpecialist(task, req, res);
+  });
 }
 
 proxyRouter.post('/decisions', handleDecision);
@@ -1400,7 +1451,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
 
   const parsed = CompletionBody.safeParse(req.body);
   if (!parsed.success) {
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .slice(0, 5)
       .join(', ');
@@ -1860,7 +1911,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     // Path-qualified issues ("messages.1.content: Invalid input" beats a bare
     // "Invalid input") and a server-side breadcrumb — these rejections never
     // reach the request log, which made #200 nearly undebuggable.
-    const detail = parsed.error.errors
+    const detail = parsed.error.issues
       .map(e => (e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message))
       .slice(0, 5)
       .join(', ');
@@ -1990,6 +2041,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       ...(m.name ? { name: m.name } : {}),
     };
   });
+
+  // Session identity must come from the caller's conversation, before an
+  // aging or budget engine can rewrite or remove its first user turn (#1889).
+  const sessionMessages = sessionIdentityMessages(messages);
 
   let cacheControlPrefixLength = 0;
   parsed.data.messages.forEach((message, index) => {
@@ -2374,7 +2429,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // be semantically wrong.
   const isAutoRouted = !requestedModel || isAutoModel(requestedModel);
   const handoffMode = isAutoRouted ? getContextHandoffMode() : ('off' as const);
-  const sessionKey = handoffMode !== 'off' ? getSessionKey(messages, sessionIdHeader, strategyKey) : '';
+  const rawSessionKey = handoffMode !== 'off' ? getSessionKey(sessionMessages, sessionIdHeader, strategyKey) : '';
+  const sessionKey = callerScopedSessionKey(auth, rawSessionKey);
   if (handoffMode !== 'off' && sessionKey) {
     recordIncomingMessages(sessionKey, messages);
   }
@@ -2388,10 +2444,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Header-less clients are covered: without x-session-id, getSessionKey hashes
   // the FIRST user message, which does not change as the conversation grows —
   // the same stability sticky sessions already rely on. Its known weakness is
-  // shared here: two conversations opening with identical text share a key, so
+  // shared here, within one calling key (#1890 keeps keys apart): two
+  // conversations opening with identical text share a key, so
   // the same-model + field-actually-missing gates below are what keep a
   // mis-keyed restore from reaching a payload it does not belong in.
-  const reasoningSessionKey = getSessionKey(messages, sessionIdHeader, strategyKey);
+  const reasoningSessionKey = callerScopedSessionKey(auth, getSessionKey(sessionMessages, sessionIdHeader, strategyKey));
   // A handoff can only fire when a prior model is on record for this session.
   // Check after recordIncomingMessages, which clears the prior model on a
   // fresh conversation. Stable across the retry loop (the prior model only
@@ -2417,10 +2474,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     // empty tier falls through to plain auto, as on /v1/messages.
     groupChain = aliasTierChain;
     stickyStrategyKey = `tier:${aliasTierChain[0]!.model_db_id}`;
-    const sticky = getStickyModel(messages, sessionIdHeader, stickyStrategyKey);
+    const sticky = getStickyModel(sessionMessages, sessionIdHeader, stickyStrategyKey);
     preferredModel = (sticky != null && groupChain.some(r => r.model_db_id === sticky)) ? sticky : undefined;
   } else if (isAutoModel(requestedModel)) {
-    preferredModel = resolveStickyPreference(getStickyModel(messages, sessionIdHeader, strategyKey), resolvedChain?.chain);
+    preferredModel = resolveStickyPreference(getStickyModel(sessionMessages, sessionIdHeader, strategyKey), resolvedChain?.chain);
   } else if (requestedModel) {
     const db = getDb();
     // Unify ON: a requested id (canonical slug OR any provider's model_id) maps
@@ -2459,7 +2516,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         return;
       }
       stickyStrategyKey = requestedModel;
-      const sticky = getStickyModel(messages, sessionIdHeader, stickyStrategyKey);
+      const sticky = getStickyModel(sessionMessages, sessionIdHeader, stickyStrategyKey);
       // Only prefer the sticky member if it's actually IN this group — passing a
       // non-member as preferredModelDbId would make routeRequest inject an
       // off-group model and break strict pinning.
@@ -2484,7 +2541,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       }
     }
   } else {
-    preferredModel = resolveStickyPreference(getStickyModel(messages, sessionIdHeader, strategyKey), resolvedChain?.chain);
+    preferredModel = resolveStickyPreference(getStickyModel(sessionMessages, sessionIdHeader, strategyKey), resolvedChain?.chain);
   }
 
   // For analytics: the model id the client pinned, null when auto-routed
@@ -2559,7 +2616,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     let injectedHandoffTokens = 0;
     if (handoffMode !== 'off' && sessionKey) {
       const handoff = maybeInjectContextHandoff({ mode: handoffMode, sessionKey, messages, selectedModelKey: modelKey });
-      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${sessionKey.slice(0, 8)}…, model switch detected)`);
+      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${rawSessionKey.slice(0, 8)}…, model switch detected)`);
       outboundMessages = handoff.messages;
       injectedHandoffTokens = handoff.injectedTokens;
     }
@@ -3030,7 +3087,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             });
           }
 
-          setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
+          setStickyModel(sessionMessages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
           if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
           // #797: remember this turn's thinking trace so the next request from
           // the same session can restore it (clients strip it on replay).
@@ -3238,7 +3295,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         // from (set to the requested model id at the top of the loop). Matches the
         // streaming success path; without it, "prefer last successful provider"
         // is lost for non-streaming group-pinned sessions. (#341 review)
-        setStickyModel(messages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
+        setStickyModel(sessionMessages, route.modelDbId, sessionIdHeader, stickyStrategyKey);
         if (handoffMode !== 'off' && sessionKey) recordSuccessfulModel({ sessionKey, modelKey });
 
         res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));

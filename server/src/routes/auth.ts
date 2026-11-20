@@ -14,13 +14,14 @@ import {
   accountEmail,
   normalizeEmail,
   desktopSessionToken,
+  recordReauthFailure,
+  clearReauthFailures,
 } from '../services/auth.js';
 import { setupCodeMatches, clearSetupCode } from '../lib/setup-code.js';
+import { isLoopbackRequest } from '../lib/loopback.js';
 import { generateResetCode, resetCodeMatches, clearResetCode } from '../lib/reset-code.js';
 
 export const authRouter = Router();
-
-const failedPasswordAttempts = new Map<number, number>();
 
 // Dashboard auth (#35). These routes are mounted BEFORE requireAuth, so
 // /status, /setup and /login are reachable without a session (bootstrap);
@@ -101,14 +102,6 @@ function bearer(req: Request): string | undefined {
     ?? (req.headers['x-dashboard-token'] as string | undefined);
 }
 
-function isLoopbackAddress(value: string | undefined): boolean {
-  let addr = (value ?? '').trim();
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
-}
-
 // Is the caller connecting from the local machine? The socket peer address is
 // the authority, NOT req.ip: forwarded headers are attacker-controlled, so
 // letting one of them ASSERT locality would hand a remote caller the setup
@@ -119,18 +112,9 @@ function isLoopbackAddress(value: string | undefined): boolean {
 // docs/en/troubleshooting/01-common-issues.md on TRUST_PROXY) puts Caddy/nginx/
 // Traefik on the SAME host: every request then arrives from 127.0.0.1 and the
 // socket test is true for the entire internet. So a forwarded hop can never
-// grant locality, but it can withdraw it — exactly the treatment the Ollama
-// open-loopback mode already applies in routes/ollama.ts:25-38.
-function isLoopbackRemote(req: Request): boolean {
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
-  const forwarded = req.headers['x-forwarded-for'];
-  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-    ?.split(',')[0];
-  // A local reverse proxy is itself a loopback socket, but its first forwarded
-  // hop may be remote. Refuse that request rather than silently widening the
-  // no-code first-run path through the proxy.
-  return !firstForwarded || isLoopbackAddress(firstForwarded);
-}
+// grant locality, but it can withdraw it — the nearest proxy's hop, which is
+// the right-most one, because callers control everything to its left.
+const isLoopbackRemote = (req: Request): boolean => isLoopbackRequest(req);
 
 // ── Desktop sign-in (#1399) ───────────────────────────────────────────────
 // The desktop app's account is a hidden machine user with a random password
@@ -231,7 +215,7 @@ authRouter.post('/setup', (req: Request, res: Response) => {
 
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   const user = createUser(parsed.data.email, parsed.data.password);
@@ -243,7 +227,7 @@ authRouter.post('/setup', (req: Request, res: Response) => {
 authRouter.post('/login', (req: Request, res: Response) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   const { email, password } = parsed.data;
@@ -298,24 +282,20 @@ authRouter.post('/change-email', (req: Request, res: Response) => {
   }
   const parsed = changeEmailSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   try {
     const ok = updateEmail(session.userId, parsed.data.currentPassword, parsed.data.newEmail);
     if (!ok) {
-      const attempts = (failedPasswordAttempts.get(session.userId) || 0) + 1;
-      if (attempts >= 3) {
-        deleteSession(bearer(req));
-        failedPasswordAttempts.delete(session.userId);
+      if (recordReauthFailure(session.userId, bearer(req))) {
         res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
         return;
       }
-      failedPasswordAttempts.set(session.userId, attempts);
       res.status(403).json({ error: { message: 'Current password is incorrect', type: 'invalid_password' } });
       return;
     }
-    failedPasswordAttempts.delete(session.userId);
+    clearReauthFailures(session.userId);
     res.json({ success: true, email: parsed.data.newEmail.trim().toLowerCase() });
   } catch (err: any) {
     if (err.code === 'email_taken') {
@@ -340,23 +320,19 @@ authRouter.post('/change-password', (req: Request, res: Response) => {
   }
   const parsed = changePasswordSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   const ok = updatePassword(session.userId, parsed.data.currentPassword, parsed.data.newPassword);
   if (!ok) {
-    const attempts = (failedPasswordAttempts.get(session.userId) || 0) + 1;
-    if (attempts >= 3) {
-      deleteSession(bearer(req));
-      failedPasswordAttempts.delete(session.userId);
+    if (recordReauthFailure(session.userId, bearer(req))) {
       res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
       return;
     }
-    failedPasswordAttempts.set(session.userId, attempts);
     res.status(403).json({ error: { message: 'Current password is incorrect', type: 'invalid_password' } });
     return;
   }
-  failedPasswordAttempts.delete(session.userId);
+  clearReauthFailures(session.userId);
   res.json({ success: true });
 });
 
@@ -389,7 +365,7 @@ const resetPasswordSchema = z.object({
 authRouter.post('/reset-password', (req: Request, res: Response) => {
   const parsed = resetPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   if (!resetCodeMatches(parsed.data.resetCode)) {

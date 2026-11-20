@@ -1,3 +1,4 @@
+import { speechFlowCredentials } from '../providers/speechflow.js';
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
@@ -10,7 +11,7 @@ import { getSyncState } from '../services/catalog-sync.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
-import { verifyCredentials } from '../services/auth.js';
+import { verifyCredentials, recordReauthFailure, clearReauthFailures } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential, normalizeGroupLabel, setCustomEndpointGroup } from '../services/custom-endpoint.js';
@@ -35,6 +36,8 @@ import type { Db } from '../db/types.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
+import { isLoopbackRequest } from '../lib/loopback.js';
+import { availableKeylessProviders, dismissAvailableKeylessProviders, enableAvailableKeylessProviders } from '../services/keyless-defaults.js';
 
 export const keysRouter = Router();
 
@@ -69,9 +72,16 @@ const PLATFORMS = [
   'moondream',
   'jamai',
   'nabh',
+  'zro',
   'novai',
   'varosity',
+  'speechflow',
+  'meldport',
   'rime',
+  'typecast',
+  'cartesia',
+  'silvr',
+  'freetts',
   'freeinference',
   'freemodel',
   'beatapi',
@@ -80,6 +90,7 @@ const PLATFORMS = [
   'iteracompute',
   'serpsearch',
   'brave',
+  'outcrawl',
   'halx',
   'aisense',
   'freeai',
@@ -515,6 +526,11 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       // request) — distinct from lastCheckedAt, which a transport error also
       // refreshes.
       lastHealthyAt: row.last_healthy_at ?? null,
+      // #1516 (display-only): what the healthy verdict rests on — a /models
+      // probe ('models_only') or a served request ('inference_verified').
+      // Null = never verified. Exposed so the dashboard can say which it is;
+      // it changes no routing.
+      verificationBasis: row.verification_basis ?? null,
       lastHealthError: row.last_health_error ?? null,
       // The model_id list this key is limited to; null = serves everything (#657).
       modelScope: scope ? [...scope] : null,
@@ -580,16 +596,11 @@ keysRouter.delete('/:id/cooldowns/checkin', (req: Request, res: Response) => {
   res.json({ cleared: clearApinexCheckinCooldownsForKey(id) });
 });
 
-// Is the caller connecting from this machine? Read from the real socket peer
-// address, NOT req.ip or X-Forwarded-For: those are caller-controlled, so
-// trusting them here would let a remote caller claim to be local.
-function isLoopbackRemote(req: Request): boolean {
-  let addr = req.socket?.remoteAddress ?? '';
-  // Node reports IPv4 loopback over a dual-stack socket as "::ffff:127.0.0.1".
-  if (addr.startsWith('::ffff:')) addr = addr.slice(7);
-  if (addr === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(addr);
-}
+// Is the caller connecting from this machine? The socket peer decides, and a
+// same-host reverse proxy's own X-Forwarded-For hop can withdraw locality but
+// never grant it (lib/loopback.ts, #1884). Reading the socket alone made every
+// request through such a proxy look local.
+const isLoopbackRemote = (req: Request): boolean => isLoopbackRequest(req);
 
 // #786: the desktop build has no user-set password (its machine user's password
 // is random and never shown), so re-verification would lock desktop users out of
@@ -602,20 +613,40 @@ function skipsReauth(req: Request): boolean {
   return process.env.FREEAPI_DESKTOP === '1' && isLoopbackRemote(req);
 }
 
+// Re-verify the dashboard password for a plaintext-key endpoint (export,
+// reveal). Wrong guesses count toward the shared strike limit, so a stolen
+// session cannot be used to test passwords until one works (#1885): the third
+// wrong password signs the session out. Returns true when the request may go on;
+// otherwise the response has been sent.
+function passesReauth(req: Request, res: Response, action: string): boolean {
+  if (skipsReauth(req)) return true;
+  const user = (req as any).user as { userId: number; email: string };
+  const password = req.headers['x-reauth-password'] as string | undefined;
+  if (!password) {
+    res.status(403).json({ error: { message: `Password verification required to ${action}`, type: 'authentication_error' } });
+    return false;
+  }
+  if (!verifyCredentials(user.email, password)) {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+      ?? (req.headers['x-dashboard-token'] as string | undefined);
+    if (recordReauthFailure(user.userId, token)) {
+      res.status(401).json({ error: { message: 'Too many incorrect attempts. You have been signed out.', type: 'authentication_error' } });
+    } else {
+      res.status(403).json({ error: { message: `Password verification required to ${action}`, type: 'authentication_error' } });
+    }
+    return false;
+  }
+  clearReauthFailures(user.userId);
+  return true;
+}
+
 // Export keys — returns plaintext keys in the requested format.
 // GET /api/keys/export?format=json|env|csv&healthy=true
 // The response is the raw file download (Content-Type varies by format).
 // Password re-verification via x-reauth-password header is required, except for
 // a local request on the desktop build (see skipsReauth).
 keysRouter.get('/export', (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (!skipsReauth(req)) {
-    const password = req.headers['x-reauth-password'] as string | undefined;
-    if (!password || !verifyCredentials(user.email, password)) {
-      res.status(403).json({ error: { message: 'Password verification required to export keys', type: 'authentication_error' } });
-      return;
-    }
-  }
+  if (!passesReauth(req, res, 'export keys')) return;
   const db = getDb();
   const format = (req.query.format as string) ?? 'json';
   const healthyOnly = req.query.healthy === 'true';
@@ -732,14 +763,7 @@ keysRouter.get('/export', (req: Request, res: Response) => {
 // local request on the desktop build, which has no password to re-enter (see
 // skipsReauth; a LAN client of that same desktop server still needs one).
 keysRouter.post('/:id/reveal', (req: Request, res: Response) => {
-  const user = (req as any).user;
-  if (!skipsReauth(req)) {
-    const password = req.headers['x-reauth-password'] as string | undefined;
-    if (!password || !verifyCredentials(user.email, password)) {
-      res.status(403).json({ error: { message: 'Password verification required to reveal a key', type: 'authentication_error' } });
-      return;
-    }
-  }
+  if (!passesReauth(req, res, 'reveal a key')) return;
 
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
@@ -761,11 +785,25 @@ keysRouter.post('/:id/reveal', (req: Request, res: Response) => {
   }
 });
 
+// #1870: no-key providers this install's catalog offers but it has not added.
+keysRouter.get('/keyless-available', (_req: Request, res: Response) => {
+  res.json({ providers: availableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/enable', (_req: Request, res: Response) => {
+  res.json({ enabled: enableAvailableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/dismiss', (_req: Request, res: Response) => {
+  dismissAvailableKeylessProviders();
+  res.json({ ok: true });
+});
+
 // Add a key
 keysRouter.post('/', (req: Request, res: Response) => {
   const parsed = addKeySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -774,6 +812,10 @@ keysRouter.post('/', (req: Request, res: Response) => {
   const isKeyless = resolveProvider(platform)?.keyless === true;
   const rawKey = parsed.data.key?.trim() ?? '';
 
+  if (platform === 'speechflow' && !speechFlowCredentials(rawKey)) {
+    res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+    return;
+  }
   if (!isKeyless && !rawKey) {
     res.status(400).json({ error: { message: 'key is required' } });
     return;
@@ -1060,7 +1102,7 @@ async function registerImportedModels(
 // too when FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS is set. Re-checked at request
 // time in proxyFetch for URLs already in the DB.
 async function rejectUnsafeBaseUrl(baseUrl: string, res: Response): Promise<boolean> {
-  const verdict = await assessProviderUrl(baseUrl);
+  const verdict = await assessProviderUrl(baseUrl, { allowUnresolved: true });
   if (verdict.allowed) return false;
   res.status(400).json({ error: { message: `baseUrl rejected: ${verdict.reason}` } });
   return true;
@@ -1085,7 +1127,7 @@ const discoverModelsSchema = z.object({
 keysRouter.post('/custom/discover-models', async (req: Request, res: Response) => {
   const parsed = discoverModelsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1216,7 +1258,7 @@ const registerDiscoveredSchema = z.object({
 keysRouter.post('/discovered-models', (req: Request, res: Response) => {
   const parsed = registerDiscoveredSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
   const key = builtinKeyRow(parsed.data.keyId);
@@ -1253,7 +1295,7 @@ keysRouter.post('/discovered-models', (req: Request, res: Response) => {
 keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
   const parsed = discoverModelsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1346,7 +1388,7 @@ keysRouter.post('/custom/probe', async (req: Request, res: Response) => {
 keysRouter.post('/custom', async (req: Request, res: Response) => {
   const parsed = customProviderSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1580,7 +1622,7 @@ keysRouter.post('/import', (req: Request, res: Response, next: NextFunction) => 
           // just as capable of naming a cloud metadata address.
           let verdict = urlVerdicts.get(baseUrl);
           if (!verdict) {
-            verdict = await assessProviderUrl(baseUrl);
+            verdict = await assessProviderUrl(baseUrl, { allowUnresolved: true });
             urlVerdicts.set(baseUrl, verdict);
           }
           if (!verdict.allowed) {
@@ -1695,7 +1737,7 @@ keysRouter.post('/preview', (req: Request, res: Response, next: NextFunction) =>
 keysRouter.post('/import-selected', async (req: Request, res: Response) => {
   const parsed = z.object({ keys: z.array(importKeySchema).max(100) }).safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1733,7 +1775,7 @@ keysRouter.post('/import-selected', async (req: Request, res: Response) => {
       // manual add form can (#440), so it gets the same guard.
       let verdict = urlVerdicts.get(baseUrl);
       if (!verdict) {
-        verdict = await assessProviderUrl(baseUrl);
+        verdict = await assessProviderUrl(baseUrl, { allowUnresolved: true });
         urlVerdicts.set(baseUrl, verdict);
       }
       if (!verdict.allowed) {
@@ -1904,7 +1946,7 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
 
   const parsed = updateKeySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: { message: parsed.error.errors.map(e => e.message).join(', ') } });
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
     return;
   }
 
@@ -1924,6 +1966,10 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     // Key-optional platforms (Kilo, OVH, AI Horde) accept a real key here like
     // any other provider: it replaces the anonymous sentinel (#1331).
 
+    if (stored.platform === 'speechflow' && !speechFlowCredentials(key)) {
+      res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+      return;
+    }
     if (stored.platform === 'cloudflare') {
       const separator = key.indexOf(':');
       if (separator < 1 || !key.slice(0, separator).trim() || !key.slice(separator + 1).trim()) {

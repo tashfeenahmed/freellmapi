@@ -12,6 +12,7 @@ let keySeq = keySeqStart;
 
 import { initDb, getDb } from '../../db/index.js';
 import { runModelCall } from '../../services/fusion.js';
+import { providerRequestError } from '../../providers/base.js';
 import { getAllPenalties, type RouteResult } from '../../services/router.js';
 import type { ChatMessage } from '@freellmapi/shared/types.js';
 
@@ -100,5 +101,14 @@ describe('provider-moment attribution in the fusion retry path (#1347)', () => {
     // 400 is not retryable at all, so the slot stops without a penalty —
     // assert instead that the log row was NOT tagged as a provider moment.
     expect(lastLogRow()).toEqual({ status: 'error', failure_attribution: null });
+  });
+
+  it.each(['request', 'model'] as const)('does not cooldown a key for an adapter %s rejection', async kind => {
+    const { route } = fakeRoute(providerRequestError('unsupported by this route', kind));
+    await runSlot(route);
+    const cooldowns = getDb().prepare('SELECT COUNT(*) AS n FROM rate_limit_cooldowns WHERE key_id = ?')
+      .get(route.keyId) as { n: number };
+    expect(cooldowns.n).toBe(0);
+    expect(penaltyFor(route.modelDbId)).toBeUndefined();
   });
 });

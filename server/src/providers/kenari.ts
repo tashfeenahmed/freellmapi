@@ -1,5 +1,5 @@
 import type { ChatCompletionChunk, ChatCompletionResponse, ChatMessage } from '@freellmapi/shared/types.js';
-import { providerHttpError, type CompletionOptions, type KeyValidationResult, type ProviderFetchOptions } from './base.js';
+import { providerHttpError, providerRequestError, type CompletionOptions, type KeyValidationResult, type ProviderFetchOptions } from './base.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 
@@ -11,7 +11,7 @@ function upstreamError(message: string): Error {
 
 export function requireKenariFreeModel(modelId: string): void {
   if (!modelId.endsWith(':free')) {
-    throw Object.assign(new Error('Kenari requires an explicit :free model route'), { status: 400 });
+    throw providerRequestError('Kenari requires an explicit :free model route', 'model');
   }
 }
 

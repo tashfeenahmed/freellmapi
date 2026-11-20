@@ -104,11 +104,23 @@ export type Platform =
   | 'jamai'
   // One shared renewable monthly credit allowance; signed catalog only.
   | 'nabh'
+  // Zro by MoonMath.ai: selected chat routes share daily free usage. The
+  // allowance is not monthly cash credit; model rows are hosted-catalog only.
+  | 'zro'
   // Daily-free video route; signed catalog only.
   | 'novai'
   | 'varosity'
   // Native TTS and transcription; one shared renewable monthly credit grant.
+  | 'speechflow'
+  | 'meldport'
   | 'rime'
+  // Native speech: shared monthly credits, non-commercial Free output.
+  | 'typecast'
+  | 'cartesia'
+  // OpenAI-compatible gateway; one shared daily free allowance.
+  | 'silvr'
+  // Local personal BYOK TTS; shared monthly characters, watermarked Free audio.
+  | 'freetts'
   // Research API; chat and embeddings share a daily quota. Requests are logged.
   | 'freeinference'
   // Personal BYOK client; shared monthly account allowance, Telegram verification.
@@ -173,6 +185,7 @@ export type Platform =
   | 'halx'
   | 'aisense'
   | 'brave'
+  | 'outcrawl'
   | 'cloudflare'
   | 'zhipu'
   | 'ollama'
@@ -303,7 +316,7 @@ export type Platform =
  *  web_search tools), never chat. Search engine rows arrive through the
  *  catalog's `searchEngines` registry. The server keeps its own runtime copy in
  *  server/src/lib/search-platforms.ts (shared is type-only on the server). */
-export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave'] as const;
+export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave', 'outcrawl'] as const;
 export type SearchPlatform = (typeof SEARCH_PLATFORMS)[number];
 
 export function isSearchPlatform(platform: string): platform is SearchPlatform {
@@ -366,7 +379,7 @@ export type KeyStatus = 'healthy' | 'rate_limited' | 'invalid' | 'error' | 'unkn
 
 export interface ApiKeyModel {
   id: number;
-  kind: 'chat' | 'embedding' | 'image' | 'audio' | 'transcription';
+  kind: 'chat' | 'embedding' | 'image' | 'audio' | 'transcription' | 'search' | 'decision';
   modelId: string;
   displayName: string;
   family?: string | null;
@@ -381,6 +394,10 @@ export interface ApiKeyCooldown {
   expiresAtMs: number;
   remainingMs: number;
 }
+
+/** What a key's healthy verdict rests on (#1516, display-only). See
+ *  `ApiKey.verificationBasis`. */
+export type KeyVerificationBasis = 'models_only' | 'inference_verified';
 
 export interface ApiKey {
   id: number;
@@ -408,6 +425,12 @@ export interface ApiKey {
    *  live request (#1493). Unlike lastCheckedAt, a transport error does not
    *  refresh it, so "checked recently but never worked" is visible. */
   lastHealthyAt?: string | null;
+  /** What the key's healthy verdict actually rests on (#1516, display-only):
+   *  'models_only' when it comes from the /models catalog probe — a 200 there
+   *  says nothing about real inference — 'inference_verified' once the key
+   *  served a live request. Null = never verified, or cleared by an invalid
+   *  verdict. Changes no routing. */
+  verificationBasis?: KeyVerificationBasis | null;
   lastHealthError: string | null;
   /** Model ids this key is limited to; null = serves every model of its
    *  platform (#657). */

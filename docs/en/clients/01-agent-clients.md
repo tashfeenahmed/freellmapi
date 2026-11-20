@@ -5,6 +5,7 @@
 [← Back to README](../README.md) · [Documentation index](../README.md) · [All supported agents](02-supported-agents.md)
 
 - [OpenAI-compatible clients](#openai-compatible-clients)
+- [Claude Desktop (third-party gateway)](#claude-desktop-third-party-gateway)
 - [Coding agents](#coding-agents)
 - [QwenPaw](#qwenpaw)
 - [Native Gemini clients](#native-gemini-clients)
@@ -23,7 +24,40 @@ Any client that can target an OpenAI-compatible base URL can use FreeLLMAPI:
 - **Local GPU boxes**: add custom OpenAI-compatible endpoints for Ollama,
   llama.cpp, LM Studio, vLLM, or an internal gateway.
 
+## Claude Desktop (third-party gateway)
+
+Claude Desktop can use FreeLLMAPI as a third-party inference gateway. It speaks
+the Anthropic Messages API, so the base URL is the **bare origin, without
+`/v1`**. Claude Desktop appends `/v1/models` and `/v1/messages` itself.
+
+1. In Claude Desktop, open **Setup** and choose **Gateway**.
+2. Set the **Gateway base URL** to `http://127.0.0.1:31415` for the desktop app,
+   or `http://localhost:3001` for a server install.
+   - In the desktop app, the tray panel's **Copy Claude URL** button copies this.
+   - On the dashboard it is the **Claude base URL** on the Keys page's **Anthropic** tab.
+3. Use the unified key from the dashboard as the API key (`x-api-key`).
+4. Click **Check again**. Model discovery lists `claude-opus-*`, `claude-sonnet-*`
+   and `claude-haiku-*` ids, which route to your free models according to the
+   Claude model mapping on the Keys page.
+
+If you paste the OpenAI-style URL (`.../v1`) by mistake, Claude Desktop calls
+`/v1/v1/models`. FreeLLMAPI now collapses the duplicate `/v1`, so this works
+anyway, but older builds answer 404 with "Gateway /v1/models returned HTTP 404".
+
 ## Coding agents
+
+Install the agent itself first: FreeLLMAPI does not bundle it. For Claude Code, see
+[the Claude Code setup guide](https://docs.claude.com/en/docs/claude-code/setup), then check
+that `claude --version` works in a new terminal. The desktop app listens on
+`http://127.0.0.1:31415`, so use that in place of `http://localhost:3001` below.
+
+On Windows (PowerShell), with the unified key from the dashboard:
+
+```powershell
+$env:ANTHROPIC_BASE_URL = "http://127.0.0.1:31415"
+$env:ANTHROPIC_AUTH_TOKEN = "<unified-key>"
+claude
+```
 
 Use the generator instead of hand-editing a client configuration:
 
@@ -69,6 +103,20 @@ because it appends the Anthropic Messages path. OpenAI-compatible clients in
 this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
 Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, Reasonix, ZCode, QwenPaw, and DeepSeek Harness—expect their configured
 base URL to include `/v1`.
+
+Codex prints "Model metadata for `auto` not found" on every run because it
+does not know the gateway's model ids. To give it real metadata (context
+window, image support), point the provider's `model_catalog_url` at
+`/v1/codex/models` in `~/.codex/config.toml`:
+
+```toml
+[model_providers.freellmapi]
+# ...existing base_url, env_key and wire_api...
+model_catalog_url = "http://localhost:3001/v1/codex/models"
+```
+
+The catalog keeps Codex's own default system prompt and tool settings, so
+only the warning and the context window change.
 
 ### DeepSeek Harness (`dsh`)
 

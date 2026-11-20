@@ -927,4 +927,20 @@ describe('applyCatalog: decisionModels', () => {
     setSetting('catalog_applied_json', JSON.stringify(catalog));
     expect(reapplyCachedCatalog().reapplied).toBe(false);
   });
+
+  it('never prunes a custom decision row (#1777)', () => {
+    // A user-registered custom decision row is not a catalog row: a catalog
+    // sync carrying the built-in registry must leave it alone, the way the
+    // custom search relay survives a search sync. Without the
+    // CATALOG_DECISION_PLATFORMS exclusion, adding 'custom' to the adapters
+    // would make the prune loop delete this row on the next sync.
+    getDb().prepare(`
+      INSERT INTO media_models (platform, model_id, display_name, modality, priority, enabled, quota_label)
+      VALUES ('custom', 'my-decider', 'My Decider', 'decision', 9, 1, 'custom endpoint')
+    `).run();
+    applyCatalog(getDb(), decisionCatalog(decisionRoster()));
+    expect(decisionRows().map(r => r.model_id)).toContain('my-decider');
+    applyCatalog(getDb(), decisionCatalog([]));
+    expect(decisionRows().map(r => r.model_id)).toEqual(['my-decider']);
+  });
 });

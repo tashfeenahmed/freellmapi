@@ -2,7 +2,7 @@
 
 # FreeLLMAPI
 
-**Ayda 7,4 milyar token. 34 ücretsiz LLM sağlayıcısı. 635 ücretsiz model uç noktası. OpenAI uyumlu tek bir uç nokta.**
+**Ayda 10,1 milyar token. 87 ücretsiz LLM sağlayıcısı. 1.313 ücretsiz model uç noktası. OpenAI uyumlu tek bir uç nokta.**
 
 Onlarca sağlayıcının ücretsiz kullanım kotalarını ve özel OpenAI uyumlu sohbet, gömme (embedding), görüntü ve ses uç noktalarını tek bir `/v1` API’sinde birleştirin. Anahtarlar şifreli saklanır. Yönlendirici, her istek için kullanılabilir en iyi modeli seçer; bir sağlayıcı hız sınırına ulaştığında sıradakine geçer ve ücretsiz kotaları aşmamak için kullanımı anahtar bazında izler.
 
@@ -13,13 +13,13 @@ Onlarca sağlayıcının ücretsiz kullanım kotalarını ve özel OpenAI uyumlu
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 [![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-Ask-blue)](https://deepwiki.com/tashfeenahmed/freellmapi)
 
-**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · tüm kataloğa göz atın: 474 model ailesi, 635 ücretsiz uç nokta
+**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · tüm kataloğa göz atın: 736 model ailesi, 1.313 ücretsiz uç nokta
 
-[English](README.md) · **Türkçe** · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md)
+[English](README.md) · **Türkçe** · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos-tr.svg" height="48" alt="macOS için indir"></a>
-  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows-tr.svg" height="48" alt="Windows için indir"></a>
+  <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store-tr.svg" height="48" alt="Microsoft Store’dan edinin"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker-tr.svg" height="48" alt="Docker ile kendi ortamınızda çalıştırın"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store-tr.svg" height="48" alt="Google Play’den edinin"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store-tr.svg" height="48" alt="App Store’dan indirin"></a>
@@ -60,13 +60,13 @@ Yönlendiriciniz model kataloğunu imzalı bir akıştan kendisi günceller: yen
 
 ## Neden geliştirildi?
 
-Günümüzde önde gelen yapay zekâ laboratuvarları ayda birkaç milyon token, günde birkaç bin istek sunan ücretsiz planlar sağlıyor. Tek başlarına sınırlı olsalar da bir araya geldiklerinde, küçük ve hızlı modellerden oldukça yetenekli modellere kadar **474 model ailesi / 635 sağlayıcı uç noktası** üzerinden **ayda yaklaşık 7,4 milyar token** çıkarım kapasitesine ulaşıyorlar.
+Günümüzde önde gelen yapay zekâ laboratuvarları ayda birkaç milyon token, günde birkaç bin istek sunan ücretsiz planlar sağlıyor. Tek başlarına sınırlı olsalar da bir araya geldiklerinde, küçük ve hızlı modellerden oldukça yetenekli modellere kadar **736 model ailesi / 1.313 sağlayıcı uç noktası** üzerinden **ayda yaklaşık 10,1 milyar token** çıkarım kapasitesine ulaşıyorlar.
 
-Bunları elle birleştirmek zahmetli: otuz dört farklı SDK, otuz dört farklı hız sınırı ve bir isteğin başarısız olabileceği otuz dört ayrı yer. FreeLLMAPI hepsini OpenAI uyumlu tek bir uç noktada toplar. Herhangi bir OpenAI istemci kitaplığını yerel sunucunuza yönlendirin; istekler, anahtar eklediğiniz sağlayıcılar arasında istemciye yansımadan yönlendirilir.
+Bunları elle birleştirmek zahmetli: seksen yedi farklı SDK, seksen yedi farklı hız sınırı ve bir isteğin başarısız olabileceği seksen yedi ayrı yer. FreeLLMAPI hepsini OpenAI uyumlu tek bir uç noktada toplar. Herhangi bir OpenAI istemci kitaplığını yerel sunucunuza yönlendirin; istekler, anahtar eklediğiniz sağlayıcılar arasında istemciye yansımadan yönlendirilir.
 
 Ücretsiz planlar da her hafta değişiyor: sağlayıcılar yeni modeller çıkarıyor, eskilerini kaldırıyor ve kotaları haber vermeden değiştiriyor. FreeLLMAPI bunları sizin için takip eder. Yönlendirici, imzalı model kataloğunu [freellmapi.co](https://freellmapi.co) üzerinden kendisi alır; kurulumunuz `git pull` gerekmeden güncel kalır. Güncellemelerin ne kadar hızlı geldiği için [Premium (canlı katalog)](#premium-live-catalog) bölümüne bakın.
 
-![Ücretsiz planlar bir arada — 34 sağlayıcıdan ayda yaklaşık 7,4 milyar token](repo-assets/i18n/tr/free-tier.png)
+![Ücretsiz planlar bir arada — 87 sağlayıcıdan ayda yaklaşık 10,1 milyar token](repo-assets/i18n/tr/free-tier.png)
 
 <a id="supported-providers"></a>
 
@@ -96,7 +96,7 @@ Bunları elle birleştirmek zahmetli: otuz dört farklı SDK, otuz dört farklı
 </tr>
 </table>
 
-<i>… ve 22 ücretsiz sağlayıcı daha</i>
+<i>… ve 75 ücretsiz sağlayıcı daha</i>
 
 </div>
 
@@ -184,7 +184,7 @@ Bash’e aktarmadan önce okumak ister misiniz? [Betik burada](https://freellmap
 
 http://localhost:3001 adresini açın, **Anahtarlar (Keys)** sayfasına sağlayıcı anahtarlarınızı ekleyin, **Yedek Model Zinciri (Fallback Chain)** sırasını istediğiniz gibi düzenleyin ve **Anahtarlar** sayfasının üst kısmından birleşik API anahtarınızı alın. OpenAI SDK’nızda bu birleşik anahtarı kullanın.
 
-Windows’ta en kolay yol, aşağıda açıklanan **[Releases bölümündeki `.exe` masaüstü yükleyicisidir](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. Android için deneysel [Termux rehberine](docs/en/install/02-android-termux.md) bakın.
+Windows’ta en kolay yol, masaüstü uygulamasını **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** üzerinden kurmaktır: imzalıdır (Smart App Control engellemez) ve kendini günceller. İmzasız `.exe` yükleyicisi [Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest) bölümündedir (aşağıda). Android için deneysel [Termux rehberine](docs/en/install/02-android-termux.md) bakın.
 
 Docker Compose, yerel geliştirme, bildirimsel başlangıç yapılandırması, üretim derlemeleri, yerel ağ erişimi ve yedeklemeler için **[kurulum rehberine](docs/en/install/01-install.md)** bakın.
 
@@ -196,7 +196,7 @@ Docker Compose, yerel geliştirme, bildirimsel başlangıç yapılandırması, �
 
 ![FreeLLMAPI masaüstü uygulaması](repo-assets/desktop.png)
 
-**[Releases bölümünden indirin](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — her sürüme macOS `.dmg` ve Windows `.exe` yükleyicileri eklenir. Hesap veya parola oluşturmanız gerekmez; ihtiyacınız olan tek kimlik bilgisi tepsi panelindeki birleşik API anahtarıdır. Kaynaktan derleme adımları ve veri konumları: [masaüstü uygulaması rehberi](docs/en/install/01-install.md#desktop-app).
+**[Releases bölümünden indirin](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — her sürüme macOS `.dmg` ve Windows `.exe` yükleyicileri eklenir. Windows’ta **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** sürümünü tercih edin: imzalı olduğu için Smart App Control engellemez ve Store onu güncel tutar. Hesap veya parola oluşturmanız gerekmez; ihtiyacınız olan tek kimlik bilgisi tepsi panelindeki birleşik API anahtarıdır. Kaynaktan derleme adımları ve veri konumları: [masaüstü uygulaması rehberi](docs/en/install/01-install.md#desktop-app).
 
 macOS 12 Monterey ve sonrası için **arm64 (Apple Silicon)** veya **x64 (Intel)** sürümünü seçin. Her iki Mac derlemesinin ZIP paketi de sunulur.
 
@@ -232,7 +232,7 @@ Tam dil listesi [`client/src/i18n/locale-config.ts`](./client/src/i18n/locale-co
 
 Yönlendirici model kataloğunu kendisi güncel tutar: günde iki kez [freellmapi.co](https://freellmapi.co) üzerinden imzalı kataloğu alır, yeni modelleri, kota değişikliklerini ve sağlayıcılara özgü uyumluluk düzeltmelerini yerel veritabanınıza uygular. Etkinleştirme/devre dışı bırakma seçimleriniz ve özel sağlayıcılarınız değişmez. Her indirme uygulanmadan önce sabitlenmiş Ed25519 anahtarıyla doğrulanır.
 
-Katalog şu anda **34 sağlayıcı**, **474 model ailesi**, **635 ücretsiz sağlayıcı/model uç noktası** (584 sohbet, 41 gömme, 7 ses dökümü, 3 video) ve listelenen ücretsiz planlarda **ayda yaklaşık 7,4 milyar token** kapasitesini izler. Tam liste: **[freellmapi.co/models](https://freellmapi.co/models.html)**.
+Katalog şu anda **87 sağlayıcı**, **736 model ailesi**, **1.313 ücretsiz sağlayıcı/model uç noktası** (1.137 sohbet, 29 görsel, 41 ses, 68 gömme, 19 ses dökümü, 6 video, 13 karar) ve listelenen ücretsiz planlarda **ayda yaklaşık 10,1 milyar token** kapasitesini izler. Tam liste: **[freellmapi.co/models](https://freellmapi.co/models.html)**.
 
 Ücretsiz kurulumlar aynı imzalı kataloğun aylık anlık görüntüsünü alır. Bir model, canlı akışa eklendikten 30 gün sonra bu görüntüye katılır; bu nedenle ücretsiz sürüm şu anda yaklaşık 303 model geridedir. Hiçbir şeyin süresi dolmaz ve hiçbir özellik kısıtlanmaz; modeller yalnızca daha geç gelir.
 
@@ -368,7 +368,7 @@ Katkılarınızı bekliyoruz! Geliştirme süreci, PR beklentileri ve AI/LLM des
 <a href="https://github.com/thedavidweng"><img src="https://images.weserv.nl/?url=github.com/thedavidweng.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@thedavidweng" /></a>
 <a href="https://github.com/bharvey42"><img src="https://images.weserv.nl/?url=github.com/bharvey42.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@bharvey42" /></a>
 <a href="https://github.com/yuvrxj-afk"><img src="https://images.weserv.nl/?url=github.com/yuvrxj-afk.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@yuvrxj-afk" /></a>
-<a href="https://github.com/Tushar49"><img src="https://images.weserv.nl/?url=github.com/Tushar49.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tushar49" /></a>
+<a href="https://github.com/v0rtex1223"><img src="https://images.weserv.nl/?url=github.com/v0rtex1223.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@v0rtex1223" /></a>
 <a href="https://github.com/nicyoong"><img src="https://images.weserv.nl/?url=github.com/nicyoong.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@nicyoong" /></a>
 <a href="https://github.com/Aldo-f"><img src="https://images.weserv.nl/?url=github.com/Aldo-f.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Aldo-f" /></a>
 <a href="https://github.com/Tazrif-Raim"><img src="https://images.weserv.nl/?url=github.com/Tazrif-Raim.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tazrif-Raim" /></a>
@@ -502,6 +502,21 @@ Katkılarınızı bekliyoruz! Geliştirme süreci, PR beklentileri ve AI/LLM des
 <a href="https://github.com/kjgggggg"><img src="https://images.weserv.nl/?url=github.com/kjgggggg.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@kjgggggg" /></a>
 <a href="https://github.com/TheoCui-Saulcy"><img src="https://images.weserv.nl/?url=github.com/TheoCui-Saulcy.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@TheoCui-Saulcy" /></a>
 <a href="https://github.com/MatthewRobertDunn"><img src="https://images.weserv.nl/?url=github.com/MatthewRobertDunn.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@MatthewRobertDunn" /></a>
+<a href="https://github.com/nk-batman21"><img src="https://images.weserv.nl/?url=github.com/nk-batman21.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@nk-batman21" /></a>
+<a href="https://github.com/PowerTokens"><img src="https://images.weserv.nl/?url=github.com/PowerTokens.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@PowerTokens" /></a>
+<a href="https://github.com/navzo"><img src="https://images.weserv.nl/?url=github.com/navzo.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@navzo" /></a>
+<a href="https://github.com/motasimfuad"><img src="https://images.weserv.nl/?url=github.com/motasimfuad.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@motasimfuad" /></a>
+<a href="https://github.com/thedevil11255"><img src="https://images.weserv.nl/?url=github.com/thedevil11255.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@thedevil11255" /></a>
+<a href="https://github.com/kvianAR"><img src="https://images.weserv.nl/?url=github.com/kvianAR.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@kvianAR" /></a>
+<a href="https://github.com/TanmayShah29"><img src="https://images.weserv.nl/?url=github.com/TanmayShah29.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@TanmayShah29" /></a>
+<a href="https://github.com/heydryft"><img src="https://images.weserv.nl/?url=github.com/heydryft.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@heydryft" /></a>
+<a href="https://github.com/leucds2018-hub"><img src="https://images.weserv.nl/?url=github.com/leucds2018-hub.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@leucds2018-hub" /></a>
+<a href="https://github.com/zhangkom"><img src="https://images.weserv.nl/?url=github.com/zhangkom.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@zhangkom" /></a>
+<a href="https://github.com/noahkhomer18"><img src="https://images.weserv.nl/?url=github.com/noahkhomer18.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@noahkhomer18" /></a>
+<a href="https://github.com/mentallyunstable-lab"><img src="https://images.weserv.nl/?url=github.com/mentallyunstable-lab.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mentallyunstable-lab" /></a>
+<a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
+<a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
+<a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
 
 <a id="disclaimer"></a>
 

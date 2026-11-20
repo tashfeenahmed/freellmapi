@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ChatToolDefinition,
 } from '@freellmapi/shared/types.js';
+import { isLoopbackRequest } from '../lib/loopback.js';
 import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
@@ -21,20 +22,8 @@ export function getOllamaEmulationMode(): OllamaEmulationMode {
   return stored === 'open-loopback' || stored === 'key-required' ? stored : 'off';
 }
 
-export function isLoopback(req: Request): boolean {
-  const isLoopbackAddress = (value: string | undefined) => {
-    const address = value?.trim().replace(/^::ffff:/i, '');
-    return address === '127.0.0.1' || address === '::1';
-  };
-  if (!isLoopbackAddress(req.socket.remoteAddress)) return false;
-  const forwarded = req.headers['x-forwarded-for'];
-  const firstForwarded = (Array.isArray(forwarded) ? forwarded[0] : forwarded)
-    ?.split(',')[0];
-  // A local reverse proxy is itself a loopback socket, but its first forwarded
-  // hop may be remote. Refuse that request instead of silently widening
-  // open-loopback mode through the proxy.
-  return !firstForwarded || isLoopbackAddress(firstForwarded);
-}
+// The nearest proxy's hop decides, not the caller's: see lib/loopback.ts.
+export const isLoopback = (req: Request): boolean => isLoopbackRequest(req);
 
 function authorize(req: Request, res: Response): boolean {
   if ((req as Request & { urlTokenAuthenticated?: boolean }).urlTokenAuthenticated) {

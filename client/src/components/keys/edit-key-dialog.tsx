@@ -108,7 +108,8 @@ export function EditKeyDialog({
   const [proxyUrl, setProxyUrl] = useState('')
   const [clearProxy, setClearProxy] = useState(false)
 
-  const needsAccountId = apiKey.platform === 'cloudflare'
+  const speechFlow = apiKey.platform === 'speechflow'
+  const needsAccountId = speechFlow || apiKey.platform === 'cloudflare'
   // Every row takes a credential, including the anonymous row of a
   // key-optional platform (Kilo, OVH, AI Horde): a real key replaces the
   // sentinel there (#1331).
@@ -204,7 +205,7 @@ export function EditKeyDialog({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-xs" htmlFor="edit-key-value">
-                {needsAccountId ? t('keys.apiToken') : t('keys.customApiKey')}
+                {speechFlow ? 'keySecret' : needsAccountId ? t('keys.apiToken') : t('keys.customApiKey')}
               </Label>
               {!apiKey.keyless && (
                 <code className="font-mono text-[11px] text-muted-foreground">{apiKey.maskedKey}</code>
@@ -214,7 +215,7 @@ export function EditKeyDialog({
               <Input
                 value={accountId}
                 onChange={e => setAccountId(e.target.value)}
-                placeholder={t('keys.accountId')}
+                placeholder={speechFlow ? 'keyId' : t('keys.accountId')}
                 className="font-mono text-xs"
                 aria-invalid={attempted && Boolean(credentialError)}
               />
@@ -225,7 +226,7 @@ export function EditKeyDialog({
               autoComplete="new-password"
               value={apiKeyValue}
               onChange={e => setApiKeyValue(e.target.value)}
-              placeholder={apiKey.keyless ? t('keys.keyOptionalPlaceholder') : (needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
+              placeholder={apiKey.keyless ? t('keys.keyOptionalPlaceholder') : (speechFlow ? 'keySecret' : needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
               className="font-mono text-xs"
               aria-invalid={attempted && Boolean(credentialError)}
             />

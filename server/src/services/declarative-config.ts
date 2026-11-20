@@ -466,7 +466,7 @@ function applyFallback(db: Db, entries: z.infer<typeof fallbackEntrySchema>[]): 
 export function applyDeclarativeConfig(input: unknown, source = 'inline'): DeclarativeConfigResult {
   const parsed = declarativeConfigSchema.safeParse(input);
   if (!parsed.success) {
-    throw new Error(`invalid declarative config: ${parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+    throw new Error(`invalid declarative config: ${parsed.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
   }
 
   const db = getDb();

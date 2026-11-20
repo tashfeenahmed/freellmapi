@@ -5,7 +5,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('freeapi', {
   snapshot: () => ipcRenderer.invoke('freeapi:snapshot'),
   openDashboard: () => ipcRenderer.invoke('freeapi:open-dashboard'),
-  copyBaseUrl: () => ipcRenderer.invoke('freeapi:copy-base-url'),
+  copyBaseUrl: (kind: 'openai' | 'anthropic') => ipcRenderer.invoke('freeapi:copy-base-url', kind),
   copyApiKey: () => ipcRenderer.invoke('freeapi:copy-api-key'),
   setLoginItem: (open: boolean) => ipcRenderer.invoke('freeapi:set-login-item', open),
   quit: () => ipcRenderer.invoke('freeapi:quit'),

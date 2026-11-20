@@ -4,13 +4,16 @@ import { app, dialog, ipcMain, clipboard, nativeTheme, net, screen, shell, type 
 import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate, outboundProxyUrl, setCatalogFallbackFetch } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
 import { installFileLogger } from './logger.js';
-import { buildTray, refreshTrayLocale } from './tray.js';
+import { buildTray, refreshTrayLocale, refreshTrayMenu } from './tray.js';
 import { trayIsInMenuBar } from './tray-visibility.js';
 import { shouldOpenDashboardOnLaunch } from './tray-platform.js';
-import { openDashboard } from './window.js';
+import { registerAgentSetup } from './agent-setup.js';
+import { getDashboardWindow, openDashboard } from './window.js';
 import { todayStats, hourlyRequests, successRateToday } from './stats.js';
 import { normalizeLocale, nativeStrings, type NativeLocale } from './i18n.js';
+import { installGpuRecovery } from './gpu-recovery-host.js';
 import { initUpdater, getUpdateState, checkForUpdates, downloadUpdate, installUpdate, checkFromTray } from './updater.js';
+import { gatewayBaseUrl, parseBaseUrlKind } from './base-urls.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PORT = 31415;
@@ -28,6 +31,9 @@ if (!app.requestSingleInstanceLock()) {
   // without this the server's console output — the password-reset code above
   // all (#824) — is written nowhere the user can read it.
   installFileLogger();
+
+  // Before 'ready': GPU switches only take effect if set now (#1759).
+  installGpuRecovery();
 
   let resolvedPort = DEFAULT_PORT;
   let sessionToken = '';
@@ -103,6 +109,8 @@ if (!app.requestSingleInstanceLock()) {
     });
   });
 
+  registerAgentSetup({ port: () => resolvedPort, key: getUnifiedApiKey, dashboard: getDashboardWindow });
+
   // ── popover IPC ──────────────────────────────────────────────────────────
   ipcMain.handle('freeapi:snapshot', () => {
     const s = todayStats();
@@ -150,8 +158,10 @@ if (!app.requestSingleInstanceLock()) {
     getPopoverWindow()?.webContents.send('freeapi:refresh');
   });
   ipcMain.handle('freeapi:open-dashboard', () => openDashboard(resolvedPort, sessionToken));
-  ipcMain.handle('freeapi:copy-base-url', () => clipboard.writeText(`http://127.0.0.1:${resolvedPort}/v1`));
+  ipcMain.handle('freeapi:copy-base-url', (_e, kind: unknown) =>
+    clipboard.writeText(gatewayBaseUrl(resolvedPort, parseBaseUrlKind(kind))));
   ipcMain.handle('freeapi:copy-api-key', () => clipboard.writeText(getUnifiedApiKey()));
+  ipcMain.handle('freeapi:get-login-item', () => app.getLoginItemSettings().openAtLogin);
   ipcMain.handle('freeapi:set-login-item', (_e, open: boolean) => app.setLoginItemSettings({ openAtLogin: open }));
   ipcMain.handle('freeapi:quit', () => app.quit());
   // Dashboard → the in-app updater (preload __FREEAPI_UPDATER__). Each call
@@ -186,7 +196,8 @@ if (!app.requestSingleInstanceLock()) {
         detail:
           'The server will bind to 0.0.0.0 so other devices (Tailscale, VMs, ' +
           'phones on your Wi-Fi) can reach it at http://<this-machine-ip>:' +
-          `${resolvedPort}/v1.\n\nThe API is protected only by your unified ` +
+          `${resolvedPort}/v1 (OpenAI-style clients) or http://<this-machine-ip>:` +
+          `${resolvedPort} (Claude / Anthropic clients, no /v1).\n\nThe API is protected only by your unified ` +
           'API key. Only do this on a network you trust. The app will restart ' +
           'to apply the change.',
       });
@@ -249,6 +260,7 @@ if (!app.requestSingleInstanceLock()) {
     const next = !(loadConfig().showInDock ?? true);
     saveConfig({ ...loadConfig(), showInDock: next });
     applyDockVisibility(next);
+    refreshTrayMenu();
   }
 
   app.whenReady().then(async () => {
@@ -285,6 +297,8 @@ if (!app.requestSingleInstanceLock()) {
         try { return outboundProxyUrl(); } catch { return ''; }
       },
       getLocale: () => locale,
+      // The Linux tray menu is attached, not rebuilt per click (#1804).
+      onChange: () => refreshTrayMenu(),
     });
 
     // License activation and catalog sync retry through Chromium's network
@@ -344,7 +358,6 @@ if (!app.requestSingleInstanceLock()) {
       if (tray && process.env.FREEAPI_SHOT && !app.isPackaged) {
         const fs = await import('node:fs');
         const { togglePopover, getPopoverWindow } = await import('./popover.js');
-        const { getDashboardWindow } = await import('./window.js');
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
         await sleep(800);
         togglePopover(tray);

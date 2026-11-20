@@ -25,7 +25,7 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 Prefer to read before you pipe to bash? [The script is here](https://freellmapi.co/install.sh). Re-running it is safe: your `.env` (and encryption key) is preserved and the container updates to `:latest`. Override the defaults with `FREELLMAPI_DIR`, `PORT`, or `HOST_BIND` env vars.
 
-On Windows, the easiest path is the desktop **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** ([below](#desktop-app)); the Docker steps work in WSL or any bash shell.
+On Windows, the easiest path is the desktop app from the **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** (signed, so Smart App Control allows it, and updated by the Store), or the unsigned **[`.exe` installer from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** ([below](#desktop-app)); the Docker steps work in WSL or any bash shell.
 
 On Android, see the experimental [Termux installation guide](02-android-termux.md). It uses Node's built-in SQLite driver and does not require the Android NDK.
 
@@ -290,7 +290,7 @@ request stats.
 
 ![FreeLLMAPI desktop app](../../../repo-assets/desktop.png)
 
-**[Download from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — the macOS `.dmg` and the Windows `.exe` installer are built and attached to every release by the [`desktop-release`](../../../.github/workflows/desktop-release.yml) workflow. Or build it from this repo in a few minutes:
+**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** on Windows, or **[download from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — the macOS `.dmg` and the Windows `.exe` installer are built and attached to every release by the [`desktop-release`](../../../.github/workflows/desktop-release.yml) workflow. Or build it from this repo in a few minutes:
 
 **Mac downloads:** choose `arm64` for Apple Silicon or `x64` for Intel. Both require macOS 12 Monterey or later and include DMG and ZIP downloads.
 
@@ -301,8 +301,8 @@ request stats.
 ```bash
 npm install
 npm install --prefix desktop  # install desktop dependencies
-npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-arm64.dmg
-npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-x64.dmg
+npm run desktop:dist          # macOS  → desktop/dist-electron/FreeLLMAPI-…-macos-arm64.dmg
+npm run desktop:dist:mac:x64  # Intel Mac → desktop/dist-electron/FreeLLMAPI-…-macos-x64.dmg
 npm run desktop:dist:win      # Windows → "desktop/dist-electron/FreeLLMAPI-Setup-….exe"
 ```
 

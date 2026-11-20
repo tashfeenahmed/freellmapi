@@ -112,12 +112,84 @@ describe('inline tool-call dialect rescue', () => {
     });
   });
 
+  describe('dots <dots_function_call> dialect', () => {
+    it('parses a well-formed single invoke', () => {
+      const text = `<dots_function_call>
+  <invoke name="Bash">
+    <parameter name="command">echo "TOOL_CALL_SUCCESS"; whoami; pwd</parameter>
+  </invoke>
+</dots_function_call>`;
+      const r = rescueInlineToolCalls(text, TOOLS);
+      expect(r.detected).toBe(true);
+      expect(r.calls).toEqual([{
+        name: 'Bash',
+        arguments: '{"command":"echo \\"TOOL_CALL_SUCCESS\\"; whoami; pwd"}',
+      }]);
+      expect(r.cleanText).toBe('');
+    });
+
+    it('parses multiple invokes in one wrapper and keeps surrounding prose', () => {
+      const text = 'Let me check.\n<dots_function_call>\n  <invoke name="Bash">\n    <parameter name="command">ls</parameter>\n  </invoke>\n  <invoke name="Read">\n    <parameter name="file_path">/tmp/a</parameter>\n  </invoke>\n</dots_function_call>';
+      const r = rescueInlineToolCalls(text, TOOLS);
+      expect(r.detected).toBe(true);
+      expect(r.calls).toEqual([
+        { name: 'Bash', arguments: '{"command":"ls"}' },
+        { name: 'Read', arguments: '{"file_path":"/tmp/a"}' },
+      ]);
+      expect(r.cleanText).toBe('Let me check.');
+    });
+
+    it('gives JSON-typed values their type (numbers, booleans, arrays, objects)', () => {
+      const tools = new Set(['Read', 'Edit', 'TodoWrite']);
+      const text = `<dots_function_call>
+<invoke name="Read"><parameter name="file_path">/a.ts</parameter><parameter name="offset">10</parameter><parameter name="limit">50</parameter></invoke>
+<invoke name="Edit"><parameter name="file_path">/a.ts</parameter><parameter name="old_string">a</parameter><parameter name="new_string">b</parameter><parameter name="replace_all">true</parameter></invoke>
+<invoke name="TodoWrite"><parameter name="todos">[{"content":"x","status":"pending"}]</parameter></invoke>
+</dots_function_call>`;
+      const r = rescueInlineToolCalls(text, tools);
+      expect(r.calls?.map((c) => JSON.parse(c.arguments))).toEqual([
+        { file_path: '/a.ts', offset: 10, limit: 50 },
+        { file_path: '/a.ts', old_string: 'a', new_string: 'b', replace_all: true },
+        { todos: [{ content: 'x', status: 'pending' }] },
+      ]);
+    });
+
+    it('keeps non-JSON text as a string, including text that only looks like JSON', () => {
+      const tools = new Set(['Bash', 'Grep']);
+      const text = '<dots_function_call><invoke name="Grep"><parameter name="pattern">[a-z]+</parameter><parameter name="path">007x</parameter></invoke><invoke name="Bash"><parameter name="command">{ echo hi; }</parameter></invoke></dots_function_call>';
+      const r = rescueInlineToolCalls(text, tools);
+      expect(r.calls?.map((c) => JSON.parse(c.arguments))).toEqual([
+        { pattern: '[a-z]+', path: '007x' },
+        { command: '{ echo hi; }' },
+      ]);
+    });
+
+    it('keeps a value\'s own whitespace and drops only the line breaks next to the tags', () => {
+      const tools = new Set(['Edit']);
+      const text = '<dots_function_call><invoke name="Edit">\n<parameter name="old_string">\n    foo()\n  bar()\n</parameter>\n<parameter name="new_string">  baz()  </parameter>\n</invoke></dots_function_call>';
+      const r = rescueInlineToolCalls(text, tools);
+      expect(JSON.parse(r.calls![0].arguments)).toEqual({
+        old_string: '    foo()\n  bar()',
+        new_string: '  baz()  ',
+      });
+    });
+
+    it('rejects a call naming a tool the request never declared', () => {
+      const text = '<dots_function_call><invoke name="DropTables"><parameter name="x">1</parameter></invoke></dots_function_call>';
+      const r = rescueInlineToolCalls(text, TOOLS);
+      expect(r.detected).toBe(true);
+      expect(r.calls).toBeNull();
+    });
+  });
+
   describe('stream hold-window helpers', () => {
     it('startsWithDialectMarker matches all dialects, with leading whitespace', () => {
       expect(startsWithDialectMarker('<|tool_calls_section_begin|>x')).toBe(true);
       expect(startsWithDialectMarker('  <|tool_call_begin|>')).toBe(true);
       expect(startsWithDialectMarker('\n<tool_call>{}')).toBe(true);
       expect(startsWithDialectMarker('<function=Bash{')).toBe(true);
+      expect(startsWithDialectMarker('<dots_function_call>')).toBe(true);
+      expect(startsWithDialectMarker('  <dots_function_call>\n')).toBe(true);
       expect(startsWithDialectMarker('Hello!')).toBe(false);
       expect(startsWithDialectMarker('<html>')).toBe(false);
     });
@@ -127,14 +199,17 @@ describe('inline tool-call dialect rescue', () => {
       expect(couldBecomeDialectMarker('<|to')).toBe(true);
       expect(couldBecomeDialectMarker('<fun')).toBe(true);
       expect(couldBecomeDialectMarker('<tool_ca')).toBe(true);
+      expect(couldBecomeDialectMarker('<dots_fun')).toBe(true);
       expect(couldBecomeDialectMarker('<div')).toBe(false);
       expect(couldBecomeDialectMarker('Hi')).toBe(false);
       // Full marker present is no longer a *prefix* — startsWith takes over.
       expect(couldBecomeDialectMarker('<tool_call>')).toBe(false);
+      expect(couldBecomeDialectMarker('<dots_function_call>')).toBe(false);
     });
 
     it('containsDialectMarker finds markers mid-text', () => {
       expect(containsDialectMarker('prose then <function=Read{"a":1}</function>')).toBe(true);
+      expect(containsDialectMarker('prose then <dots_function_call>')).toBe(true);
       expect(containsDialectMarker('plain text')).toBe(false);
     });
   });
@@ -160,6 +235,13 @@ describe('inline tool-call dialect rescue', () => {
     it('does not synthesize a call from the Qwen/Hermes XML dialect', () => {
       const text = '<tool_call>{"name":"Bash","arguments":{"command":"ls"}}</tool_call>';
       expect(rescueInlineToolCalls(text, EMPTY).calls).toBeNull();
+    });
+
+    it('does not synthesize a call from the dots XML dialect', () => {
+      const text = '<dots_function_call><invoke name="Bash"><parameter name="command">ls</parameter></invoke></dots_function_call>';
+      const r = rescueInlineToolCalls(text, EMPTY);
+      expect(r.detected).toBe(true);
+      expect(r.calls).toBeNull();
     });
 
     it('still rescues the same text when the tool WAS declared', () => {
