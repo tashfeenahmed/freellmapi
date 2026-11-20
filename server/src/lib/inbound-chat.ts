@@ -249,6 +249,9 @@ export async function runInboundChat(
         input.responseFormat !== undefined,
         state.skipPlatforms.size ? state.skipPlatforms : undefined,
         outputReserve,
+        undefined,
+        undefined,
+        state.skipEndpoints.size ? state.skipEndpoints : undefined,
       );
     },
     dispatch: async (route, attempt) => {

@@ -24,7 +24,7 @@ import {
   getCompressionConfig,
   setCompressionConfig,
 } from '../services/compression/config.js';
-import { getHeadroomThresholds, setHeadroomThresholds, getTaskWeightShare, setTaskWeightShare, getMinReliabilityFloor, setMinReliabilityFloor, isProviderMomentAttributionEnabled, setProviderMomentAttribution } from '../services/router.js';
+import { getHeadroomThresholds, setHeadroomThresholds, getTaskWeightShare, setTaskWeightShare, getMinReliabilityFloor, setMinReliabilityFloor, isProviderMomentAttributionEnabled, setProviderMomentAttribution, getCustomFallbackMode, setCustomFallbackMode } from '../services/router.js';
 import { MCP_ENABLED_SETTING, isMcpServerEnabled } from './mcp.js';
 import { z } from 'zod';
 import { getAppVersion } from '../lib/app-version.js';
@@ -450,6 +450,26 @@ settingsRouter.put('/provider-moment-attribution', (req: Request, res: Response)
   }
   setProviderMomentAttribution(parsed.data.enabled);
   res.json({ enabled: isProviderMomentAttributionEnabled() });
+});
+
+// Custom platform 5xx fallback granularity: 'model' (default) skips only the
+// failing relay's model so sibling relays stay in play (#651); 'platform' keeps
+// the original #788 behaviour (skip the whole custom platform). The env var
+// ROUTER_CUSTOM_FALLBACK_MODE pins it without the UI.
+settingsRouter.get('/custom-fallback-mode', (_req: Request, res: Response) => {
+  res.json({ mode: getCustomFallbackMode() });
+});
+
+const customFallbackModePutSchema = z.object({ mode: z.enum(['model', 'platform']) });
+
+settingsRouter.put('/custom-fallback-mode', (req: Request, res: Response) => {
+  const parsed = customFallbackModePutSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'Invalid custom-fallback-mode: send {"mode": "model" | "platform"}', type: 'invalid_request_error' } });
+    return;
+  }
+  setCustomFallbackMode(parsed.data.mode);
+  res.json({ mode: getCustomFallbackMode() });
 });
 
 // Update the guardrails. Partial: send just the knob you want to change.

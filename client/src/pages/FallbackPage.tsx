@@ -50,6 +50,7 @@ import { PenaltyInspector } from '@/components/penalty-inspector'
 import { PeakHoursControls } from '@/components/peak-hours-controls'
 import { ReliabilityFloorControl } from '@/components/reliability-floor-control'
 import { ProviderMomentControl } from '@/components/provider-moment-control'
+import { CustomFallbackModeControl } from '@/components/custom-fallback-mode-control'
 import { DecisionRoutingPopover, DecisionSetupGuide } from '@/components/decision-routing-popover'
 import { ChainManager } from '@/components/chain-manager'
 
@@ -526,6 +527,10 @@ export default function FallbackPage() {
                   timeouts and transport drops steer the key without counting
                   against the model's reliability. Off by default. */}
               <ProviderMomentControl />
+              {/* Custom relay 5xx fallback granularity: model-level (default)
+                  skips only the failing relay; platform-level skips the whole
+                  custom platform. */}
+              <CustomFallbackModeControl />
             </div>
           )}
 
