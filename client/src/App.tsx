@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ChevronDown, KeyRound, LogOut, Menu, MoreHorizontal, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
@@ -29,24 +29,27 @@ import { I18nProvider, useI18n } from '@/i18n'
 import { logout } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { ThemeProvider } from '@/theme'
-import KeysPage from '@/pages/KeysPage'
-import PlaygroundPage from '@/pages/PlaygroundPage'
-import FallbackPage from '@/pages/FallbackPage'
-import ModelDetailPage from '@/pages/ModelDetailPage'
-import FusionPage from '@/pages/FusionPage'
-import EmbeddingsPage from '@/pages/EmbeddingsPage'
-import ImagePage from '@/pages/ImagePage'
-import VideoPage from '@/pages/VideoPage'
-import AudioPage from '@/pages/AudioPage'
-import SearchPage from '@/pages/SearchPage'
-import DecisionPage from '@/pages/DecisionPage'
-import MediaDetailPage from '@/pages/MediaDetailPage'
-import EmbeddingDetailPage from '@/pages/EmbeddingDetailPage'
-import AnalyticsPage from '@/pages/AnalyticsPage'
-import LogsPage from '@/pages/LogsPage'
-import PremiumPage from '@/pages/PremiumPage'
-import NotFoundPage from '@/pages/NotFoundPage'
-import AgentsPage from '@/pages/AgentsPage'
+
+// Route pages are code-split: each loads on first navigation instead of
+// shipping in the entry chunk. Shell, navbar and auth gate stay eager.
+const KeysPage = lazy(() => import('@/pages/KeysPage'))
+const PlaygroundPage = lazy(() => import('@/pages/PlaygroundPage'))
+const FallbackPage = lazy(() => import('@/pages/FallbackPage'))
+const ModelDetailPage = lazy(() => import('@/pages/ModelDetailPage'))
+const FusionPage = lazy(() => import('@/pages/FusionPage'))
+const EmbeddingsPage = lazy(() => import('@/pages/EmbeddingsPage'))
+const ImagePage = lazy(() => import('@/pages/ImagePage'))
+const VideoPage = lazy(() => import('@/pages/VideoPage'))
+const AudioPage = lazy(() => import('@/pages/AudioPage'))
+const SearchPage = lazy(() => import('@/pages/SearchPage'))
+const DecisionPage = lazy(() => import('@/pages/DecisionPage'))
+const MediaDetailPage = lazy(() => import('@/pages/MediaDetailPage'))
+const EmbeddingDetailPage = lazy(() => import('@/pages/EmbeddingDetailPage'))
+const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage'))
+const LogsPage = lazy(() => import('@/pages/LogsPage'))
+const PremiumPage = lazy(() => import('@/pages/PremiumPage'))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
+const AgentsPage = lazy(() => import('@/pages/AgentsPage'))
 
 // Every failed mutation surfaces as an error toast, so no action fails
 // silently. A page that already shows the failure inline can opt out with
@@ -409,6 +412,11 @@ function Navbar() {
   )
 }
 
+// Neutral placeholder while a lazily loaded route chunk arrives.
+function RouteFallback() {
+  return <div className="min-h-[40vh]" role="status" aria-busy="true" aria-label="Loading" />
+}
+
 // Keyed by pathname so navigating away from a crashed page resets the boundary.
 function PageBoundary({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -476,6 +484,7 @@ function App() {
                 <Navbar />
                 <PageContainer>
                   <PageBoundary>
+                    <Suspense fallback={<RouteFallback />}>
                     <Routes>
                       <Route path="/" element={<Navigate to="/models/chat" replace />} />
                       <Route path="/models" element={<Navigate to="/models/chat" replace />} />
@@ -504,6 +513,7 @@ function App() {
                       <Route path="/health" element={<Navigate to="/keys" replace />} />
                       <Route path="*" element={<NotFoundPage />} />
                     </Routes>
+                    </Suspense>
                   </PageBoundary>
                 </PageContainer>
                 <Toaster />
