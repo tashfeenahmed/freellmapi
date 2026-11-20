@@ -56,15 +56,15 @@ it('does not report an empty completion as a successful model test', async () =>
   expect(getDb().prepare('SELECT status,input_tokens,output_tokens FROM requests WHERE key_id=?').get(keyId))
     .toEqual({status:'error',input_tokens:3,output_tokens:2});
 });
-it('counts reasoning tokens when an empty completion omits usage', async () => {
+it('counts reasoning tokens when a reasoning-only reply omits usage', async () => {
   vi.spyOn(getProvider('groq')!,'chatCompletion').mockResolvedValue({
     ...answer, usage:undefined,
     choices:[{...answer.choices[0],message:{role:'assistant',content:null,reasoning_content:'x'.repeat(32)}}],
   });
-  expect((await post('/api/models/'+ids[0]+'/test')).body.success).toBe(false);
+  expect((await post('/api/models/'+ids[0]+'/test')).body.success).toBe(true);
   expect(getMonthlyUsage(keyId)).toEqual({requests:1,tokens:24});
   expect(getDb().prepare('SELECT status,input_tokens,output_tokens FROM requests WHERE key_id=?').get(keyId))
-    .toEqual({status:'error',input_tokens:16,output_tokens:8});
+    .toEqual({status:'success',input_tokens:16,output_tokens:8});
   expect(getDb().prepare("SELECT SUM(tokens) AS tokens FROM rate_limit_usage WHERE key_id=? AND kind='tokens'").get(keyId))
     .toEqual({tokens:24});
 });
