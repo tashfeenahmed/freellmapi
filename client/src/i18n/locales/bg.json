@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "по избор",
     "customFamily": "Семейство",
     "customFamilyPlaceholder": "По подразбиране към Model ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ключ",
     "customCapabilities": "Възможности",
     "addModel": "Добави модел",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ток макс",
     "emptyTitle": "Все още няма вградени модели",
     "emptyDesc": "Семействата за вграждане се появяват тук, след като добавите доставчик ключ, който поддържа вграждания.",
-    "dragToReorder": "Drag to reorder provider"
+    "dragToReorder": "Drag to reorder provider",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Сливане",

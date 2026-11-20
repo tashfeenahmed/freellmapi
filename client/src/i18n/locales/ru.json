@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "необязательно",
     "customFamily": "Семья",
     "customFamilyPlaceholder": "по умолчанию используется идентификатор модели",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Ключ API",
     "customCapabilities": "Возможности",
     "addModel": "Добавить модель",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ток макс.",
     "emptyTitle": "Встраиваемых моделей пока нет.",
     "emptyDesc": "Семейства встраивания появляются здесь после добавления ключа поставщика, поддерживающего встраивание.",
-    "dragToReorder": "Перетащите, чтобы изменить порядок поставщиков"
+    "dragToReorder": "Перетащите, чтобы изменить порядок поставщиков",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Фьюжн",

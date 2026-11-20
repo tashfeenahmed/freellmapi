@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "opsional",
     "customFamily": "Keluarga",
     "customFamilyPlaceholder": "default untuk id model",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Kunci API",
     "customCapabilities": "Kemampuan",
     "addModel": "Tambahkan model",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} hingga maks",
     "emptyTitle": "Belum ada model penyematan",
     "emptyDesc": "Keluarga penyematan muncul di sini setelah Anda menambahkan kunci penyedia yang mendukung penyematan.",
-    "dragToReorder": "Tarik untuk menyusun ulang penyedia"
+    "dragToReorder": "Tarik untuk menyusun ulang penyedia",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusi",

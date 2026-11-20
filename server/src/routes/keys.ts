@@ -1087,6 +1087,10 @@ async function registerImportedModels(
         dimensions,
         maxInputTokens: null,
         quotaLabel: 'custom endpoint',
+        // No rate-limit windows here on purpose: a bulk key import has no
+        // per-model limit input, and omitting them leaves whatever an operator
+        // configured through POST /api/embeddings/custom intact instead of
+        // silently resetting it to unlimited.
       });
       registered++;
     } catch (err: any) {

@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "nhọrọ",
     "customFamily": "Ezinụlọ",
     "customFamilyPlaceholder": "ndabara na ụdị id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "igodo API",
     "customCapabilities": "Ike",
     "addModel": "Tinye ihe nlereanya",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Ọnweghị ụdị mgbakwunye",
     "emptyDesc": "Ezinaụlọ agbakwunyere na-apụta ebe a ozugbo ị gbakwunye igodo ndị na-eweta ihe na-akwado ntinye.",
-    "dragToReorder": "Dọrọ ka ịhazigharị onye na-eweta ya"
+    "dragToReorder": "Dọrọ ka ịhazigharị onye na-eweta ya",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Ngwakọta",

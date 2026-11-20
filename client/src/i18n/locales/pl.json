@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "opcjonalne",
     "customFamily": "Rodzina",
     "customFamilyPlaceholder": "domyślnie jest to identyfikator modelu",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Klucz API",
     "customCapabilities": "Możliwości",
     "addModel": "Dodaj model",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Nie ma jeszcze osadzonych modeli",
     "emptyDesc": "Rodziny osadzania pojawiają się tutaj po dodaniu klucza dostawcy obsługującego osadzanie.",
-    "dragToReorder": "Przeciągnij, aby zmienić kolejność dostawcy"
+    "dragToReorder": "Przeciągnij, aby zmienić kolejność dostawcy",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fuzja",

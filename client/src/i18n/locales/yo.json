@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "iyan",
     "customFamily": "Idile",
     "customFamilyPlaceholder": "aseku to awoṣe id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API bọtini",
     "customCapabilities": "Awọn agbara",
     "addModel": "Fi awoṣe kun",
@@ -998,7 +1001,8 @@
     "tokMax": "Iye ti o ga julọ ti {tokens}",
     "emptyTitle": "Ko si awọn awoṣe ifibọ sibẹsibẹ",
     "emptyDesc": "Awọn idile ifibọ han nibi ni kete ti o ba ṣafikun bọtini olupese ti o ṣe atilẹyin awọn ifibọ.",
-    "dragToReorder": "Fa lati tunto olupese"
+    "dragToReorder": "Fa lati tunto olupese",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Iparapọ",

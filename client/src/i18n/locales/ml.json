@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ഓപ്ഷണൽ",
     "customFamily": "കുടുംബം",
     "customFamilyPlaceholder": "മോഡൽ ഐഡിയിലേക്ക് സ്ഥിരസ്ഥിതികൾ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API കീ",
     "customCapabilities": "കഴിവുകൾ",
     "addModel": "മോഡൽ ചേർക്കുക",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ടോക്ക് പരമാവധി",
     "emptyTitle": "ഇതുവരെ എംബഡിംഗ് മോഡലുകളൊന്നുമില്ല",
     "emptyDesc": "എംബെഡ്ഡിംഗുകളെ പിന്തുണയ്ക്കുന്ന ഒരു ദാതാവിൻ്റെ കീ ചേർത്തുകഴിഞ്ഞാൽ എംബഡിംഗ് ഫാമിലികൾ ഇവിടെ ദൃശ്യമാകും.",
-    "dragToReorder": "ദാതാവിനെ പുനഃക്രമീകരിക്കാൻ വലിച്ചിടുക"
+    "dragToReorder": "ദാതാവിനെ പുനഃക്രമീകരിക്കാൻ വലിച്ചിടുക",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ഫ്യൂഷൻ",

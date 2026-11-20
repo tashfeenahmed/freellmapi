@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ግዴታ ያልሆነ",
     "customFamily": "ቤተሰብ",
     "customFamilyPlaceholder": "የሞዴል መታወቂያ ነባሪዎች",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ቁልፍ",
     "customCapabilities": "ችሎታዎች",
     "addModel": "ሞዴል ያክሉ",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ቶክ ማክስ",
     "emptyTitle": "እስካሁን ምንም የመክተት ሞዴሎች የሉም",
     "emptyDesc": "መክተትን የሚደግፍ የአቅራቢ ቁልፍ ካከሉ በኋላ ቤተሰቦችን መክተት እዚህ ይታያል።",
-    "dragToReorder": "አቅራቢውን እንደገና ለማዘዝ ይጎትቱ"
+    "dragToReorder": "አቅራቢውን እንደገና ለማዘዝ ይጎትቱ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ቅልጥፍና",

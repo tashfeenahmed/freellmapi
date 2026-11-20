@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "선택사항",
     "customFamily": "가족",
     "customFamilyPlaceholder": "기본값은 모델 ID입니다.",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API 키",
     "customCapabilities": "기능",
     "addModel": "모델 추가",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} 토크 최대",
     "emptyTitle": "아직 임베딩 모델이 없습니다.",
     "emptyDesc": "임베딩을 지원하는 공급자 키를 추가하면 임베딩 계열이 여기에 표시됩니다.",
-    "dragToReorder": "공급자를 재정렬하려면 드래그하세요."
+    "dragToReorder": "공급자를 재정렬하려면 드래그하세요.",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "퓨전",

@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "volitelné",
     "customFamily": "Rodina",
     "customFamilyPlaceholder": "výchozí nastavení na model id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API klíč",
     "customCapabilities": "Schopnosti",
     "addModel": "Přidat model",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Modely zatím nejsou žádné embedding",
     "emptyDesc": "Embedding families se zde objeví, jakmile přidáte klíč poskytovatele, který embeddingy podporuje.",
-    "dragToReorder": "Poskytovatel přetahování pro přeobjednaní"
+    "dragToReorder": "Poskytovatel přetahování pro přeobjednaní",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fúze",

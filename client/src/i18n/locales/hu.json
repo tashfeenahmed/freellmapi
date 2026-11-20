@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "Opcionális",
     "customFamily": "Család",
     "customFamilyPlaceholder": "Alapértelmezett modellazonosító",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API kulcs",
     "customCapabilities": "Képességek",
     "addModel": "Modell hozzáadása",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Még nincsenek beágyazási modellek",
     "emptyDesc": "A beágyazási családok itt akkor jelennek meg, amikor hozzáadsz egy szolgáltatókulcsot, amely támogatja a beágyazásokat.",
-    "dragToReorder": "Húzás az újrarendelési szolgáltatóhoz"
+    "dragToReorder": "Húzás az újrarendelési szolgáltatóhoz",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fúzió",

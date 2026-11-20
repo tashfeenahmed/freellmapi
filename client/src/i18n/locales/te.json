@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ఐచ్ఛికం",
     "customFamily": "కుటుంబం",
     "customFamilyPlaceholder": "మోడల్ ఐడికి డిఫాల్ట్",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API కీ",
     "customCapabilities": "సామర్థ్యాలు",
     "addModel": "మోడల్‌ని జోడించండి",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} గరిష్టంగా",
     "emptyTitle": "ఇంకా పొందుపరిచే మోడల్‌లు లేవు",
     "emptyDesc": "ఎంబెడ్డింగ్‌లకు మద్దతిచ్చే ప్రొవైడర్ కీని మీరు జోడించిన తర్వాత పొందుపరిచే కుటుంబాలు ఇక్కడ కనిపిస్తాయి.",
-    "dragToReorder": "ప్రొవైడర్‌ని మళ్లీ ఆర్డర్ చేయడానికి లాగండి"
+    "dragToReorder": "ప్రొవైడర్‌ని మళ్లీ ఆర్డర్ చేయడానికి లాగండి",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ఫ్యూజన్",

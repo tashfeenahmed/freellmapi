@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "optioneel",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "Standaard naar model-ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API sleutel",
     "customCapabilities": "Capaciteiten",
     "addModel": "Model toevoegen",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Nog geen embeddingmodellen",
     "emptyDesc": "Embeddingfamilies verschijnen hier zodra je een provider-sleutel toevoegt die embeddings ondersteunt.",
-    "dragToReorder": "Drag om provider opnieuw te bestellen"
+    "dragToReorder": "Drag om provider opnieuw te bestellen",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusie",

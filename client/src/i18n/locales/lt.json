@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "Pasirenkama",
     "customFamily": "Šeima",
     "customFamilyPlaceholder": "Numatytasis modelio ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API raktas",
     "customCapabilities": "Galimybės",
     "addModel": "Pridėti modelį",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} Tok Max",
     "emptyTitle": "Kol kas nėra įterpiamų modelių",
     "emptyDesc": "Įterpimo šeimos čia atsiranda, kai pridedate tiekėjo raktą, kuris palaiko įterpimus.",
-    "dragToReorder": "Vilkti į peružsakymo tiekėją"
+    "dragToReorder": "Vilkti į peružsakymo tiekėją",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Sintezė",

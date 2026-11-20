@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "προαιρετικός",
     "customFamily": "Οικογένεια",
     "customFamilyPlaceholder": "Προεπιλογή σε αναγνωριστικό μοντέλου",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API κλειδί",
     "customCapabilities": "Δυνατότητες",
     "addModel": "Προσθήκη μοντέλου",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Δεν υπάρχουν ακόμη μοντέλα ενσωμάτωσης",
     "emptyDesc": "Οι οικογένειες ενσωμάτωσης εμφανίζονται εδώ μόλις προσθέσετε ένα κλειδί υπηρεσίας παροχής που υποστηρίζει ενσωματώσεις.",
-    "dragToReorder": "Σύρετε για να αλλάξετε τη σειρά του παρόχου"
+    "dragToReorder": "Σύρετε για να αλλάξετε τη σειρά του παρόχου",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Σύντηξη",

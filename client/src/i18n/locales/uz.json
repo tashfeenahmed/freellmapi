@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ixtiyoriy",
     "customFamily": "Oila",
     "customFamilyPlaceholder": "standart identifikatori uchun",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API kaliti",
     "customCapabilities": "Imkoniyatlar",
     "addModel": "Model qo'shing",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok maks",
     "emptyTitle": "Hozircha oʻrnatish modellari yoʻq",
     "emptyDesc": "Oʻrnatishlarni qoʻllab-quvvatlaydigan provayder kalitini qoʻshganingizdan soʻng, oʻrnatish oilalari shu yerda paydo boʻladi.",
-    "dragToReorder": "Provayderni qayta tartiblash uchun torting"
+    "dragToReorder": "Provayderni qayta tartiblash uchun torting",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",

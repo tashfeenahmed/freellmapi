@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "valgfrit",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "standard til model-id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API nøgle",
     "customCapabilities": "Kapaciteter",
     "addModel": "Tilføj model",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Ingen embedding-modeller endnu",
     "emptyDesc": "Embedding-familier vises her, når du tilføjer en provider-nøgle, der understøtter embeddings.",
-    "dragToReorder": "Træk for at ombestille udbyder"
+    "dragToReorder": "Træk for at ombestille udbyder",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",

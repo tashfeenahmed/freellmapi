@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "opsyonal",
     "customFamily": "Pamilya",
     "customFamilyPlaceholder": "default sa model id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "susi API",
     "customCapabilities": "Mga Kakayahan",
     "addModel": "Magdagdag ng modelo",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Wala pang mga embedding na modelo",
     "emptyDesc": "Lumilitaw dito ang mga embedding family kapag nagdagdag ka ng provider key na sumusuporta sa embeddings.",
-    "dragToReorder": "I-drag para i-reorder ang provider"
+    "dragToReorder": "I-drag para i-reorder ang provider",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Pagsasanib",

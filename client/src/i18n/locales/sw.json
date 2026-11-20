@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "hiari",
     "customFamily": "Familia",
     "customFamilyPlaceholder": "chaguo-msingi kwa kitambulisho cha mfano",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Kitufe cha API",
     "customCapabilities": "Uwezo",
     "addModel": "Ongeza mfano",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Bado hakuna miundo ya kupachika",
     "emptyDesc": "Familia zinazopachika huonekana hapa pindi tu unapoongeza ufunguo wa mtoa huduma unaoauni upachikaji.",
-    "dragToReorder": "Buruta ili upange upya mtoa huduma"
+    "dragToReorder": "Buruta ili upange upya mtoa huduma",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",

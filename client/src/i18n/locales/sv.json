@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "Valfritt",
     "customFamily": "Familj",
     "customFamilyPlaceholder": "Standardinställning till modell-ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API nyckel",
     "customCapabilities": "Kapabiliteter",
     "addModel": "Lägg till modell",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Inga inbäddningsmodeller än",
     "emptyDesc": "Embedding-familjer visas här när du lägger till en leverantörsnyckel som stödjer inbäddningar.",
-    "dragToReorder": "Dra till omordna leverantör"
+    "dragToReorder": "Dra till omordna leverantör",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",

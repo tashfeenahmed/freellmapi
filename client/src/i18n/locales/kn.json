@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ಐಚ್ಛಿಕ",
     "customFamily": "ಕುಟುಂಬ",
     "customFamilyPlaceholder": "ಮಾದರಿ ಐಡಿಗೆ ಡಿಫಾಲ್ಟ್",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ಕೀ",
     "customCapabilities": "ಸಾಮರ್ಥ್ಯಗಳು",
     "addModel": "ಮಾದರಿಯನ್ನು ಸೇರಿಸಿ",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "ಇನ್ನೂ ಎಂಬೆಡಿಂಗ್ ಮಾಡೆಲ್‌ಗಳಿಲ್ಲ",
     "emptyDesc": "ಎಂಬೆಡಿಂಗ್‌ಗಳನ್ನು ಬೆಂಬಲಿಸುವ ಪ್ರೊವೈಡರ್ ಕೀಯನ್ನು ಒಮ್ಮೆ ನೀವು ಸೇರಿಸಿದಾಗ ಎಂಬೆಡಿಂಗ್ ಕುಟುಂಬಗಳು ಇಲ್ಲಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತವೆ.",
-    "dragToReorder": "ಪೂರೈಕೆದಾರರನ್ನು ಮರುಕ್ರಮಗೊಳಿಸಲು ಎಳೆಯಿರಿ"
+    "dragToReorder": "ಪೂರೈಕೆದಾರರನ್ನು ಮರುಕ್ರಮಗೊಳಿಸಲು ಎಳೆಯಿರಿ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ಫ್ಯೂಷನ್",

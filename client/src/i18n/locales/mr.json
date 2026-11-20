@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "पर्यायी",
     "customFamily": "कुटुंब",
     "customFamilyPlaceholder": "मॉडेल आयडीवर डीफॉल्ट",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API की",
     "customCapabilities": "क्षमता",
     "addModel": "मॉडेल जोडा",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} टोक कमाल",
     "emptyTitle": "अद्याप कोणतेही एम्बेडिंग मॉडेल नाहीत",
     "emptyDesc": "तुम्ही एम्बेडिंगला सपोर्ट करणारी प्रदाता की जोडल्यानंतर एम्बेडिंग कुटुंबे येथे दिसतात.",
-    "dragToReorder": "प्रदाता पुनर्क्रमित करण्यासाठी ड्रॅग करा"
+    "dragToReorder": "प्रदाता पुनर्क्रमित करण्यासाठी ड्रॅग करा",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "फ्यूजन",

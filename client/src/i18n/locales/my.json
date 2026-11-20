@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ရွေးချယ်နိုင်သော",
     "customFamily": "မိသားစု",
     "customFamilyPlaceholder": "မော်ဒယ် ID ကို မူလအတိုင်း သတ်မှတ်သည်။",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API သော့",
     "customCapabilities": "စွမ်းဆောင်ရည်များ",
     "addModel": "မော်ဒယ်ထည့်ပါ",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} TOK အများဆုံး",
     "emptyTitle": "embedding မော်ဒယ်များ မရှိသေးပါ",
     "emptyDesc": "embedding မိသားစုများသည် embedding များကို ထောက်ပံ့သော provider key တစ်ခု ထည့်သွင်းပြီးနောက် ဤနေရာတွင် ပေါ်လာသည်။",
-    "dragToReorder": "ပံ့ပိုးသူကို ပြန်လည်စီစဉ်ရန် ဆွဲယူပါ"
+    "dragToReorder": "ပံ့ပိုးသူကို ပြန်လည်စီစဉ်ရန် ဆွဲယူပါ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ပေါင်းစပ်ခြင်း",

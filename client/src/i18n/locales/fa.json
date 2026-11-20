@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "اختیاری",
     "customFamily": "خانواده",
     "customFamilyPlaceholder": "به طور پیش فرض به مدل ID است",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "کلید API",
     "customCapabilities": "قابلیت ها",
     "addModel": "اضافه کردن مدل",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} توک حداکثر",
     "emptyTitle": "هنوز مدل تعبیه نشده است",
     "emptyDesc": "هنگامی که کلید ارائه دهنده ای را اضافه کنید که از جاسازی ها پشتیبانی می کند، خانواده های جاسازی در اینجا ظاهر می شوند.",
-    "dragToReorder": "برای سفارش دادن مجدد ارائه دهنده را بکشید"
+    "dragToReorder": "برای سفارش دادن مجدد ارائه دهنده را بکشید",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "فیوژن",

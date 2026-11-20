@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "необов'язковий",
     "customFamily": "Сім'я",
     "customFamilyPlaceholder": "за замовчуванням ідентифікатор моделі",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Ключ API",
     "customCapabilities": "Можливості",
     "addModel": "Додати модель",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ток макс",
     "emptyTitle": "Вбудованих моделей ще немає",
     "emptyDesc": "Сімейства вбудовування з’являються тут, коли ви додаєте ключ постачальника, який підтримує вбудовування.",
-    "dragToReorder": "Перетягніть, щоб змінити порядок постачальника"
+    "dragToReorder": "Перетягніть, щоб змінити порядок постачальника",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",

@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ជាជម្រើស",
     "customFamily": "គ្រួសារ",
     "customFamilyPlaceholder": "លំនាំដើមទៅលេខសម្គាល់ម៉ូដែល",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API",
     "customCapabilities": "សមត្ថភាព",
     "addModel": "បន្ថែមម៉ូដែល",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} TOK Max",
     "emptyTitle": "មិនទាន់មានម៉ូដែលបញ្ចូលនៅឡើយទេ",
     "emptyDesc": "គ្រួសារបញ្ចូលនឹងបង្ហាញនៅទីនេះបន្ទាប់ពីអ្នកបន្ថែមកូនសោអ្នកផ្គត់ផ្គង់ដែលគាំទ្រការបញ្ចូល។",
-    "dragToReorder": "អូសដើម្បីរៀបចំលំដាប់អ្នកផ្គត់ផ្គង់"
+    "dragToReorder": "អូសដើម្បីរៀបចំលំដាប់អ្នកផ្គត់ផ្គង់",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ការរួមបញ្ចូល",
