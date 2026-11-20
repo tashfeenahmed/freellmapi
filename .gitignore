@@ -19,6 +19,9 @@ server/data/
 # TypeScript incremental build cache
 *.tsbuildinfo
 
+# Vitest JSON reporter output (test artifacts, not source)
+.vitest/
+
 # Personal deployment scripts (contain keys/credentials — kept local)
 deploy-pi.sh
 update-hermes.sh

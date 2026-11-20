@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "voliteľné",
     "customFamily": "Rodina",
     "customFamilyPlaceholder": "Predvolené na Model ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API kľúč",
     "customCapabilities": "Schopnosti",
     "addModel": "Pridaj model",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Zatiaľ žiadne modely vkladania",
     "emptyDesc": "Embeddingové rodiny sa tu objavia po pridaní poskytovateľského kľúča, ktorý podporuje embeddingy.",
-    "dragToReorder": "Drag to reorder provider"
+    "dragToReorder": "Drag to reorder provider",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fúzia",

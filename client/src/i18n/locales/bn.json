@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ঐচ্ছিক",
     "customFamily": "পরিবার",
     "customFamilyPlaceholder": "মডেল আইডিতে ডিফল্ট",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API কী",
     "customCapabilities": "ক্ষমতা",
     "addModel": "মডেল যোগ করুন",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} টোক সর্বাধিক",
     "emptyTitle": "এখনও কোনো এমবেডিং মডেল নেই৷",
     "emptyDesc": "আপনি এম্বেডিং সমর্থন করে এমন একটি প্রদানকারী কী যোগ করার পরে এমবেডিং পরিবারগুলি এখানে উপস্থিত হবে৷",
-    "dragToReorder": "প্রদানকারীকে পুনরায় সাজাতে টেনে আনুন"
+    "dragToReorder": "প্রদানকারীকে পুনরায় সাজাতে টেনে আনুন",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ফিউশন",

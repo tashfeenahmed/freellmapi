@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "אופציונלי",
     "customFamily": "משפחה",
     "customFamilyPlaceholder": "ברירת מחדל למזהה מודל",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "מפתח API",
     "customCapabilities": "יכולות",
     "addModel": "מודל הוספה",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} טוק מקסימום",
     "emptyTitle": "עדיין אין דגמי הטמעה",
     "emptyDesc": "משפחות הטמעה מופיעות כאן ברגע שמוסיפים מפתח ספק שתומך בהטמעות.",
-    "dragToReorder": "גרור לספק הזמנה מחדש"
+    "dragToReorder": "גרור לספק הזמנה מחדש",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "היתוך",

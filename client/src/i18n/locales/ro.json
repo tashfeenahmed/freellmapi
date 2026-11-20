@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "opțional",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "Implicit la ID-ul modelului",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API cheie",
     "customCapabilities": "Capabilități",
     "addModel": "Adaugă modelul",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Încă nu există modele de embedding",
     "emptyDesc": "Familiile de încorporare apar aici odată ce adaugi o cheie de furnizor care suportă încorporarea.",
-    "dragToReorder": "Tragerea către furnizorul de recomandă"
+    "dragToReorder": "Tragerea către furnizorul de recomandă",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fuziune",

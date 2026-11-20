@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "na zaɓi",
     "customFamily": "Iyali",
     "customFamilyPlaceholder": "Matsaloli zuwa model id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Maɓallin API",
     "customCapabilities": "Abubuwan iyawa",
     "addModel": "Ƙara samfuri",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Babu samfuran haɗawa tukuna",
     "emptyDesc": "Haɗin iyalai suna bayyana nan da zarar kun ƙara maɓallin mai ba da tallafi wanda ke goyan bayan haɗawa.",
-    "dragToReorder": "Ja don sake yin odar mai bada sabis"
+    "dragToReorder": "Ja don sake yin odar mai bada sabis",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",

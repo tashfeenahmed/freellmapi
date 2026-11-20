@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "વૈકલ્પિક",
     "customFamily": "કુટુંબ",
     "customFamilyPlaceholder": "મોડલ id માટે ડિફોલ્ટ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API કી",
     "customCapabilities": "ક્ષમતાઓ",
     "addModel": "મોડેલ ઉમેરો",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ટોક મહત્તમ",
     "emptyTitle": "હજી સુધી કોઈ એમ્બેડિંગ મોડલ નથી",
     "emptyDesc": "એકવાર તમે એમ્બેડિંગને સપોર્ટ કરતી પ્રદાતા કી ઉમેર્યા પછી એમ્બેડિંગ પરિવારો અહીં દેખાય છે.",
-    "dragToReorder": "પ્રદાતાને ફરીથી ગોઠવવા માટે ખેંચો"
+    "dragToReorder": "પ્રદાતાને ફરીથી ગોઠવવા માટે ખેંચો",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ફ્યુઝન",

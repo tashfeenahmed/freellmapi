@@ -492,6 +492,9 @@
     "customDisplayNameOptional": "可选",
     "customFamily": "系列",
     "customFamilyPlaceholder": "默认为模型 ID",
+    "customEmbeddingInputType": "输入类型",
+    "customEmbeddingInputTypeUnset": "未指定",
+    "customEmbeddingInputTypeNone": "无（对称）",
     "customApiKey": "API 密钥",
     "customCapabilities": "能力",
     "addModel": "添加模型",
@@ -998,7 +1001,8 @@
     "tokMax": "最多 {tokens} tok",
     "emptyTitle": "暂无嵌入模型",
     "emptyDesc": "添加支持嵌入的提供方密钥后，嵌入系列会显示在这里。",
-    "dragToReorder": "拖动以重新排序提供方"
+    "dragToReorder": "拖动以重新排序提供方",
+    "inputTypeTitle": "非对称嵌入模型：向量空间的这一侧会作为 input_type 发送。"
   },
   "fusion": {
     "title": "融合",

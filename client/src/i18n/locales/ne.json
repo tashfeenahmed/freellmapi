@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "वैकल्पिक",
     "customFamily": "परिवार",
     "customFamilyPlaceholder": "नमूना आईडीमा पूर्वनिर्धारितहरू",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "कुञ्जी API गर्नुहोस्",
     "customCapabilities": "क्षमताहरू",
     "addModel": "नमूना थप्नुहोस्",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} अधिकतम",
     "emptyTitle": "अहिले सम्म कुनै सम्मिलित नमुना छैन",
     "emptyDesc": "तपाईँले एम्बेडिङलाई समर्थन गर्ने प्रदायक कुञ्जी थप्नु भएपछि सम्मिलित परिवारहरू यहाँ देखा पर्दछ।",
-    "dragToReorder": "प्रदायक पुन: क्रमबद्ध गर्न तान्नुहोस्"
+    "dragToReorder": "प्रदायक पुन: क्रमबद्ध गर्न तान्नुहोस्",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "फ्युजन",

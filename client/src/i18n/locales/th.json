@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ไม่จำเป็น",
     "customFamily": "ครอบครัว",
     "customFamilyPlaceholder": "ค่าเริ่มต้นเป็นรหัสรุ่น",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "คีย์ API",
     "customCapabilities": "ความสามารถ",
     "addModel": "เพิ่มรุ่น",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} โทเค็นสูงสุด",
     "emptyTitle": "ยังไม่มีการฝังโมเดล",
     "emptyDesc": "กลุ่มการฝังจะปรากฏที่นี่เมื่อคุณเพิ่มรหัสผู้ให้บริการที่รองรับการฝัง",
-    "dragToReorder": "ลากเพื่อจัดลำดับผู้ให้บริการใหม่"
+    "dragToReorder": "ลากเพื่อจัดลำดับผู้ให้บริการใหม่",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ฟิวชั่น",

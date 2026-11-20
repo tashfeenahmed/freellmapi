@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ଇଚ୍ଛାଧୀନ",
     "customFamily": "ପରିବାର",
     "customFamilyPlaceholder": "ମଡେଲ୍ IDକୁ ଡିଫଲ୍ଟ କରନ୍ତୁ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API କୀ",
     "customCapabilities": "ସାମର୍ଥ୍ୟ",
     "addModel": "ମଡେଲ ଯୋଡନ୍ତୁ",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ଟୋକ୍ ସର୍ବାଧିକ",
     "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଏମ୍ବେଡିଂ ମଡେଲ୍ ନାହିଁ",
     "emptyDesc": "ଥରେ ଏମ୍ବେଡିଂ ପରିବାରଗୁଡିକ ଏଠାରେ ଦୃଶ୍ୟମାନ ହେବ ଥରେ ଆପଣ ଏକ ପ୍ରଦାନକାରୀ କୀ ଯୋଡିଲେ ଯାହା ଏମ୍ବେଡିଂଗୁଡିକ ସମର୍ଥନ କରେ।",
-    "dragToReorder": "ପ୍ରଦାନକାରୀ ପୁନଃକ୍ରମ କରିବାକୁ ଡ୍ରାଗ୍ କରନ୍ତୁ"
+    "dragToReorder": "ପ୍ରଦାନକାରୀ ପୁନଃକ୍ରମ କରିବାକୁ ଡ୍ରାଗ୍ କରନ୍ତୁ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ଫ୍ୟୁଜନ୍",

@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "वैकल्पिक",
     "customFamily": "परिवार",
     "customFamilyPlaceholder": "मॉडल आईडी के लिए डिफ़ॉल्ट",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API कुंजी",
     "customCapabilities": "क्षमताएं",
     "addModel": "मॉडल जोड़ें",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} टोक मैक्स",
     "emptyTitle": "अभी तक कोई एम्बेडिंग मॉडल नहीं है",
     "emptyDesc": "जब आप एम्बेडिंग का समर्थन करने वाली प्रदाता कुंजी जोड़ते हैं तो एम्बेडिंग परिवार यहां दिखाई देते हैं।",
-    "dragToReorder": "प्रदाता को पुनः व्यवस्थित करने के लिए खींचें"
+    "dragToReorder": "प्रदाता को पुनः व्यवस्थित करने के लिए खींचें",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "संलयन",

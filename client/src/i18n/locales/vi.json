@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "tùy chọn",
     "customFamily": "gia đình",
     "customFamilyPlaceholder": "mặc định là id mẫu",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Phím API",
     "customCapabilities": "Khả năng",
     "addModel": "Thêm mô hình",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} đạt mức tối đa",
     "emptyTitle": "Chưa có mô hình nhúng nào",
     "emptyDesc": "Nhóm nhúng xuất hiện ở đây sau khi bạn thêm khóa nhà cung cấp hỗ trợ nhúng.",
-    "dragToReorder": "Kéo để sắp xếp lại nhà cung cấp"
+    "dragToReorder": "Kéo để sắp xếp lại nhà cung cấp",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Sự kết hợp",

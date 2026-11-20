@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "விருப்பமானது",
     "customFamily": "குடும்பம்",
     "customFamilyPlaceholder": "மாடல் ஐடிக்கு இயல்புநிலை",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API விசை",
     "customCapabilities": "திறன்கள்",
     "addModel": "மாதிரியைச் சேர்க்கவும்",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok அதிகபட்சம்",
     "emptyTitle": "இன்னும் உட்பொதித்தல் மாதிரிகள் இல்லை",
     "emptyDesc": "உட்பொதிப்புகளை ஆதரிக்கும் வழங்குநர் விசையைச் சேர்த்தவுடன், உட்பொதித்தல் குடும்பங்கள் இங்கு தோன்றும்.",
-    "dragToReorder": "வழங்குநரை மறுவரிசைப்படுத்த இழுக்கவும்"
+    "dragToReorder": "வழங்குநரை மறுவரிசைப்படுத்த இழுக்கவும்",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "இணைவு",

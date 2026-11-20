@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "opcional",
     "customFamily": "Familia",
     "customFamilyPlaceholder": "por defecto, el id del modelo",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Clave API",
     "customCapabilities": "Capacidades",
     "addModel": "Añadir modelo",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok máx.",
     "emptyTitle": "Aún no hay modelos de embeddings",
     "emptyDesc": "Las familias de embeddings aparecen aquí cuando añades una clave de proveedor compatible con embeddings.",
-    "dragToReorder": "Arrastra para reordenar el proveedor"
+    "dragToReorder": "Arrastra para reordenar el proveedor",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusión",

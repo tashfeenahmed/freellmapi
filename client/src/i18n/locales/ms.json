@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "pilihan",
     "customFamily": "Keluarga",
     "customFamilyPlaceholder": "lalai kepada id model",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "kunci API",
     "customCapabilities": "Keupayaan",
     "addModel": "Tambah model",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Belum ada model yang disematkan lagi",
     "emptyDesc": "Keluarga penyematan akan muncul di sini apabila anda menambah kunci penyedia yang menyokong penyembatan.",
-    "dragToReorder": "Seret untuk menyusun semula penyedia"
+    "dragToReorder": "Seret untuk menyusun semula penyedia",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusi",

@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "ਵਿਕਲਪਿਕ",
     "customFamily": "ਪਰਿਵਾਰ",
     "customFamilyPlaceholder": "ਮਾਡਲ id ਲਈ ਡਿਫਾਲਟ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ਕੁੰਜੀ",
     "customCapabilities": "ਸਮਰੱਥਾਵਾਂ",
     "addModel": "ਮਾਡਲ ਸ਼ਾਮਲ ਕਰੋ",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ਟੋਕ ਅਧਿਕਤਮ",
     "emptyTitle": "ਅਜੇ ਤੱਕ ਕੋਈ ਏਮਬੈਡਿੰਗ ਮਾਡਲ ਨਹੀਂ ਹਨ",
     "emptyDesc": "ਏਮਬੈਡਿੰਗ ਪਰਿਵਾਰ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ ਜਦੋਂ ਤੁਸੀਂ ਇੱਕ ਪ੍ਰਦਾਤਾ ਕੁੰਜੀ ਜੋੜਦੇ ਹੋ ਜੋ ਏਮਬੈਡਿੰਗ ਦਾ ਸਮਰਥਨ ਕਰਦੀ ਹੈ।",
-    "dragToReorder": "ਪ੍ਰਦਾਤਾ ਨੂੰ ਮੁੜ ਕ੍ਰਮਬੱਧ ਕਰਨ ਲਈ ਘਸੀਟੋ"
+    "dragToReorder": "ਪ੍ਰਦਾਤਾ ਨੂੰ ਮੁੜ ਕ੍ਰਮਬੱਧ ਕਰਨ ਲਈ ਘਸੀਟੋ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ਫਿਊਜ਼ਨ",

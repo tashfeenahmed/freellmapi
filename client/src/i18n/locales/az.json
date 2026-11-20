@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "İstəyə bağlı",
     "customFamily": "Ailə",
     "customFamilyPlaceholder": "Standart olaraq model ID-yə keçid",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API açarı",
     "customCapabilities": "İmkanlar",
     "addModel": "Model əlavə et",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} Tok Max",
     "emptyTitle": "Hələ embedding modelləri yoxdur",
     "emptyDesc": "Embedding ailələri burada embeddingləri dəstəkləyən provayder açarı əlavə etdikdən sonra görünür.",
-    "dragToReorder": "Yenidən sifariş təminatçısına sürüklə"
+    "dragToReorder": "Yenidən sifariş təminatçısına sürüklə",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Birləşmə",

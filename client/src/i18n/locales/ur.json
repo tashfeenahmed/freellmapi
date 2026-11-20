@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "اختیاری",
     "customFamily": "خاندان",
     "customFamilyPlaceholder": "ماڈل آئی ڈی کے لیے ڈیفالٹس",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API کلید",
     "customCapabilities": "صلاحیتیں",
     "addModel": "ماڈل شامل کریں۔",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ٹوک زیادہ سے زیادہ",
     "emptyTitle": "ابھی تک کوئی سرایت کرنے والا ماڈل نہیں ہے۔",
     "emptyDesc": "سرایت کرنے والے خاندان یہاں ظاہر ہوتے ہیں جب آپ ایک فراہم کنندہ کلید شامل کرتے ہیں جو سرایت کرنے کو سپورٹ کرتی ہے۔",
-    "dragToReorder": "فراہم کنندہ کو دوبارہ ترتیب دینے کے لیے گھسیٹیں۔"
+    "dragToReorder": "فراہم کنندہ کو دوبارہ ترتیب دینے کے لیے گھسیٹیں۔",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "فیوژن",

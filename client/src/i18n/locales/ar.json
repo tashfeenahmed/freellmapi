@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "اختياري",
     "customFamily": "العائلة",
     "customFamilyPlaceholder": "الإعدادات الافتراضية لمعرف النموذج",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "مفتاح API",
     "customCapabilities": "القدرات",
     "addModel": "إضافة نموذج",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} توك ماكس",
     "emptyTitle": "لا توجد نماذج التضمين حتى الآن",
     "emptyDesc": "تظهر عائلات التضمين هنا بمجرد إضافة مفتاح موفر يدعم عمليات التضمين.",
-    "dragToReorder": "اسحب لإعادة ترتيب الموفر"
+    "dragToReorder": "اسحب لإعادة ترتيب الموفر",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "الانصهار",

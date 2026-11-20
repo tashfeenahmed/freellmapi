@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "opcionalno",
     "customFamily": "Obitelj",
     "customFamilyPlaceholder": "Zadano na ID modela",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ključ",
     "customCapabilities": "Mogućnosti",
     "addModel": "Dodaj model",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Još nema modela ugradnje",
     "emptyDesc": "Ugrađene obitelji pojavljuju se ovdje nakon što dodate ključ pružatelja usluga koji podržava ugrađivanja.",
-    "dragToReorder": "Povuci za ponovno naručivanje pružatelja"
+    "dragToReorder": "Povuci za ponovno naručivanje pružatelja",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fuzija",

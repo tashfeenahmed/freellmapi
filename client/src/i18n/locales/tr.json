@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "isteğe bağlı",
     "customFamily": "Aile",
     "customFamilyPlaceholder": "varsayılan olarak model kimliği kullanılır",
+    "customEmbeddingInputType": "Giriş türü",
+    "customEmbeddingInputTypeUnset": "Belirtilmemiş",
+    "customEmbeddingInputTypeNone": "Yok (simetrik)",
     "customApiKey": "API anahtarı",
     "customCapabilities": "Yetenekler",
     "addModel": "Model ekle",
@@ -998,7 +1001,8 @@
     "tokMax": "maks. {tokens} token",
     "emptyTitle": "Henüz gömme modeli yok",
     "emptyDesc": "Gömmeleri destekleyen bir sağlayıcı anahtarı eklediğinizde gömme aileleri burada görünür.",
-    "dragToReorder": "Sağlayıcıyı yeniden sıralamak için sürükleyin"
+    "dragToReorder": "Sağlayıcıyı yeniden sıralamak için sürükleyin",
+    "inputTypeTitle": "Asimetrik gömme modeli: vektör uzayının bu tarafı input_type olarak gönderilir."
   },
   "fusion": {
     "title": "Füzyon",

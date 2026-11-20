@@ -488,6 +488,9 @@
     "customDisplayNameOptional": "опционо",
     "customFamily": "Породица",
     "customFamilyPlaceholder": "подразумевано је на ИД модела",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Кључ API",
     "customCapabilities": "Могућности",
     "addModel": "Додајте модел",
@@ -998,7 +1001,8 @@
     "tokMax": "{tokens} ток мак",
     "emptyTitle": "Још нема модела за уграђивање",
     "emptyDesc": "Породице за уграђивање се појављују овде када додате кључ добављача који подржава уграђивање.",
-    "dragToReorder": "Превуците да бисте променили редослед добављача"
+    "dragToReorder": "Превуците да бисте променили редослед добављача",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Фусион",

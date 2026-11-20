@@ -492,6 +492,9 @@
     "customDisplayNameOptional": "選填",
     "customFamily": "系列",
     "customFamilyPlaceholder": "預設為模型 ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API 金鑰",
     "customCapabilities": "能力",
     "addModel": "新增模型",
@@ -998,7 +1001,8 @@
     "tokMax": "最多 {tokens} Token",
     "emptyTitle": "尚無嵌入模型",
     "emptyDesc": "新增支援嵌入的提供者金鑰後，嵌入系列會顯示在這裡。",
-    "dragToReorder": "拖曳以重新排序提供者"
+    "dragToReorder": "拖曳以重新排序提供者",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "融合",
