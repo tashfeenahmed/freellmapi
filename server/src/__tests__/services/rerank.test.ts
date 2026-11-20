@@ -1,5 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { runRerank, RerankError } from '../../services/rerank.js';
+import { stubPublicDns } from '../helpers/dns.js';
 
 // Mutable so the scope tests can hand the service different key rows.
 let mockRows: Array<{ id: number; platform: string; base_url: string | null; encrypted_key: string; iv: string; auth_tag: string; model_scope_json?: string | null }> = [
@@ -28,7 +29,11 @@ vi.mock('../../lib/crypto.js', () => ({
 const ok = (results: unknown) => new Response(JSON.stringify({ results }), { status: 200 });
 
 describe('runRerank', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    // Fake relay hosts must resolve for the URL guard (#1875).
+    stubPublicDns();
+  });
 
   it('walks candidates custom-first and takes the first success', async () => {
     const fetch = vi.spyOn(global, 'fetch')
@@ -75,5 +80,41 @@ describe('runRerank', () => {
     ];
     await expect(runRerank(undefined, 'q', ['a'])).rejects.toMatchObject({ status: 503 });
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+// #1879: custom rerank endpoints get the same request-time URL guard and
+// redirect refusal as chat and embeddings, so the stored bearer key can never
+// be sent to a metadata address or a redirect target.
+describe('runRerank custom URL guard (#1879)', () => {
+  const saved = mockRows;
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    stubPublicDns();
+  });
+  afterEach(() => { mockRows = saved; });
+
+  it('never sends the key to a custom base URL on a metadata address', async () => {
+    mockRows = [{ id: 8, platform: 'custom', base_url: 'http://169.254.169.254/latest', encrypted_key: 'e', iv: 'i', auth_tag: 'a' }];
+    const fetch = vi.spyOn(global, 'fetch');
+    await expect(runRerank(undefined, 'q', ['a'])).rejects.toThrow(/metadata/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('never sends the key to a custom host that resolves to a metadata address', async () => {
+    stubPublicDns('169.254.169.254');
+    mockRows = [{ id: 9, platform: 'custom', base_url: 'https://rebind.example/v1', encrypted_key: 'e', iv: 'i', auth_tag: 'a' }];
+    const fetch = vi.spyOn(global, 'fetch');
+    await expect(runRerank(undefined, 'q', ['a'])).rejects.toThrow(/metadata/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses a redirect from a custom rerank endpoint instead of following it', async () => {
+    mockRows = [{ id: 10, platform: 'custom', base_url: 'https://relay.example/v1', encrypted_key: 'e', iv: 'i', auth_tag: 'a' }];
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(null, { status: 302, headers: { location: 'http://169.254.169.254/' } }));
+    await expect(runRerank(undefined, 'q', ['a'])).rejects.toThrow(/redirect/);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect((fetch.mock.calls[0][1] as RequestInit).redirect).toBe('manual');
   });
 });

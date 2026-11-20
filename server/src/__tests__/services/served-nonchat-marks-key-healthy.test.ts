@@ -8,6 +8,10 @@ import { runRerank } from '../../services/rerank.js';
 import { runDecision } from '../../services/decision.js';
 import { runImageGeneration } from '../../services/media.js';
 import { seedDecisionModels } from '../helpers/decision-models.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 // A served request is the strongest "this key works" evidence there is, and
 // every surface that spends a key from the 'healthy'/'unknown' pool must act

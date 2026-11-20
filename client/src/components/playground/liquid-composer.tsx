@@ -4,7 +4,7 @@ import { ArrowUp, Globe, Paperclip, Plus } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
-import { DictationButton, type DictationPhase } from './dictation-button'
+import { DictationButton, type DictationButtonProps, type DictationPhase } from './dictation-button'
 import { DictationWave } from './dictation-wave'
 import {
   COMPOSER_BRIDGE,
@@ -45,7 +45,7 @@ export interface LiquidComposerProps {
   onAttach: () => void
   labels: { add: string; attach: string; send: string; sending: string }
   /** Speech to text for the mic; the transcript is appended to `value`. */
-  dictation: { available: boolean; model: string; apiKey: string | null | undefined; onText: (text: string) => void }
+  dictation: Pick<DictationButtonProps, 'onUnavailable' | 'model' | 'apiKey' | 'onText'>
   /** The web search switch in the + menu (#1174). While it is on, the + turns
    *  blue with a small dot instead of a chip in the field, so the input stays clear. */
   webSearch?: { enabled: boolean; available: boolean; label: string; unavailableHint: string; onToggle: (on: boolean) => void }
@@ -170,11 +170,8 @@ export function LiquidComposer({
           </div>
           <div data-show={showMic} className="cmd-mic shrink-0 transition-opacity duration-150 ease-out data-[show=false]:pointer-events-none data-[show=false]:opacity-0">
             <DictationButton
-              available={dictation.available}
-              model={dictation.model}
-              apiKey={dictation.apiKey}
+              {...dictation}
               disabled={loading}
-              onText={dictation.onText}
               onPhaseChange={setDictationPhase}
               onStreamChange={setMicStream}
             />

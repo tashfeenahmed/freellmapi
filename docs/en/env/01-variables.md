@@ -49,7 +49,7 @@ First-run note: the first dashboard account is normally created from a browser o
 | --- | --- | --- |
 | `ALLOWED_HOSTS` | unset (off) | Opt-in Host-header allowlist against DNS rebinding. When set to a comma-separated list of hostnames/IPs (e.g. `localhost` for loopback-only, or `192.168.1.50,freellmapi.home.arpa`), requests whose `Host` names anything but those or loopback (`localhost`, `127.0.0.1`, `::1`, `*.localhost`) are rejected with 403 before auth or routing. Unset or `*` leaves the check off. Parsed by `parseAllowedHosts()` in `server/src/lib/config.ts`, enforced by `server/src/middleware/allowed-hosts.ts` (#1637). |
 | `PROXY_RATE_LIMIT_RPM` | `120` | Max `/v1` proxy requests per minute per client IP. Set to `0` to disable proxy rate limiting. See [03-outbound-proxies.md](03-outbound-proxies.md) for related knobs. When `TRUST_PROXY` is set, the limiter counts the real client IP from `X-Forwarded-For` instead of the socket peer. |
-| `ADMIN_RATE_LIMIT_RPM` | `600` | Max `/api` dashboard requests per minute per client IP. A flood guard — login has its own per-email lockout and key export its own much tighter cap. Set to `0` to disable. Also respects `TRUST_PROXY`. |
+| `ADMIN_RATE_LIMIT_RPM` | `600` | Max `/api` dashboard requests per minute per client IP. A flood guard: login has its own per-email lockout, key export its own 10/min cap and key reveal its own 60/min cap. Set to `0` to disable. Also respects `TRUST_PROXY`. |
 
 ## Routing overrides, timeouts & failover
 

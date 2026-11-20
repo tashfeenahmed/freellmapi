@@ -1,3 +1,4 @@
+import { listSpecialists, serveSpecialist } from '../services/specialist-text.js';
 import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -37,7 +38,8 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { advertisedContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { buildCodexCatalog } from '../services/codex-catalog.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { applyDecisionRouting, routingStrategyHeader } from '../services/routing-decision.js';
@@ -289,6 +291,16 @@ function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string, strate
   return crypto.createHash('sha1').update(payload).digest('hex');
 }
 
+// #1890: the reasoning memory (#797) and the context-handoff store replay what
+// one request left behind into a later one. Their key comes from the session
+// header or the first user message, which two callers can share, so prefix it
+// with the caller's credential: a client-profile key must never read state that
+// another profile's (or the unified key's) traffic wrote.
+function callerScopedSessionKey(auth: ResolvedAuth, sessionKey: string): string {
+  if (!sessionKey) return '';
+  return auth.kind === 'profile' ? `profile:${auth.profileId}:${sessionKey}` : `unified:${sessionKey}`;
+}
+
 export function getStickyModel(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): number | undefined {
   const hasAssistant = messages.some(m => m.role === 'assistant');
   if (!hasAssistant) return undefined;
@@ -356,6 +368,15 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
     object: 'list',
     data: buildCatalogEntries({ onlyAvailable, executionStatus: es }),
   });
+});
+
+// GET /v1/codex/models: the model catalog in Codex CLI's format, for
+// `model_catalog_url` in ~/.codex/config.toml. Lists only models that can serve
+// a request right now, same as `?available=true` on /v1/models.
+proxyRouter.get('/codex/models', (req, res) => {
+  if (!requireInferenceAuth(req, res)) return;
+  const visionById = new Map(buildModelListing().models.map(m => [m.id, m.supportsVision]));
+  res.json(buildCodexCatalog(buildCatalogEntries({ onlyAvailable: true }), visionById));
 });
 
 // GET /v1/models/:id — OpenAI's `models.retrieve` (single-model lookup).
@@ -505,7 +526,7 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
     },
     ...claudeFamilyEntries,
     ...profileRows.map(p => {
-      const ctx = servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]);
+      const ctx = advertisedContextWindow(servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]));
       return {
         id: `auto:${p.name.toLowerCase()}`,
         object: 'model',
@@ -1050,6 +1071,18 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
       },
     });
   }
+}
+
+proxyRouter.get('/text/models', (req, res) => {
+  if (requireInferenceAuth(req, res)) res.json({object:'list', data:listSpecialists()});
+});
+for (const [path, task] of [['translate','translation'], ['summarize','summarization']] as const) {
+  proxyRouter.post('/text/'+path, async (req, res) => {
+    const auth = requireInferenceAuth(req, res);
+    if (!auth) return;
+    if (auth.systemPrompt) { res.status(403).json({error:{message:'A profile requiring a system prompt cannot use a fixed-task specialist.'}}); return; }
+    await serveSpecialist(task, req, res);
+  });
 }
 
 proxyRouter.post('/decisions', handleDecision);
@@ -2396,7 +2429,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // be semantically wrong.
   const isAutoRouted = !requestedModel || isAutoModel(requestedModel);
   const handoffMode = isAutoRouted ? getContextHandoffMode() : ('off' as const);
-  const sessionKey = handoffMode !== 'off' ? getSessionKey(sessionMessages, sessionIdHeader, strategyKey) : '';
+  const rawSessionKey = handoffMode !== 'off' ? getSessionKey(sessionMessages, sessionIdHeader, strategyKey) : '';
+  const sessionKey = callerScopedSessionKey(auth, rawSessionKey);
   if (handoffMode !== 'off' && sessionKey) {
     recordIncomingMessages(sessionKey, messages);
   }
@@ -2410,10 +2444,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Header-less clients are covered: without x-session-id, getSessionKey hashes
   // the FIRST user message, which does not change as the conversation grows —
   // the same stability sticky sessions already rely on. Its known weakness is
-  // shared here: two conversations opening with identical text share a key, so
+  // shared here, within one calling key (#1890 keeps keys apart): two
+  // conversations opening with identical text share a key, so
   // the same-model + field-actually-missing gates below are what keep a
   // mis-keyed restore from reaching a payload it does not belong in.
-  const reasoningSessionKey = getSessionKey(sessionMessages, sessionIdHeader, strategyKey);
+  const reasoningSessionKey = callerScopedSessionKey(auth, getSessionKey(sessionMessages, sessionIdHeader, strategyKey));
   // A handoff can only fire when a prior model is on record for this session.
   // Check after recordIncomingMessages, which clears the prior model on a
   // fresh conversation. Stable across the retry loop (the prior model only
@@ -2581,7 +2616,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     let injectedHandoffTokens = 0;
     if (handoffMode !== 'off' && sessionKey) {
       const handoff = maybeInjectContextHandoff({ mode: handoffMode, sessionKey, messages, selectedModelKey: modelKey });
-      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${sessionKey.slice(0, 8)}…, model switch detected)`);
+      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${rawSessionKey.slice(0, 8)}…, model switch detected)`);
       outboundMessages = handoff.messages;
       injectedHandoffTokens = handoff.injectedTokens;
     }

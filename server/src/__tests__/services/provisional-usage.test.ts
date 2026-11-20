@@ -100,8 +100,8 @@ describe('in-flight leases count against the quota gates', () => {
 
   it('ignores an aged-out lease so a leak cannot block the gate forever', () => {
     const now = Date.now();
-    // Older than LEASE_MAX_AGE_MS (2 min).
-    acquireLease('groq', 'm1', keyId, 100, now - 5 * 60 * 1000);
+    // Older than the backstop age (30 min floor for a 120s platform timeout).
+    acquireLease('groq', 'm1', keyId, 100, now - 31 * 60 * 1000);
     expect(canMakeRequest('groq', 'm1', keyId, limits(1))).toBe(true);
   });
 });

@@ -46,6 +46,7 @@ export interface ParseResult {
 export const PREFIX_MAP: Record<string, string> = {
   ACLIDE_: 'aclide',
   SPEKA_: 'speka',
+  MELDPORT_: 'meldport',
   KENARI_: 'kenari',
   KIOSAPI_: 'kiosapi',
   KIOS_: 'kiosapi',
@@ -71,9 +72,14 @@ export const PREFIX_MAP: Record<string, string> = {
   MOONDREAM_: 'moondream',
   JAMAI_: 'jamai',
   NABH_: 'nabh',
+  ZRO_: 'zro',
+  MOONMATH_: 'zro',
   NOVAI_: 'novai',
   VAROSITY_: 'varosity',
   RIME_: 'rime',
+  TYPECAST_: 'typecast',
+  CARTESIA_: 'cartesia',
+  SILVR_: 'silvr',
   FREETTS_: 'freetts',
   FREE_TTS_: 'freetts',
   FREEINFERENCE_: 'freeinference',
@@ -160,6 +166,7 @@ export const PREFIX_MAP: Record<string, string> = {
   ANY_API_: 'anyapi',
   POWERTOKENS_: 'powertokens',
   POWER_TOKENS_: 'powertokens',
+  CHEAPLLM_: 'cheapllm',
   AIHORDE_: 'aihorde',
   QIANFAN_: 'qianfan',
   BAIDU_: 'qianfan',
@@ -203,9 +210,22 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   moondream: 'moondream',
   jamai: 'jamai',
   nabh: 'nabh',
+  zro: 'zro',
+  moonmath: 'zro',
+  'zro.moonmath.ai': 'zro',
+  'moonmath.ai': 'zro',
   novai: 'novai',
   varosity: 'varosity',
+  speechflow: 'speechflow',
+  meldport: 'meldport',
+  'meldport.com': 'meldport',
   rime: 'rime',
+  typecast: 'typecast',
+  'typecast.ai': 'typecast',
+  cartesia: 'cartesia',
+  'cartesia.ai': 'cartesia',
+  silvr: 'silvr',
+  'silvrai.net': 'silvr',
   'rime.ai': 'rime',
   freetts: 'freetts',
   'freetts.org': 'freetts',
@@ -276,6 +296,8 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   'any-api': 'anyapi',
   powertokens: 'powertokens',
   'power-tokens': 'powertokens',
+  cheapllm: 'cheapllm',
+  'cheapllm.shop': 'cheapllm',
   qianfan: 'qianfan',
   baidu: 'qianfan',
   ernie: 'qianfan',
@@ -809,7 +831,7 @@ function toParsedKeys(pairs: KeyPair[]): ParseResult {
     const value = project && /^JAMAI_(API_KEY|PAT|KEY)$/i.test(key) && !rawValue.includes(':')
       ? `${project}:${rawValue.trim()}` : rawValue;
     const prefix = extractPrefix(key);
-    const platform = statedPlatform ?? detectPlatform(prefix);
+    const platform = statedPlatform ?? (/^SPEECHFLOW_(API_)?KEY$/i.test(key) ? 'speechflow' : detectPlatform(prefix));
     // The name before `=` becomes the stored label (splitRawKey in the import
     // route). Formats that carry a display name — export JSON and CSV column 3
     // — use it here, exactly as parseExportJson does, so an export/import

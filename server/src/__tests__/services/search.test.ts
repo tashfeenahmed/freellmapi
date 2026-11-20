@@ -20,6 +20,10 @@ import { SEARCH_PLATFORMS as SHARED_SEARCH_PLATFORMS } from '../../../../shared/
 import { SEARCH_PLATFORMS } from '../../lib/search-platforms.js';
 import { seedSearchEngines } from '../helpers/search-engines.js';
 import { clearLastHealthyStampState } from '../../services/health.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 const realFetch = globalThis.fetch;
 

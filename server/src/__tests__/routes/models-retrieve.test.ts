@@ -91,7 +91,7 @@ describe('GET /v1/models/:id (models.retrieve)', () => {
     expect(got.body.object).toBe('model');
     expect(got.body.id).toBe(row.id);
     expect(got.body.owned_by).toBe(row.owned_by);
-    expect(got.body.context_window).toBe(4096);
+    expect(got.body.context_window).toBe(3276); // 4096 raw / 1.25 margin
     expect(got.body.available).toBe(true);
     expect(got.body.execution_status).toBe(row.execution_status);
   });

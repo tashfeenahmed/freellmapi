@@ -22,6 +22,14 @@ describe('updateSupport', () => {
     expect(updateSupport({ ...base, platform: 'win32', execPath }, () => false)).toEqual({ phase: 'unsupported', reason: 'package' });
   });
 
+  it('leaves a Microsoft Store install to the Store, whatever else is true', () => {
+    const execPath = 'C:\\Program Files\\WindowsApps\\TashAhmed.FreeLLMAPI_0.16.30.0_x64__6nczed04ys4da\\app\\FreeLLMAPI.exe';
+    expect(updateSupport({ ...base, platform: 'win32', execPath, windowsStore: true }, () => true))
+      .toEqual({ phase: 'unsupported', reason: 'store' });
+    expect(updateSupport({ ...base, platform: 'win32', execPath, windowsStore: true, feed: 'http://127.0.0.1:8099/' }))
+      .toEqual({ phase: 'unsupported', reason: 'store' });
+  });
+
   it('updates the AppImage on Linux and leaves deb/rpm to the package manager', () => {
     expect(updateSupport({ ...base, platform: 'linux', execPath: '/tmp/.mount_x/freellmapi-desktop', appImage: '/home/me/FreeLLMAPI.AppImage' })).toBeNull();
     expect(updateSupport({ ...base, platform: 'linux', execPath: '/opt/FreeLLMAPI/freellmapi-desktop' })).toEqual({ phase: 'unsupported', reason: 'package' });
