@@ -2,21 +2,33 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import { fileURLToPath } from 'node:url'
+
+const clientRoot = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
+  const env = loadEnv(mode, path.resolve(clientRoot, '..'), '')
   const serverPort = env.PORT ?? process.env.PORT ?? 3001
 
   return {
     plugins: [react(), tailwindcss()],
     base: process.env.VITE_BASE ?? '/',
-    envDir: path.resolve(__dirname, '..'),
+    envDir: path.resolve(clientRoot, '..'),
     define: {
       __SERVER_PORT__: JSON.stringify(String(serverPort)),
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(clientRoot, './src'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          main: path.resolve(clientRoot, 'index.html'),
+          seez: path.resolve(clientRoot, 'seez.html'),
+          seezAdmin: path.resolve(clientRoot, 'seez-admin.html'),
+        },
       },
     },
     server: {
