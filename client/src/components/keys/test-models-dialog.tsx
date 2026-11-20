@@ -10,7 +10,7 @@ import { toast } from '@/lib/toast'
 import type { Model } from '@freellmapi/shared/types'
 import type { SearchEngine } from '@/lib/search'
 import type { DecisionModel } from '@/lib/decision'
-import { MODEL_TEST_MIN_INTERVAL_MS, nowMs } from '@/lib/test-models'
+import { MODEL_TEST_MIN_INTERVAL_MS, nowMs, selectTestableModels } from '@/lib/test-models'
 
 // Fire one real "ping" at a model/engine through its own test endpoint and show
 // pass/fail with latency. Lived on the Providers page before that page was folded
@@ -62,9 +62,7 @@ export function TestModelsDialog({ platform, keyId, label, onOpenChange }: TestM
 
   const isLoading = modelsLoading || enginesLoading || decisionsLoading
 
-  const chatItems: Item[] = models
-    .filter(m => m.platform === platform && (keyId == null || m.keyId === keyId))
-    .sort((a, b) => a.intelligenceRank - b.intelligenceRank || a.displayName.localeCompare(b.displayName))
+  const chatItems: Item[] = selectTestableModels(models, platform, keyId)
     .map(m => ({ kind: 'chat', id: m.id, label: m.displayName, sublabel: m.modelId, enabled: m.enabled, keyCount: 1 }))
 
   const searchItems: Item[] = engines
@@ -91,7 +89,7 @@ export function TestModelsDialog({ platform, keyId, label, onOpenChange }: TestM
       return
     }
     setTests(prev => ({ ...prev, [key]: { loading: true, lastTestedAt: now } }))
-    const started = performance.now()
+    const started = nowMs()
     try {
       let success = false
       let latencyMs = 0
@@ -105,7 +103,7 @@ export function TestModelsDialog({ platform, keyId, label, onOpenChange }: TestM
         try {
           await apiFetch(`/api/search/engines/${item.id}/test`, { method: 'POST', body: JSON.stringify({ query: 'OpenAI' }) })
           success = true
-          latencyMs = Math.round(performance.now() - started)
+          latencyMs = Math.round(nowMs() - started)
         } catch (err: unknown) {
           success = false
           error = err instanceof Error ? err.message : t('keys.testFailed')
