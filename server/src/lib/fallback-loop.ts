@@ -206,6 +206,34 @@ export function getFallbackTimeBudgetMs(): number {
   return DEFAULT_FALLBACK_TIME_BUDGET_MS;
 }
 
+// RC3: per-attempt silent window (time to first byte). Below the provider's
+// own HTTP timeout (60s) nothing used to bound how long ONE attempt may stay
+// silent, so a single dead route consumed the whole retry budget and the
+// request failed instead of failing over. Streaming attempts that send no
+// first byte within this window are aborted and treated as a retryable stall
+// (benched lightly, like any timeout); the loop then moves to the next route
+// while budget remains. It never touches an attempt that has already
+// committed (ctx.disarmHedge clears it). Same precedence as the budget:
+// setting → env → default; 0 disables.
+export const DEFAULT_ATTEMPT_SILENT_MS = 20_000;
+export const ATTEMPT_SILENT_SETTING = 'fallback_attempt_silent_ms';
+
+export function getAttemptSilentMs(): number {
+  let stored: string | undefined;
+  try {
+    stored = getSetting(ATTEMPT_SILENT_SETTING);
+  } catch {
+    stored = undefined; // DB not ready — never throw on the proxy hot path
+  }
+  const candidates = [stored, process.env.FALLBACK_ATTEMPT_SILENT_MS];
+  for (const raw of candidates) {
+    if (raw === undefined || raw.trim() === '') continue;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return DEFAULT_ATTEMPT_SILENT_MS;
+}
+
 // Mutable per-request skip state threaded through the loop and mutated by
 // recordRetryableFailure / recordAuthFailure. skipKeys entries are
 // "platform:modelId:keyId"; skipModels holds model_db_ids ruled out for the
@@ -1308,6 +1336,13 @@ export interface DispatchContext {
    * call, including when hedging is not armed at all. See FallbackHooks.dispatch.
    */
   disarmHedge(): void;
+  /**
+   * The attempt received its first upstream token (content or reasoning), even
+   * if the surface is still holding it uncommitted. Cancels only the RC3
+   * per-attempt silent-window cap — the budget hedge stays armed until
+   * disarmHedge(). Optional for callers (tests' fake contexts); idempotent.
+   */
+  markFirstByte?(): void;
 }
 
 // Per-request exhaustion metadata handed to the exhaustion hooks, so each
@@ -1352,7 +1387,22 @@ export interface FallbackHooks {
   // newHedgeAbortError(); the loop renders timedOut exhaustion, and benches the
   // model+key only when that attempt ate the whole budget by itself (see the
   // isHedgeAbortError branch below). Absent = pre-v2 behavior.
+  //
+  // The surface MUST abort only the CURRENT attempt's signal and hand the next
+  // attempt a fresh one (replace its controller after aborting), because a
+  // silent-window abort (see `streaming` below) fails over to another attempt.
   abortInFlight?: () => void;
+  // True when dispatch calls ctx.disarmHedge() on the attempt's first byte
+  // (streaming surfaces). Enables the per-attempt silent-window cap
+  // (getAttemptSilentMs): an attempt that sends no first byte within that
+  // window is aborted and counted as an ordinary retryable stall, so the loop
+  // fails over while budget remains instead of letting one dead route eat the
+  // whole budget. A non-streaming attempt has no observable first byte (slow
+  // != stalled), so it never gets the cap.
+  streaming?: boolean;
+  // Per-attempt silent-window override, mostly for tests. Defaults to
+  // getAttemptSilentMs() (setting → env → 20s; 0 disables).
+  attemptSilentMs?: number;
   // Skip state; recordRetryableFailure / recordAuthFailure (called by the loop)
   // mutate it, and the surface's route() reads it to exclude failed keys/models.
   state: FallbackState;
@@ -1435,6 +1485,10 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
 async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace): Promise<void> {
   const maxRetries = hooks.maxRetries ?? FALLBACK_MAX_RETRIES;
   const baseBudgetMs = hooks.timeBudgetMs ?? getFallbackTimeBudgetMs();
+  // RC3 silent-window cap: only for surfaces that signal their first byte.
+  const attemptSilentMs = hooks.streaming && hooks.abortInFlight
+    ? Math.max(0, hooks.attemptSilentMs ?? getAttemptSilentMs())
+    : 0;
   const startedAt = Date.now();
   const attempts: AttemptRecord[] = hooks.attemptLog ?? [];
   const keyOrdinals = new Map<string, number>();
@@ -1506,6 +1560,8 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     }
 
     let hedgeTimer: NodeJS.Timeout | undefined;
+    let silentTimer: NodeJS.Timeout | undefined;
+    let silentCapFired = false;
     try {
     // Select the endpoint before checking the budget: a slow endpoint may
     // still have time even after the base budget has expired. Recompute from
@@ -1562,19 +1618,51 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     // because past that point cancelling would truncate a healthy response and
     // buy nothing: a committed stream can no longer fail over anyway. Slow is
     // not the same as stalled, and only stalled is worth killing.
+    const markFirstByte = () => {
+      if (silentTimer) {
+        clearTimeout(silentTimer);
+        silentTimer = undefined;
+      }
+    };
     const disarmHedge = () => {
       if (hedgeTimer) {
         clearTimeout(hedgeTimer);
         hedgeTimer = undefined;
       }
+      markFirstByte();
     };
     if (attempt > 1 && budgetMs > 0 && hooks.abortInFlight) {
       const remaining = budgetMs - (Date.now() - startedAt);
       if (remaining > 0) {
         hedgeTimer = setTimeout(() => {
+          hedgeTimer = undefined;
+          markFirstByte(); // one abort per attempt
           console.log(`[FallbackLoop] retry time budget (${budgetMs}ms) expired with no first byte on ${route.platform}/${route.modelId} — aborting stalled upstream`);
           hooks.abortInFlight?.();
         }, remaining);
+      }
+    }
+    // RC3: a streaming attempt also gets the per-attempt silent-window cap
+    // (EVERY attempt, including the #751-exempt first two — a stall there
+    // burns the budget just the same). It covers only the time to the first
+    // upstream token: ctx.markFirstByte() (any token, even one the surface is
+    // still holding uncommitted) or ctx.disarmHedge() (commit) clears it.
+    // `silentCapFired` tells the catch below that this attempt stalled on its
+    // own, so it fails over instead of rendering exhaustion. When the budget
+    // timer would fire first, it wins (cap is skipped) and behaves as before.
+    if (attemptSilentMs > 0) {
+      const remaining = hedgeTimer ? budgetMs - (Date.now() - startedAt) : Infinity;
+      if (attemptSilentMs < remaining) {
+        silentTimer = setTimeout(() => {
+          silentTimer = undefined;
+          if (hedgeTimer) {
+            clearTimeout(hedgeTimer);
+            hedgeTimer = undefined;
+          }
+          silentCapFired = true;
+          console.log(`[FallbackLoop] no first byte from ${route.platform}/${route.modelId} within the ${attemptSilentMs}ms attempt silent window — aborting stalled upstream and failing over`);
+          hooks.abortInFlight?.();
+        }, attemptSilentMs);
       }
     }
     let outcome: DispatchOutcome;
@@ -1584,7 +1672,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       // otherwise the global proxy / direct path applies as before. The URL
       // arrives already decrypted on the route (services/router.ts), so an
       // attempt costs nothing extra — no query, no decrypt.
-      outcome = await withKeyProxy(route.proxyUrl, () => hooks.dispatch(route, attempt, { disarmHedge }));
+      outcome = await withKeyProxy(route.proxyUrl, () => hooks.dispatch(route, attempt, { disarmHedge, markFirstByte }));
     } catch (err: any) {
       // Client-caused abort: the composed fetch signal fired because OUR
       // client hung up mid-attempt (see newClientAbortError). Not a
@@ -1624,6 +1712,25 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       // rate-limit signal, so cooldownDecisionForError keeps it light) plus the
       // gradual model-level sink, both of which decay on their own if the route
       // recovers.
+      // RC3: the per-attempt silent-window cap fired (not the budget). This
+      // route stalled on its own — it is an ordinary retryable failure: log
+      // it, bench it lightly (a timeout, not a rate-limit signal), and move on
+      // to the next route. The loop-top budget check still decides whether a
+      // further attempt may start, so an exhausted budget renders the same
+      // timedOut exhaustion as before.
+      if (isHedgeAbortError(err) && silentCapFired) {
+        const stallErr = Object.assign(
+          new Error(`upstream stalled: no first byte from ${route.platform}/${route.modelId} within ${attemptSilentMs}ms (attempt silent-window timeout)`),
+          { status: 504 },
+        );
+        hooks.logFailure(route, stallErr, attempt);
+        recordRetryableFailure(route, stallErr, hooks.state);
+        attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass: 'timeout' });
+        traceAttempt('timeout', stallErr);
+        lastError = stallErr;
+        if (stopIfBreakerTripped()) return;
+        continue;
+      }
       if (isHedgeAbortError(err)) {
         const elapsedMs = Date.now() - startedAt;
         const attemptElapsedMs = Date.now() - attemptStartedAt;
@@ -1717,6 +1824,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     return;
     } finally {
       if (hedgeTimer) clearTimeout(hedgeTimer);
+      if (silentTimer) clearTimeout(silentTimer);
       route.release?.();
     }
   }

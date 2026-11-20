@@ -719,14 +719,15 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
-  const hedgeAbort = new AbortController();
+  // `let`: abortInFlight aborts only the in-flight attempt and replaces the
+  // controller, so a silent-window failover gets a fresh signal (RC3).
+  let hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
       clientAbort.abort(newClientAbortError());
     }
   });
-  const dispatchOptions = { ...completionOptions, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) };
 
   // Decision routing (#1354): with the 'decision' strategy on, a decision
   // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
@@ -741,7 +742,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
     attemptLog,
     logIdentity: { surface: 'anthropic messages', requestedModel },
     clientGone: () => clientGone,
-    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
+    abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
+    streaming: stream === true,
     route: () => {
       // Task-type routing (#1127): same header/derivation as /chat/completions.
       const taskType = resolveTaskType(req, tools, messages);
@@ -753,12 +755,13 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
     },
     dispatch: async (route, attempt, dispatchCtx) => {
       const contextBudget = routeOutputBudget(route, estimatedInputTokens);
-      const routeOptions = { ...dispatchOptions, contextBudget };
+      // Signal composed per attempt: hedgeAbort is replaced after each abort.
+      const routeOptions = { ...completionOptions, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]), contextBudget };
       if (stream) {
         try {
           await streamCompletion(res, route, messages, routeOptions, {
             start, attempt, attemptLog, clientGone: () => clientGone, requestedModel, estimatedInputTokens, tools, pinnedModelId,
-            sessionId, sessionMessages, pinned: resolved.pinned, stickyScope, strategyKey, disarmHedge: dispatchCtx.disarmHedge, state,
+            sessionId, sessionMessages, pinned: resolved.pinned, stickyScope, strategyKey, disarmHedge: dispatchCtx.disarmHedge, markFirstByte: dispatchCtx.markFirstByte, state,
           });
           return 'done';
         } catch (err: any) {
@@ -904,6 +907,8 @@ interface StreamCtx {
   strategyKey?: string;
   /** Cancel this attempt's time-budget hedge once the stream commits. */
   disarmHedge: () => void;
+  /** RC3: clear the per-attempt silent-window cap on the first upstream token. */
+  markFirstByte?: () => void;
   /** The request's failover state, so a served tool request can be learned from (#1230). */
   state: FallbackState;
 }
@@ -1074,6 +1079,13 @@ async function streamCompletion(
       // `reasoning`); the shared <think> extractor emits reasoning_content.
       const reasoningDelta = choice.delta?.reasoning_content ?? choice.delta?.reasoning;
       if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) reasoningBuf += reasoningDelta;
+      // RC3: any upstream token (text, reasoning or a tool-call delta) proves
+      // the attempt alive and clears the per-attempt silent-window cap.
+      if (
+        (typeof reasoningDelta === 'string' && reasoningDelta.length > 0)
+        || (typeof choice.delta?.content === 'string' && choice.delta.content.length > 0)
+        || (Array.isArray(choice.delta?.tool_calls) && choice.delta.tool_calls.length > 0)
+      ) ctx.markFirstByte?.();
       // #1642: long reasoning with nothing streamed yet: commit and ping.
       if (reasoningBuf.length > 0 && !textBlockOpen && Date.now() - quietSince >= REASONING_HOLD_MAX_MS) {
         ensureMessageStart();

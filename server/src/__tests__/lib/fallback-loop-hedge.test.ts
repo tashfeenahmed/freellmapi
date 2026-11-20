@@ -279,3 +279,206 @@ describe('fallback loop time-budget hedging', () => {
     expect(h.onExhausted.mock.calls[0][1].timedOut).toBe(true);
   });
 });
+
+/**
+ * RC3: per-attempt silent-window cap. A streaming attempt that sends no first
+ * upstream byte within `attemptSilentMs` is aborted and treated as an ordinary
+ * retryable stall, so the loop fails over to the next route while budget
+ * remains instead of letting one dead route eat the whole budget.
+ */
+describe('fallback loop per-attempt silent-window cap (RC3)', () => {
+  beforeEach(() => {
+    initDb(':memory:');
+    resetLeases();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    resetLeases();
+    vi.restoreAllMocks();
+  });
+
+  // Mirrors the surfaces: abortInFlight aborts the CURRENT controller and
+  // installs a fresh one, so the next attempt is not born aborted.
+  function perAttemptAbort() {
+    let ctrl = new AbortController();
+    return {
+      current: () => ctrl,
+      abortInFlight: vi.fn(() => { ctrl.abort(newHedgeAbortError()); ctrl = new AbortController(); }),
+    };
+  }
+  function stallOn(ctrl: AbortController): Promise<never> {
+    return new Promise((_resolve, reject) => {
+      ctrl.signal.addEventListener('abort', () => reject(newHedgeAbortError()), { once: true });
+    });
+  }
+
+  it('stalled provider then healthy provider => served by the healthy one within the silent-window cap', async () => {
+    const state = newFallbackState();
+    const ab = perAttemptAbort();
+    const dispatch = vi.fn()
+      .mockImplementationOnce(() => stallOn(ab.current()))
+      .mockImplementationOnce(async (_r: unknown, _a: number, ctx: { disarmHedge: () => void }) => {
+        ctx.disarmHedge();
+        return 'done';
+      });
+    const h = hooks(state, {
+      maxRetries: 5,
+      timeBudgetMs: 5_000,
+      streaming: true,
+      attemptSilentMs: 50,
+      abortInFlight: ab.abortInFlight,
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    const t0 = Date.now();
+    await runFallbackLoop(h);
+    const elapsed = Date.now() - t0;
+
+    expect(dispatch).toHaveBeenCalledTimes(2);
+    expect(ab.abortInFlight).toHaveBeenCalledTimes(1);
+    // Served well before the 5s budget: the stall cost ~one silent window.
+    expect(elapsed).toBeLessThan(1_000);
+    expect(h.onExhausted).not.toHaveBeenCalled();
+    expect(h.onFatal).not.toHaveBeenCalled();
+    // The stall is booked as an ordinary retryable timeout: logged, benched,
+    // skipped for the rest of the request, and on the attempt trail.
+    expect(h.logFailure).toHaveBeenCalledTimes(1);
+    expect(h.logFailure.mock.calls[0][1].message).toMatch(/no first byte .* within 50ms/);
+    expect(state.skipKeys.size).toBe(1);
+    const cooldowns = getDb().prepare('SELECT COUNT(*) AS n FROM rate_limit_cooldowns').get() as { n: number };
+    expect(cooldowns.n).toBe(1);
+  });
+
+  it('applies to the #751-exempt first attempts and keeps failing over across several stalls', async () => {
+    const state = newFallbackState();
+    const ab = perAttemptAbort();
+    const dispatch = vi.fn()
+      .mockImplementationOnce(() => stallOn(ab.current()))
+      .mockImplementationOnce(() => stallOn(ab.current()))
+      .mockImplementationOnce(() => stallOn(ab.current()))
+      .mockImplementationOnce(async () => 'done');
+    const h = hooks(state, {
+      maxRetries: 6,
+      timeBudgetMs: 5_000,
+      streaming: true,
+      attemptSilentMs: 40,
+      abortInFlight: ab.abortInFlight,
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    await runFallbackLoop(h);
+
+    expect(dispatch).toHaveBeenCalledTimes(4);
+    expect(ab.abortInFlight).toHaveBeenCalledTimes(3);
+    expect(h.onExhausted).not.toHaveBeenCalled();
+    expect(h.logFailure).toHaveBeenCalledTimes(3);
+  });
+
+  it('a mid-stream stall is unaffected: the cap never cancels an attempt that saw its first byte', async () => {
+    const state = newFallbackState();
+    const ab = perAttemptAbort();
+    // First token arrives immediately (still uncommitted), then the stream
+    // goes quiet far longer than the cap before finishing.
+    const dispatch = vi.fn().mockImplementationOnce(
+      async (_r: unknown, _a: number, ctx: { disarmHedge: () => void; markFirstByte?: () => void }) => {
+        ctx.markFirstByte?.();
+        await new Promise(r => setTimeout(r, 200));
+        ctx.disarmHedge();
+        await new Promise(r => setTimeout(r, 100));
+        return 'done';
+      },
+    );
+    const h = hooks(state, {
+      maxRetries: 5,
+      timeBudgetMs: 5_000,
+      streaming: true,
+      attemptSilentMs: 40,
+      abortInFlight: ab.abortInFlight,
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    await runFallbackLoop(h);
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(ab.abortInFlight).not.toHaveBeenCalled();
+    expect(h.logFailure).not.toHaveBeenCalled();
+    expect(h.onExhausted).not.toHaveBeenCalled();
+  });
+
+  it('does not arm for non-streaming surfaces (no observable first byte)', async () => {
+    const state = newFallbackState();
+    const ab = perAttemptAbort();
+    const dispatch = vi.fn().mockImplementationOnce(async () => {
+      await new Promise(r => setTimeout(r, 150));
+      return 'done';
+    });
+    const h = hooks(state, {
+      maxRetries: 5,
+      timeBudgetMs: 5_000,
+      attemptSilentMs: 40,
+      abortInFlight: ab.abortInFlight,
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    await runFallbackLoop(h);
+
+    expect(ab.abortInFlight).not.toHaveBeenCalled();
+    expect(h.onExhausted).not.toHaveBeenCalled();
+  });
+
+  it('budget exhaustion still errors correctly: stalls past the budget render timedOut exhaustion', async () => {
+    const state = newFallbackState();
+    const ab = perAttemptAbort();
+    // Every route stalls. Cap 40ms, budget 100ms: attempts 0..1 are capped
+    // (#751-exempt from the budget), attempt 2 gets the budget remainder,
+    // then the loop must stop with a timedOut exhaustion render.
+    const dispatch = vi.fn().mockImplementation(() => stallOn(ab.current()));
+    const h = hooks(state, {
+      maxRetries: 10,
+      timeBudgetMs: 100,
+      streaming: true,
+      attemptSilentMs: 40,
+      abortInFlight: ab.abortInFlight,
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    const t0 = Date.now();
+    await runFallbackLoop(h);
+
+    expect(h.onExhausted).toHaveBeenCalledTimes(1);
+    expect(h.onExhausted.mock.calls[0][1].timedOut).toBe(true);
+    expect(h.onFatal).not.toHaveBeenCalled();
+    expect(dispatch.mock.calls.length).toBeLessThan(10);
+    expect(Date.now() - t0).toBeLessThan(1_000);
+  });
+
+  it('attemptSilentMs = 0 disables the cap', async () => {
+    const state = newFallbackState();
+    const ab = perAttemptAbort();
+    const dispatch = vi.fn().mockImplementationOnce(async () => {
+      await new Promise(r => setTimeout(r, 120));
+      return 'done';
+    });
+    const h = hooks(state, {
+      maxRetries: 5,
+      timeBudgetMs: 5_000,
+      streaming: true,
+      attemptSilentMs: 0,
+      abortInFlight: ab.abortInFlight,
+      route: () => leasedRoute().route,
+      dispatch,
+    });
+
+    await runFallbackLoop(h);
+
+    expect(ab.abortInFlight).not.toHaveBeenCalled();
+    expect(h.onExhausted).not.toHaveBeenCalled();
+  });
+});
