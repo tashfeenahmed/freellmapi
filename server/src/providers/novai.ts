@@ -6,7 +6,7 @@ import { OpenAICompatProvider } from './openai-compat.js';
 
 export const NOVAI_BASE_URL = 'https://aiapi-pro.com/v1';
 
-const CHAT_MODELS = new Set(['glm-4.6v-flash', 'glm-4.1v-thinking-flash']);
+const CHAT_MODELS = new Set(['glm-4.6v-flash', 'glm-4.1v-thinking-flash', 'glm-4.7-flash']);
 const THINKING_MODEL = 'glm-4.1v-thinking-flash';
 const WRAPPERS = [['<answer>', '</answer>'], ['<|begin_of_box|>', '<|end_of_box|>']] as const;
 

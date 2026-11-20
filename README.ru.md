@@ -2,7 +2,7 @@
 
 # FreeLLMAPI
 
-**7,4 миллиарда токенов в месяц. 34 бесплатных LLM-провайдера. 635 бесплатных модельных эндпоинтов. Один OpenAI-совместимый API.**
+**10,1 миллиарда токенов в месяц. 87 бесплатных LLM-провайдеров. 1313 бесплатных модельных эндпоинтов. Один OpenAI-совместимый API.**
 
 Объединяйте бесплатные тарифы десятков провайдеров, а также собственные OpenAI-совместимые эндпоинты для чата, эмбеддингов, генерации изображений и работы с аудио через единый API `/v1`. Ключи хранятся в зашифрованном виде. Маршрутизатор выбирает наиболее подходящую доступную модель, при ограничении запросов переключается на другого провайдера и учитывает расход по каждому ключу, помогая соблюдать бесплатные квоты.
 
@@ -13,15 +13,15 @@
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 [![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-Ask-blue)](https://deepwiki.com/tashfeenahmed/freellmapi)
 
-**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · полный каталог: 474 семейства моделей и 635 бесплатных эндпоинтов
+**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · полный каталог: 736 семейств моделей и 1313 бесплатных эндпоинтов
 
-[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · **Русский** · [O'zbekcha](README.uz.md)
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · **Русский** · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 Русский перевод может обновляться с задержкой. Самую актуальную информацию смотрите в английском [README](README.md).
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="Download for macOS"></a>
-  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows.svg" height="48" alt="Download for Windows"></a>
+  <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store.svg" height="48" alt="Get it from Microsoft Store"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker.svg" height="48" alt="Self-host with Docker"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store.svg" height="48" alt="Get it on Google Play"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store.svg" height="48" alt="Download on the App Store"></a>
@@ -61,13 +61,13 @@
 
 ## Зачем нужен FreeLLMAPI
 
-Крупные разработчики ИИ предлагают бесплатные тарифы: иногда это миллионы токенов в месяц и тысячи запросов в день. У каждого отдельно квота невелика, но в совокупности получается около **7,4 миллиарда токенов в месяц** для **474 семейств моделей и 635 эндпоинтов провайдеров**, от небольших быстрых моделей до более мощных.
+Крупные разработчики ИИ предлагают бесплатные тарифы: иногда это миллионы токенов в месяц и тысячи запросов в день. У каждого отдельно квота невелика, но в совокупности получается около **10,1 миллиарда токенов в месяц** для **736 семейств моделей и 1313 эндпоинтов провайдеров**, от небольших быстрых моделей до более мощных.
 
-Управлять таким количеством сервисов вручную неудобно: 34 SDK, 34 набора ограничений и столько же потенциальных точек отказа. FreeLLMAPI объединяет всё в одном OpenAI-совместимом API. Достаточно направить клиентскую библиотеку OpenAI на локальный сервер, и запросы будут распределяться между провайдерами, для которых вы добавили ключи.
+Управлять таким количеством сервисов вручную неудобно: 87 SDK, 87 наборов ограничений и столько же потенциальных точек отказа. FreeLLMAPI объединяет всё в одном OpenAI-совместимом API. Достаточно направить клиентскую библиотеку OpenAI на локальный сервер, и запросы будут распределяться между провайдерами, для которых вы добавили ключи.
 
 Бесплатные тарифы постоянно меняются: модели появляются и исчезают, ограничения корректируются. FreeLLMAPI автоматически загружает подписанный каталог с [freellmapi.co](https://freellmapi.co), поэтому данные обновляются без `git pull`. О различиях в скорости обновления рассказывается в разделе [Premium и оперативный каталог](#premium-и-оперативный-каталог).
 
-![Объединение бесплатных тарифов: около 7,4 млрд токенов в месяц от 34 провайдеров](repo-assets/free-tier.png)
+![Объединение бесплатных тарифов: около 10,1 млрд токенов в месяц от 87 провайдеров](repo-assets/free-tier.png)
 
 ## Поддерживаемые провайдеры
 
@@ -95,7 +95,7 @@
 </tr>
 </table>
 
-<i>… и ещё 22 бесплатных провайдера</i>
+<i>… и ещё 75 бесплатных провайдеров</i>
 
 </div>
 
@@ -175,7 +175,7 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 Откройте http://localhost:3001, добавьте ключи провайдеров на странице **Keys**, настройте порядок **Fallback Chain** и скопируйте единый API-ключ из заголовка страницы **Keys**. Именно его следует указывать в OpenAI SDK.
 
-Для Windows проще всего скачать **[установщик `.exe` из Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. Для Android существует экспериментальное [руководство по Termux](docs/en/install/02-android-termux.md).
+Для Windows проще всего установить приложение из **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)**: оно подписано (Smart App Control его не блокирует) и обновляется автоматически. Неподписанный установщик `.exe` доступен в [Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest). Для Android существует экспериментальное [руководство по Termux](docs/en/install/02-android-termux.md).
 
 Другие варианты, включая Docker Compose, локальную разработку, конфигурацию запуска, production-сборки, сетевой доступ и резервное копирование, описаны в **[руководстве по установке](docs/en/install/01-install.md)**.
 
@@ -185,7 +185,7 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 ![Настольное приложение FreeLLMAPI](repo-assets/desktop.png)
 
-**[Скачать из Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. К каждому выпуску прикладываются `.dmg` для macOS и `.exe` для Windows. Регистрация и отдельный пароль не требуются: необходим только единый API-ключ, доступный во всплывающем окне трея. Сборка из исходников и пути хранения данных: [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app).
+**[Скачать из Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. К каждому выпуску прикладываются `.dmg` для macOS и `.exe` для Windows. В Windows лучше установить версию из **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)**: она подписана, поэтому Smart App Control её не блокирует, а Store сам её обновляет. Регистрация и отдельный пароль не требуются: необходим только единый API-ключ, доступный во всплывающем окне трея. Сборка из исходников и пути хранения данных: [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app).
 
 Для macOS 12 Monterey и новее выберите **arm64 (Apple Silicon)** или **x64 (Intel)**. Обе версии для Mac также доступны в ZIP.
 
@@ -213,7 +213,7 @@ FreeLLMAPI рассчитан прежде всего на локальное и
 
 Маршрутизатор поддерживает каталог моделей в актуальном состоянии: дважды в день скачивает подписанный каталог с [freellmapi.co](https://freellmapi.co) и обновляет локальную БД новыми моделями, изменениями квот и исправлениями особенностей провайдеров. Ваши настройки включения/отключения моделей и пользовательские провайдеры остаются нетронутыми. Каждая загрузка перед применением проверяется закреплённым ключом Ed25519.
 
-В каталоге представлены **34 провайдера**, **474 семейства моделей**, **635 бесплатных сочетаний провайдер/модель** (584 для чата, 41 для эмбеддингов, 7 для транскрибации и 3 для видео), а заявленная общая бесплатная ёмкость составляет примерно **7,4 миллиарда токенов в месяц**. Полный список: **[freellmapi.co/models](https://freellmapi.co/models.html)**.
+В каталоге представлены **87 провайдеров**, **736 семейств моделей**, **1313 бесплатных сочетаний провайдер/модель** (1137 для чата, 29 для изображений, 41 для аудио, 68 для эмбеддингов, 19 для транскрибации, 6 для видео и 13 для принятия решений), а заявленная общая бесплатная ёмкость составляет примерно **10,1 миллиарда токенов в месяц**. Полный список: **[freellmapi.co/models](https://freellmapi.co/models.html)**.
 
 Бесплатные установки получают тот же подписанный каталог, но из ежемесячного снимка. Новая модель появляется там спустя 30 дней после оперативного каталога, поэтому бесплатная версия сейчас отстаёт примерно на 303 модели. Ничего не отключается и не истекает: обновления просто приходят позже.
 
@@ -482,6 +482,10 @@ print("Routed via:", resp.headers.get("x-routed-via"))
 <a href="https://github.com/leucds2018-hub"><img src="https://images.weserv.nl/?url=github.com/leucds2018-hub.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@leucds2018-hub" /></a>
 <a href="https://github.com/zhangkom"><img src="https://images.weserv.nl/?url=github.com/zhangkom.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@zhangkom" /></a>
 <a href="https://github.com/noahkhomer18"><img src="https://images.weserv.nl/?url=github.com/noahkhomer18.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@noahkhomer18" /></a>
+<a href="https://github.com/mentallyunstable-lab"><img src="https://images.weserv.nl/?url=github.com/mentallyunstable-lab.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mentallyunstable-lab" /></a>
+<a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
+<a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
+<a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
 
 ## Отказ от гарантий
 

@@ -42,7 +42,13 @@ import { createProxyRateLimiter, createAdminRateLimiter } from './middleware/rat
 // Password-guess ceiling for GET /api/keys/export. Deliberately low: a real
 // user exports keys occasionally, never ten times a minute.
 const EXPORT_RATE_LIMIT_RPM = 10;
+// Same idea for POST /api/keys/:id/reveal (#1885), which also re-checks the
+// password. Looser than export because a user may copy several keys in a row,
+// but far below the 600/min dashboard limit it used to share.
+const REVEAL_RATE_LIMIT_RPM = 60;
+const REVEAL_PATH_RE = /^\/[^/]+\/reveal\/?$/;
 import { errorHandler } from './middleware/errorHandler.js';
+import { collapseDoubledV1Prefix } from './middleware/doubled-v1.js';
 import { clientContextMiddleware } from './lib/client-context.js';
 import type { Config } from './lib/config.js';
 import { loadConfig } from './lib/config.js';
@@ -187,6 +193,14 @@ export function createApp(config?: Config) {
 
     next();
   });
+  // Forgive a doubled `/v1` prefix (#1956). Anthropic-style clients (Claude
+  // Desktop's gateway, Claude Code, the Anthropic SDK) append `/v1/...` to the
+  // base URL themselves, so a user who pastes the OpenAI-style base URL
+  // (`http://host:port/v1`) ends up calling `/v1/v1/models` and gets a bare
+  // 404. Strip the duplicate before any path-scoped middleware or router sees
+  // it, so the request gets the same body limits, rate limiting and auth as
+  // the canonical path.
+  app.use(collapseDoubledV1Prefix);
   app.use(cors({
     origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
       callback(null, !origin || allowedCorsOrigins.has(origin));
@@ -250,6 +264,14 @@ export function createApp(config?: Config) {
   // dashboard traffic and far too loose for that, so this path gets its own
   // tight per-IP bucket on top of it.
   app.use('/api/keys/export', createAdminRateLimiter(EXPORT_RATE_LIMIT_RPM));
+  const revealRateLimiter = createAdminRateLimiter(REVEAL_RATE_LIMIT_RPM);
+  app.use('/api/keys', (req, res, next) => {
+    if (req.method === 'POST' && REVEAL_PATH_RE.test(req.path)) {
+      revealRateLimiter(req, res, next);
+      return;
+    }
+    next();
+  });
 
   app.use('/api/keys', requireAuth, keysRouter);
   // Per-client key management (#411). Dashboard-session gated like the rest of

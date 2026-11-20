@@ -3,6 +3,7 @@
 import { getDb, getSetting, setSetting } from '../db/index.js';
 import { isLoopbackOrPrivateUrl } from '../lib/url-guard.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
+import { providerTimeoutMs } from '../lib/provider-timeout.js';
 
 interface Window {
   timestamps: number[];
@@ -70,15 +71,34 @@ const leases = new Map<number, Lease>();
 let nextLeaseId = 1;
 
 // A lease should always be released explicitly by the fallback loop's finally
-// block. This bound is the backstop for a path that somehow doesn't: without it
-// a single leaked lease would count against a key's concurrency budget forever.
-// Comfortably longer than the per-attempt provider timeout.
-const LEASE_MAX_AGE_MS = 2 * MINUTE;
+// block. Pruning is the backstop for a path that somehow doesn't: without it a
+// single leaked lease would count against a key's concurrency budget forever.
+//
+// The bound has to outlive the request it stands for, not the other way round. A
+// flat two minutes did not: the slow platforms use a 120-second chat timeout and
+// a streaming call keeps running after the response headers arrive, so a live
+// lease was pruned mid-request, a second request saw neither the in-flight lease
+// nor the recorded usage, and both could pass RPM, TPM, the daily cap and the
+// concurrency cap. So the age comes from the platform's own timeout, with a
+// floor and a margin, and a platform configured with no timeout at all
+// (PROVIDER_TIMEOUT_<PLATFORM>=0) is never aged out. The floor is 30 minutes
+// because the timeout read here is the env override or a 120s default, not a
+// provider's built-in value: AMD Radeon is built with a 600s timeout for long
+// reasoning calls, and a stream runs on past that first-byte deadline.
+const LEASE_BACKSTOP_FLOOR_MS = 30 * MINUTE;
+const LEASE_BACKSTOP_MARGIN_MS = 2 * MINUTE;
+const DEFAULT_PROVIDER_TIMEOUT_MS = 120 * 1000;
+
+function leaseMaxAgeMs(platform: string): number {
+  const timeout = providerTimeoutMs(platform, DEFAULT_PROVIDER_TIMEOUT_MS);
+  if (timeout === 0) return Number.POSITIVE_INFINITY;
+  return Math.max(LEASE_BACKSTOP_FLOOR_MS, timeout * 2 + LEASE_BACKSTOP_MARGIN_MS);
+}
 
 function pruneLeases(now: number): void {
   if (leases.size === 0) return;
   for (const [id, lease] of leases) {
-    if (now - lease.createdAt > LEASE_MAX_AGE_MS) leases.delete(id);
+    if (now - lease.createdAt > leaseMaxAgeMs(lease.platform)) leases.delete(id);
   }
 }
 

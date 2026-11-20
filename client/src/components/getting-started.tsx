@@ -48,6 +48,11 @@ export function GettingStarted() {
   if (dismissed || !keys || !summary) return null
 
   const hasKeys = keys.length > 0
+  // #1870: a new install starts with its no-key providers switched on. Step 1
+  // is then done, but "Add a provider key" crossed out would claim something
+  // the user never did, so it says what is on instead and keeps the way to
+  // add real keys.
+  const onlyNoKey = hasKeys && keys.every(k => (k as { keyless?: boolean }).keyless === true)
   const hasRequest = (summary.totalRequests ?? 0) > 0
   if (hasKeys && hasRequest) return null
 
@@ -89,8 +94,9 @@ export function GettingStarted() {
         <Step
           index={1}
           done={hasKeys}
-          title={t('setup.step1Title')}
-          description={t('setup.step1Desc')}
+          keepOpen={onlyNoKey}
+          title={onlyNoKey ? t('setup.step1KeylessTitle') : t('setup.step1Title')}
+          description={onlyNoKey ? t('setup.step1KeylessDesc') : t('setup.step1Desc')}
           action={
             <Link to="/keys">
               <Button variant="outline" size="sm">
@@ -149,16 +155,20 @@ export function GettingStarted() {
 function Step({
   index,
   done,
+  keepOpen = false,
   title,
   description,
   action,
 }: {
   index: number
   done: boolean
+  // Done, but still worth reading and acting on (the no-key step 1).
+  keepOpen?: boolean
   title: string
   description: string
   action: ReactNode
 }) {
+  const collapsed = done && !keepOpen
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-2 py-2.5 sm:flex-nowrap">
       <span
@@ -169,10 +179,10 @@ function Step({
         {done ? <Check className="size-3" /> : index}
       </span>
       <div className="min-w-0 flex-1">
-        <p className={`text-sm ${done ? 'text-muted-foreground line-through decoration-muted-foreground/40' : 'font-medium'}`}>{title}</p>
-        {!done && <p className="text-xs text-muted-foreground">{description}</p>}
+        <p className={`text-sm ${collapsed ? 'text-muted-foreground line-through decoration-muted-foreground/40' : 'font-medium'}`}>{title}</p>
+        {!collapsed && <p className="text-xs text-muted-foreground">{description}</p>}
       </div>
-      {!done && <div className="ml-8 shrink-0 sm:ml-0">{action}</div>}
+      {!collapsed && <div className="ml-8 shrink-0 sm:ml-0">{action}</div>}
     </li>
   )
 }

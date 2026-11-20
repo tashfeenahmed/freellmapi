@@ -104,11 +104,21 @@ export type Platform =
   | 'jamai'
   // One shared renewable monthly credit allowance; signed catalog only.
   | 'nabh'
+  // Zro by MoonMath.ai: selected chat routes share daily free usage. The
+  // allowance is not monthly cash credit; model rows are hosted-catalog only.
+  | 'zro'
   // Daily-free video route; signed catalog only.
   | 'novai'
   | 'varosity'
   // Native TTS and transcription; one shared renewable monthly credit grant.
+  | 'speechflow'
+  | 'meldport'
   | 'rime'
+  // Native speech: shared monthly credits, non-commercial Free output.
+  | 'typecast'
+  | 'cartesia'
+  // OpenAI-compatible gateway; one shared daily free allowance.
+  | 'silvr'
   // Local personal BYOK TTS; shared monthly characters, watermarked Free audio.
   | 'freetts'
   // Research API; chat and embeddings share a daily quota. Requests are logged.
@@ -147,6 +157,11 @@ export type Platform =
   // glm-4.7-flash ($0 / 1M in+out, 0 Credits). RPM/RPD unpublished. Hosted
   // catalog only (no migration seed), same as the anyapi/bai gateways.
   | 'powertokens'
+  // cheapllm.shop - OpenAI-compatible host for one model, DeepSeek V4.1 Flash
+  // 1017. Free with no rate limit during its beta; afterwards a permanent free
+  // tier of at least 5,000 input + 1,000 output tokens per hour per account.
+  // Email sign-up, no card. Hosted catalog only (no migration seed).
+  | 'cheapllm'
   // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
   // rotating public-model roster is free without consuming instance credits,
   // with recurring account-level allowance and request/concurrency controls.
@@ -380,6 +395,10 @@ export interface ApiKeyCooldown {
   remainingMs: number;
 }
 
+/** What a key's healthy verdict rests on (#1516, display-only). See
+ *  `ApiKey.verificationBasis`. */
+export type KeyVerificationBasis = 'models_only' | 'inference_verified';
+
 export interface ApiKey {
   id: number;
   platform: Platform;
@@ -406,6 +425,12 @@ export interface ApiKey {
    *  live request (#1493). Unlike lastCheckedAt, a transport error does not
    *  refresh it, so "checked recently but never worked" is visible. */
   lastHealthyAt?: string | null;
+  /** What the key's healthy verdict actually rests on (#1516, display-only):
+   *  'models_only' when it comes from the /models catalog probe — a 200 there
+   *  says nothing about real inference — 'inference_verified' once the key
+   *  served a live request. Null = never verified, or cleared by an invalid
+   *  verdict. Changes no routing. */
+  verificationBasis?: KeyVerificationBasis | null;
   lastHealthError: string | null;
   /** Model ids this key is limited to; null = serves every model of its
    *  platform (#657). */

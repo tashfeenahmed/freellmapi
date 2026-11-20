@@ -4,6 +4,10 @@ import { encrypt } from '../../lib/crypto.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription } from '../../services/media.js';
 import { registerCustomMediaModel } from '../../services/custom-media-register.js';
 import { clearCooldownsForKey, isOnCooldown, setCooldown } from '../../services/ratelimit.js';
+import { stubPublicDns } from '../helpers/dns.js';
+
+// Fake relay hosts must resolve for the URL guard (#1875).
+beforeEach(() => stubPublicDns());
 
 const realFetch = globalThis.fetch;
 
@@ -594,6 +598,70 @@ describe('media service', () => {
         Authorization: 'Bearer hf_test_token',
       });
       expect((fetchMock.mock.calls[3][1] as RequestInit).headers).toBeUndefined();
+    });
+
+    // #1880: the result URL comes from an upstream body, so every hop of its
+    // download is classified and redirects are never followed blindly.
+    describe('Hugging Face video download guard (#1880)', () => {
+      const submitUrl = 'https://router.huggingface.co/fal-ai/fal-ai/ltx-video-v095?_subdomain=queue';
+      const jobUrl = 'https://router.huggingface.co/fal-ai/fal-ai/ltx-video-v095/requests/job-1?_subdomain=queue';
+      const statusUrl = 'https://router.huggingface.co/fal-ai/fal-ai/ltx-video-v095/requests/job-1/status?_subdomain=queue';
+
+      function setup(download: (url: string) => Response) {
+        addMedia('huggingface', 'Lightricks/LTX-Video-0.9.5', 'video', 1, null,
+          JSON.stringify({ providerModelId: 'fal-ai/ltx-video-v095' }));
+        addKey('huggingface', 'hf_test_token');
+        const fetchMock = vi.fn(async (input: string | URL | Request) => {
+          const url = String(input);
+          if (url === submitUrl) {
+            return jsonResponse({ request_id: 'job-1', status: 'IN_QUEUE',
+              response_url: 'https://queue.fal.run/fal-ai/ltx-video-v095/requests/job-1' });
+          }
+          if (url === statusUrl) return jsonResponse({ status: 'COMPLETED' });
+          if (url === jobUrl) return jsonResponse({ video: { url: 'https://cdn.example.test/video.mp4' } });
+          return download(url);
+        });
+        globalThis.fetch = fetchMock as any;
+        return fetchMock;
+      }
+      const downloads = (m: ReturnType<typeof vi.fn>) =>
+        m.mock.calls.map(c => String(c[0])).filter(u => !u.includes('huggingface.co'));
+      const redirect = (to: string) => new Response(null, { status: 302, headers: { location: to } });
+
+      it('does not follow a redirect to a metadata address', async () => {
+        const fetchMock = setup(u => u === 'https://cdn.example.test/video.mp4'
+          ? redirect('http://169.254.169.254/latest/meta-data/iam/')
+          : new Response('SECRET', { status: 200 }));
+        await expect(runVideoGeneration('Lightricks/LTX-Video-0.9.5', { prompt: 'x' }))
+          .rejects.toThrow(/metadata/);
+        expect(downloads(fetchMock)).toEqual(['https://cdn.example.test/video.mp4']);
+        expect((fetchMock.mock.calls.find(c => String(c[0]).includes('cdn.example.test'))![1] as RequestInit).redirect).toBe('manual');
+      });
+
+      it('follows a redirect to another public host', async () => {
+        const fetchMock = setup(u => u === 'https://cdn.example.test/video.mp4'
+          ? redirect('https://storage.example.test/v.mp4')
+          : new Response(Buffer.from('HFVIDEO'), { status: 200, headers: { 'content-type': 'video/mp4' } }));
+        const result = await runVideoGeneration('Lightricks/LTX-Video-0.9.5', { prompt: 'x' });
+        expect(result.video.toString()).toBe('HFVIDEO');
+        expect(downloads(fetchMock)).toEqual(['https://cdn.example.test/video.mp4', 'https://storage.example.test/v.mp4']);
+      });
+
+      it('gives up after three redirects', async () => {
+        let n = 0;
+        const fetchMock = setup(() => redirect(`https://cdn.example.test/hop${++n}.mp4`));
+        await expect(runVideoGeneration('Lightricks/LTX-Video-0.9.5', { prompt: 'x' }))
+          .rejects.toThrow(/redirected too many times/);
+        expect(downloads(fetchMock)).toHaveLength(4);
+      });
+
+      it('refuses a video larger than 100 MB', async () => {
+        setup(() => new Response(Buffer.from('x'), {
+          status: 200, headers: { 'content-type': 'video/mp4', 'content-length': String(101 * 1024 * 1024) },
+        }));
+        await expect(runVideoGeneration('Lightricks/LTX-Video-0.9.5', { prompt: 'x' }))
+          .rejects.toThrow(/too large/);
+      });
     });
 
     it('stops the chain when the API caller hangs up instead of paying for a second provider', async () => {

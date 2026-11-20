@@ -52,9 +52,15 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'moondream', label: 'Moondream ($5 shared monthly credits)', url: 'https://moondream.ai/c/cloud/api-keys' },
   { value: 'jamai', label: 'JamAI Base (monthly ELLM allowance)', url: 'https://cloud.jamaibase.com' },
   { value: 'nabh', label: 'nabh.cloud (50 shared monthly credits)', url: 'https://app.nabh.cloud' },
+  { value: 'zro', label: 'Zro / MoonMath.ai (shared daily free usage)', url: 'https://zro.moonmath.ai/api-keys' },
   { value: 'novai', label: 'NovAI (daily free chat + video quota)', url: 'https://aiapi-pro.com' },
   { value: 'varosity', label: 'Varosity (one-time $1.50 starter credit)', url: 'https://varosity.ai/app/keys/api-keys' },
+  { value: 'speechflow', label: 'SpeechFlow (file transcription)', url: 'https://speechflow.io' },
+  { value: 'meldport', label: 'Meldport (monthly free tokens)', url: 'https://console.meldport.com' },
   { value: 'rime', label: 'Rime (shared monthly TTS / transcription credits)', url: 'https://app.rime.ai' },
+  { value: 'typecast', label: 'Typecast (15K credits/month; non-commercial, attribution required)', url: 'https://studio.typecast.ai/developers/api' },
+  { value: 'cartesia', label: 'Cartesia (20K shared credits/month; non-commercial Free plan)', url: 'https://play.cartesia.ai/keys' },
+  { value: 'silvr', label: 'SilvR AI ($3.50 shared daily allowance)', url: 'https://dashboard.silvrai.net' },
   { value: 'freetts', label: 'FreeTTS (personal use only; watermarked TTS)', url: 'https://freetts.org/dashboard?section=api-keys' },
   { value: 'freeinference', label: 'FreeInference (research; requests logged)', url: 'https://freeinference.org' },
   { value: 'freemodel', label: 'FreeModel (monthly allowance; Telegram verification)', url: 'https://freemodel.in/dashboard' },
@@ -68,7 +74,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'septor', label: 'Septor Labs (daily free-model quota)', url: 'https://septorlabs.com/dashboard' },
   { value: 'clod', label: 'CLōD (shared daily free requests)', url: 'https://app.clod.io' },
   { value: 'speechify', label: 'Speechify (monthly free TTS characters)', url: 'https://platform.speechify.ai' },
-  { value: 'freeai', label: 'Free.ai (shared free speech / transcription quota)', url: 'https://free.ai/account/#api-keys' },
+  { value: 'freeai', label: 'Free.ai (speech, transcription and embeddings)', url: 'https://free.ai/account/#api-keys' },
   { value: 'blaze', label: 'BlazeAPI (daily free tokens; Discord verification)', url: 'https://blazeapi.org/dashboard' },
   { value: 'lucidity', label: 'Lucidity Composite (daily free-model requests)', url: 'https://composite.lucidity.sh' },
   { value: 'airforce', label: 'Api.Airforce (daily free requests; 1 per minute)', url: 'https://api.airforce' },
@@ -111,6 +117,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'anyapi', label: 'AnyAPI (free key)', url: 'https://anyapi.ai' },
   // Free: glm-4.7-flash $0/1M in+out (0 Credits) on Models UI, 2026-10-22.
   { value: 'powertokens', label: 'PowerTokens (free: glm-4.7-flash)', url: 'https://www.powertokens.ai' },
+  // Free during the beta with no rate limit, then 5K in + 1K out tokens/hour, 2026-11-10.
+  { value: 'cheapllm', label: 'cheapllm.shop (free: DeepSeek V4.1 Flash)', url: 'https://cheapllm.shop/signup' },
   { value: 'modelscope', label: 'ModelScope (free key, needs Aliyun cn binding)', url: 'https://modelscope.cn/my/myaccesstoken' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
   // Chinese domestic providers. All four gate API access behind real-name

@@ -4,7 +4,7 @@
 
 [← 返回 README](../../../README.zh-cn.md) · [文档索引](../README.md) · [深入解析域](OVERVIEW.md)
 
-FreeLLMAPI 是一个自托管的、兼容 OpenAI 的网关，把约 34 家提供方的免费额度叠加在一个 `freellmapi-…` Bearer 令牌之后。一个 Express 代理暴露 `/v1/chat/completions`（以及 `/v1/responses`、`/v1/messages`、`/v1/completions`、`/v1/embeddings` 和 `/v1/models`）；每次请求时，路由器挑选一个状态健康、且未触及任何限流的最佳模型，在内存中解密其上游密钥，再把响应流式传回。
+FreeLLMAPI 是一个自托管的、兼容 OpenAI 的网关，把约 87 家提供方的免费额度叠加在一个 `freellmapi-…` Bearer 令牌之后。一个 Express 代理暴露 `/v1/chat/completions`（以及 `/v1/responses`、`/v1/messages`、`/v1/completions`、`/v1/embeddings` 和 `/v1/models`）；每次请求时，路由器挑选一个状态健康、且未触及任何限流的最佳模型，在内存中解密其上游密钥，再把响应流式传回。
 
 没有哪一家的免费额度足以单独支撑日常使用，所以路由器把目录当作一条汇聚的回退链来对待：通过 Thompson 采样的老虎机算法实时评估可靠性、速度、能力和余量，用持久化账本执行 RPM/RPD/TPM/TPD 与提供方级上限，并在墙钟预算内跨最多 20 次尝试进行故障转移。当链路顶端的模型耗尽当日额度时，端点会平滑降级到下一档健康模型，并在 UTC 午夜重置。
 
@@ -37,7 +37,7 @@ FreeLLMAPI 是一个自托管的、兼容 OpenAI 的网关，把约 34 家提供
                                           │
    ┌──────────────┬────────────┬──────────┴─────────┬─────────────┬──────────┐
    ▼              ▼            ▼                    ▼             ▼          ▼
- Google         Groq        Cerebras           OpenRouter        HF       …29 more
+ Google         Groq        Cerebras           OpenRouter        HF       …82 more
 ```
 
 - **路由器**（`server/src/services/router.ts`）—— 为每次请求挑选模型。

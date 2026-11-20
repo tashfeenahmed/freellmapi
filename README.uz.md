@@ -2,7 +2,7 @@
 
 # FreeLLMAPI
 
-**Oyiga 7,4 milliard token. 34 ta bepul LLM provayderi. 635 ta bepul model endpointi. OpenAI bilan mos bitta endpoint.**
+**Oyiga 10,1 milliard token. 87 ta bepul LLM provayderi. 1313 ta bepul model endpointi. OpenAI bilan mos bitta endpoint.**
 
 O'nlab provayderlarning bepul tariflarini, shuningdek, OpenAI bilan mos keladigan istalgan chat, embedding, rasm va audio endpointlaringizni bitta `/v1` API orqasida birlashtiring. Kalitlar shifrlangan holda saqlanadi. Router har bir so'rov uchun eng yaxshi mavjud modelni tanlaydi, provayder limitga yetganda keyingisiga o'tadi va har bir kalitning sarfini kuzatib boradi, shunda siz hech bir bepul tarif limitidan oshib ketmaysiz.
 
@@ -13,15 +13,15 @@ O'nlab provayderlarning bepul tariflarini, shuningdek, OpenAI bilan mos keladiga
 [![Docker image](https://img.shields.io/badge/ghcr.io-freellmapi-2496ED?logo=docker&logoColor=white)](https://github.com/tashfeenahmed/freellmapi/pkgs/container/freellmapi)
 [![Ask DeepWiki](https://img.shields.io/badge/DeepWiki-Ask-blue)](https://deepwiki.com/tashfeenahmed/freellmapi)
 
-**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · to'liq katalogni ko'ring: 474 ta model oilasi, 635 ta bepul endpoint
+**[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · to'liq katalogni ko'ring: 736 ta model oilasi, 1313 ta bepul endpoint
 
-[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha**
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha** · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 Bu tarjima ortda qolishi mumkin. Eng so'nggi ma'lumot uchun inglizcha README'ga qarang.
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="Download for macOS"></a>
-  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows.svg" height="48" alt="Download for Windows"></a>
+  <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store.svg" height="48" alt="Get it from Microsoft Store"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker.svg" height="48" alt="Self-host with Docker"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store.svg" height="48" alt="Get it on Google Play"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store.svg" height="48" alt="Download on the App Store"></a>
@@ -60,13 +60,13 @@ Routeringiz model katalogini imzolangan manbadan o'zi yangilaydi: yangi bepul mo
 
 ## Bu loyiha nega kerak
 
-Bugun har bir jiddiy AI laboratoriyasi bepul tarif taklif qiladi: oyiga bir necha million token, kuniga bir necha ming so'rov. Alohida olinganda har bir tarif o'yinchoqdek gap. Lekin ularni birlashtirsangiz, oyiga taxminan **7,4 milliard token** ishchi inference quvvati hosil bo'ladi. Bu kichik va tezkor modellardan tortib ancha qobiliyatlilarigacha bo'lgan **474 ta model oilasi / 635 ta provayder endpointi**ni qamrab oladi.
+Bugun har bir jiddiy AI laboratoriyasi bepul tarif taklif qiladi: oyiga bir necha million token, kuniga bir necha ming so'rov. Alohida olinganda har bir tarif o'yinchoqdek gap. Lekin ularni birlashtirsangiz, oyiga taxminan **10,1 milliard token** ishchi inference quvvati hosil bo'ladi. Bu kichik va tezkor modellardan tortib ancha qobiliyatlilarigacha bo'lgan **736 ta model oilasi / 1313 ta provayder endpointi**ni qamrab oladi.
 
-Muammo shundaki, ularni qo'lda birlashtirish juda og'ir: o'ttiz to'rtta turli SDK, o'ttiz to'rtta turli limit, so'rov xato berishi mumkin bo'lgan o'ttiz to'rtta joy. FreeLLMAPI bularning hammasini OpenAI bilan mos bitta endpointga jamlaydi. Istalgan OpenAI klient kutubxonasini lokal serveringizga yo'naltiring, u esa so'rovlarni siz kalit qo'shgan provayderlar bo'ylab sezdirmasdan taqsimlaydi.
+Muammo shundaki, ularni qo'lda birlashtirish juda og'ir: sakson yettita turli SDK, sakson yettita turli limit, so'rov xato berishi mumkin bo'lgan sakson yettita joy. FreeLLMAPI bularning hammasini OpenAI bilan mos bitta endpointga jamlaydi. Istalgan OpenAI klient kutubxonasini lokal serveringizga yo'naltiring, u esa so'rovlarni siz kalit qo'shgan provayderlar bo'ylab sezdirmasdan taqsimlaydi.
 
 Bundan tashqari, bepul tariflar manzarasi har hafta o'zgaradi: provayderlar ogohlantirmasdan model chiqaradi, eskilarini o'chiradi va limitlarni o'zgartiradi. FreeLLMAPI bularning barchasini siz uchun kuzatib boradi. Router imzolangan model katalogini [freellmapi.co](https://freellmapi.co) dan o'zi tortib oladi, shuning uchun o'rnatmangiz `git pull` qilmasdan ham dolzarb bo'lib turadi. Qanchalik tez yangilanishi haqida [Premium (jonli katalog)](#premium-jonli-katalog) bo'limida o'qing.
 
-![Bepul tariflar birlashtirilganda: 34 ta provayder bo'ylab oyiga ~7,4 mlrd token bepul inference](repo-assets/free-tier.png)
+![Bepul tariflar birlashtirilganda: 87 ta provayder bo'ylab oyiga ~10,1 mlrd token bepul inference](repo-assets/free-tier.png)
 
 ## Qo'llab-quvvatlanadigan provayderlar
 
@@ -94,7 +94,7 @@ Bundan tashqari, bepul tariflar manzarasi har hafta o'zgaradi: provayderlar ogoh
 </tr>
 </table>
 
-<i>… va yana 22 ta bepul provayder</i>
+<i>… va yana 75 ta bepul provayder</i>
 
 </div>
 
@@ -174,7 +174,7 @@ bash'ga yuborishdan oldin o'qib chiqmoqchimisiz? [Skript shu yerda](https://free
 
 http://localhost:3001 ni oching, **Kalitlar** (Keys) sahifasida provayder kalitlaringizni qo'shing, **Fallback Chain** tartibini xohishingizga ko'ra o'zgartiring va **Kalitlar** sahifasining yuqori qismidan birlashtirilgan API kalitingizni oling. OpenAI SDK'ingizga aynan shu birlashtirilgan kalitni berasiz.
 
-Windows'da eng oson yo'l: quyida tasvirlangan desktop ilovaning **[Releases'dagi `.exe` o'rnatuvchisi](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. Android uchun tajriba bosqichidagi [Termux qo'llanmasiga](docs/en/install/02-android-termux.md) qarang.
+Windows'da eng oson yo'l: desktop ilovani **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)**'dan o'rnatish: u imzolangan (Smart App Control uni bloklamaydi) va o'zi yangilanadi. Imzolanmagan `.exe` o'rnatuvchisi [Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)'da (quyida). Android uchun tajriba bosqichidagi [Termux qo'llanmasiga](docs/en/install/02-android-termux.md) qarang.
 
 Qolgan hamma narsa (Docker Compose, lokal ishlab chiqish, deklarativ ishga tushirish konfiguratsiyasi, production build'lar, LAN orqali kirish va zaxira nusxalar) **[docs/en/install/01-install.md](docs/en/install/01-install.md)** da.
 
@@ -184,7 +184,7 @@ Qolgan hamma narsa (Docker Compose, lokal ishlab chiqish, deklarativ ishga tushi
 
 ![FreeLLMAPI desktop ilovasi](repo-assets/desktop.png)
 
-**[Releases'dan yuklab oling](https://github.com/tashfeenahmed/freellmapi/releases/latest)**: har bir relizga macOS `.dmg` va Windows `.exe` o'rnatuvchisi biriktirilgan. Akkaunt yoki parol sozlash shart emas: sizga kerak bo'ladigan yagona maxfiy ma'lumot trey popoveridagi birlashtirilgan API kaliti. Manba koddan build qilish bosqichlari va ma'lumotlaringiz qayerda saqlanishi: [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app).
+**[Releases'dan yuklab oling](https://github.com/tashfeenahmed/freellmapi/releases/latest)**: har bir relizga macOS `.dmg` va Windows `.exe` o'rnatuvchisi biriktirilgan. Windows'da **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** versiyasini tanlang: u imzolangan, shuning uchun Smart App Control uni bloklamaydi va Store uni o'zi yangilaydi. Akkaunt yoki parol sozlash shart emas: sizga kerak bo'ladigan yagona maxfiy ma'lumot trey popoveridagi birlashtirilgan API kaliti. Manba koddan build qilish bosqichlari va ma'lumotlaringiz qayerda saqlanishi: [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app).
 
 macOS 12 Monterey yoki undan yangi versiyalar uchun **arm64 (Apple Silicon)** yoki **x64 (Intel)** ni tanlang. Ikkala Mac build'i ZIP ko'rinishida ham yuklab olinadi.
 
@@ -236,9 +236,10 @@ qo'llaydi. Siz o'zingiz yoqqan yoki o'chirgan modellarga va o'z provayderlaringi
 qachon tegilmaydi. Har bir yuklab olingan fayl qo'llanishidan oldin qat'iy belgilangan
 Ed25519 kaliti bilan tekshiriladi.
 
-Hozir katalog **34 ta provayder**, **474 ta model oilasi**, **635 ta bepul provayder/model
-endpointi** (584 ta chat, 41 ta embedding, 7 ta transkripsiya, 3 ta video) va ro'yxatga
-olingan bepul tariflardagi oyiga taxminan **7,4 milliard token** quvvatni kuzatadi. To'liq
+Hozir katalog **87 ta provayder**, **736 ta model oilasi**, **1313 ta bepul provayder/model
+endpointi** (1137 ta chat, 29 ta rasm, 41 ta audio, 68 ta embedding, 19 ta transkripsiya,
+6 ta video, 13 ta qaror) va ro'yxatga olingan bepul tariflardagi oyiga taxminan
+**10,1 milliard token** quvvatni kuzatadi. To'liq
 ro'yxatni **[freellmapi.co/models](https://freellmapi.co/models.html)** da ko'ring.
 
 Bepul o'rnatmalar ham xuddi shu imzolangan katalogni oladi, lekin oylik snapshotdan: model
@@ -517,6 +518,10 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 <a href="https://github.com/leucds2018-hub"><img src="https://images.weserv.nl/?url=github.com/leucds2018-hub.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@leucds2018-hub" /></a>
 <a href="https://github.com/zhangkom"><img src="https://images.weserv.nl/?url=github.com/zhangkom.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@zhangkom" /></a>
 <a href="https://github.com/noahkhomer18"><img src="https://images.weserv.nl/?url=github.com/noahkhomer18.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@noahkhomer18" /></a>
+<a href="https://github.com/mentallyunstable-lab"><img src="https://images.weserv.nl/?url=github.com/mentallyunstable-lab.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mentallyunstable-lab" /></a>
+<a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
+<a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
+<a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
 
 ## Ogohlantirish
 

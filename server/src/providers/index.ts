@@ -31,6 +31,7 @@ import { BlockRunProvider } from './blockrun.js';
 import { MoondreamProvider } from './moondream.js';
 import { JamaiProvider } from './jamai.js';
 import { NabhProvider } from './nabh.js';
+import { ZroProvider } from './zro.js';
 import { NovaiProvider } from './novai.js';
 import { FreeInferenceProvider } from './freeinference.js';
 import { FreeModelProvider } from './freemodel.js';
@@ -41,7 +42,11 @@ import { SeptorProvider } from './septor.js';
 import { ClodProvider } from './clod.js';
 import { SpeechifyProvider } from './speechify.js';
 import { VarosityProvider } from './varosity.js';
+import { SpeechFlowProvider } from './speechflow.js';
+import { MeldportProvider } from './meldport.js';
 import { RimeProvider } from './rime.js';
+import { TypecastProvider, CartesiaProvider } from './voice-gateways.js';
+import { SilvrProvider } from './silvr.js';
 import { FreeTtsProvider } from './freetts.js';
 import { FreeAiProvider } from './freeai.js';
 import { BlazeProvider } from './blaze.js';
@@ -105,6 +110,7 @@ register(new BlockRunProvider());
 register(new MoondreamProvider());
 register(new JamaiProvider());
 register(new NabhProvider());
+register(new ZroProvider());
 register(new NovaiProvider());
 register(new FreeInferenceProvider());
 register(new FreeModelProvider());
@@ -130,6 +136,11 @@ register(new ClodProvider());
 register(new SpeechifyProvider());
 register(new VarosityProvider());
 register(new RimeProvider());
+register(new SpeechFlowProvider());
+register(new MeldportProvider());
+register(new TypecastProvider());
+register(new CartesiaProvider());
+register(new SilvrProvider());
 register(new FreeTtsProvider());
 register(new FreeAiProvider());
 register(new BlazeProvider());
@@ -184,6 +195,22 @@ register(new OpenAICompatProvider({
   platform: 'powertokens',
   name: 'PowerTokens',
   baseUrl: 'https://api.powertokens.ai/v1',
+}));
+
+// cheapllm.shop - OpenAI-compatible host for a single model,
+// deepseek-v4.1-flash-1017 (https://cheapllm.shop/v1). Free tier per
+// https://cheapllm.shop/docs#free-tier (checked 2026-11-10): free with no rate
+// limit during the beta, then a permanent free tier of at least 5,000 input +
+// 1,000 output tokens per rolling hour per account; email sign-up, no card.
+// When busy it queues and retries instead of answering 429, and the model
+// reasons before answering, so allow 180s. GET /v1/models is public without a
+// key but answers 401 when a bad key is sent, so the default validation probe
+// is meaningful and free. Model rows live in the hosted catalog.
+register(new OpenAICompatProvider({
+  platform: 'cheapllm',
+  name: 'cheapllm.shop',
+  baseUrl: 'https://cheapllm.shop/v1',
+  timeoutMs: 180_000,
 }));
 
 // AMD Radeon Cloud TokenFactory — the shared Model API is OpenAI-compatible

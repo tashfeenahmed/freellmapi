@@ -1,7 +1,7 @@
 import type { ModelListRow } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { isUnifyEnabled, getModelGroups } from './model-groups.js';
-import { hasUsableKeyForModel } from './router.js';
+import { CONTEXT_WINDOW_SAFETY_FACTOR, hasUsableKeyForModel } from './router.js';
 
 // Shared catalog-listing logic behind both the OpenAI `GET /v1/models` and the
 // Anthropic `GET /v1/models` endpoints, so the two wire formats list the exact
@@ -21,6 +21,9 @@ export interface NormalizedModel {
   // `supported_parameters` so agents can pick knobs per model.
   platforms: string[];
   supportsTools: boolean;
+  // Accepts image input (any member, under unify — the router can steer an
+  // image request to a vision-capable member). Feeds /v1/codex/models.
+  supportsVision: boolean;
   // Dynamic execution status for agents: `ready` (a key can serve it right
   // now), `needsKey` (disabled, or no enabled key matches it — available=0's
   // breakdown), or `exhausted` (keys exist but every one is currently blocked,
@@ -64,6 +67,20 @@ function executionStatusFor(modelDbIds: number[], available: number): 'ready' | 
  * most of the pool rejects (#1717). Larger requests still route: the router's
  * size gates send them to the models that can hold them.
  */
+/**
+ * The window a client may actually fill: the raw window divided by the
+ * router's CONTEXT_WINDOW_SAFETY_FACTOR. The router only accepts a request
+ * whose estimated size times that factor fits the raw window
+ * (fitsContextWindow), so advertising the raw number let clients like OpenCode
+ * grow their history to sizes the router then turned away with a context
+ * overflow. Every listing (OpenAI, Anthropic, Gemini, Ollama, MCP, Codex) reads
+ * windows from here, so they all advertise what a request can really use.
+ */
+export function advertisedContextWindow(raw: number | null | undefined): number | null {
+  if (typeof raw !== 'number' || raw <= 0) return null;
+  return Math.floor(raw / CONTEXT_WINDOW_SAFETY_FACTOR);
+}
+
 export function servableContextWindow(windows: readonly (number | null | undefined)[]): number | null {
   const known = windows.filter((w): w is number => typeof w === 'number' && w > 0).sort((a, b) => b - a);
   if (known.length === 0) return null;
@@ -85,9 +102,9 @@ export function buildModelListing(): ModelListing {
   if (isUnifyEnabled()) {
     // Unify ON: one entry per logical model group. Pull per-row availability +
     // context keyed by db id, then aggregate over each group's members.
-    type AvailRow = { id: number; platform: string; intelligence_rank: number; context_window: number | null; enabled: number; available: number; supports_tools: number };
+    type AvailRow = { id: number; platform: string; intelligence_rank: number; context_window: number | null; enabled: number; available: number; supports_tools: number; supports_vision: number };
     const rows = db.prepare(`
-      SELECT m.id, m.platform, m.intelligence_rank, m.context_window, m.supports_tools,
+      SELECT m.id, m.platform, m.intelligence_rank, m.context_window, m.supports_tools, m.supports_vision,
              m.enabled AS enabled, ${availableExpr} AS available
       FROM models m
     `).all() as AvailRow[];
@@ -101,10 +118,11 @@ export function buildModelListing(): ModelListing {
         ownedBy: 'freellmapi',
         available,
         enabled: infos.some(i => i.enabled === 1) ? 1 : 0,
-        contextWindow: servableContextWindow(infos.map(i => i.context_window)),
+        contextWindow: advertisedContextWindow(servableContextWindow(infos.map(i => i.context_window))),
         intel: infos.length ? Math.min(...infos.map(i => i.intelligence_rank)) : Number.MAX_SAFE_INTEGER,
         platforms: [...new Set(infos.map(i => i.platform))],
         supportsTools: infos.some(i => i.supports_tools === 1),
+        supportsVision: infos.some(i => i.supports_vision === 1),
         // A group is ready when ANY member can serve it — that is exactly the
         // choice the router has when it dispatches the group.
         executionStatus: executionStatusFor(g.members.map(m => m.model_db_id), available),
@@ -114,9 +132,9 @@ export function buildModelListing(): ModelListing {
     // Unify OFF: one entry per model_id (dedup picks the available, smartest
     // representative row).
     const models = db.prepare(`
-      SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id, supports_tools
+      SELECT platform, model_id, display_name, context_window, enabled, available, intelligence_rank, id, supports_tools, supports_vision
       FROM (
-        SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id, m.supports_tools,
+        SELECT m.platform, m.model_id, m.display_name, m.context_window, m.intelligence_rank, m.id, m.supports_tools, m.supports_vision,
                m.enabled AS enabled,
                ${availableExpr} AS available,
                ROW_NUMBER() OVER (
@@ -126,13 +144,14 @@ export function buildModelListing(): ModelListing {
         FROM models m
       )
       WHERE rn = 1
-    `).all() as (ModelListRow & { intelligence_rank: number; id: number; supports_tools: number })[];
+    `).all() as (ModelListRow & { intelligence_rank: number; id: number; supports_tools: number; supports_vision: number })[];
     allListed = models.map(m => ({
       id: m.model_id, name: m.display_name, ownedBy: m.platform,
-      available: m.available, enabled: m.enabled, contextWindow: m.context_window,
+      available: m.available, enabled: m.enabled, contextWindow: advertisedContextWindow(m.context_window),
       intel: m.intelligence_rank,
       platforms: [m.platform],
       supportsTools: m.supports_tools === 1,
+      supportsVision: m.supports_vision === 1,
       executionStatus: executionStatusFor([m.id], m.available),
     }));
   }
@@ -141,6 +160,8 @@ export function buildModelListing(): ModelListing {
   allListed.sort((a, b) =>
     (b.available - a.available) || (b.enabled - a.enabled) || (a.intel - b.intel) || a.name.localeCompare(b.name));
 
+  // Already-advertised windows: the median of the divided values is the
+  // divided median, so no second division here.
   const autoContextWindow = servableContextWindow(
     allListed.filter(m => m.available === 1).map(m => m.contextWindow),
   );

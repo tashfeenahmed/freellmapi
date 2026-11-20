@@ -25,6 +25,7 @@ describe('in-flight leases', () => {
     resetLeases();
     delete process.env.MAX_CONCURRENT_REQUESTS_PER_KEY;
     delete process.env.MAX_CONCURRENT_REQUESTS_PER_KEY_GROQ;
+    delete process.env.PROVIDER_TIMEOUT_GROQ;
     vi.useRealTimers();
   });
 
@@ -52,13 +53,40 @@ describe('in-flight leases', () => {
     expect(inFlightForKey('groq', 1)).toBe(0);
   });
 
+  // #1878: the slow platforms allow a 120s attempt and a stream outlives its
+  // headers, so a live lease must survive the old flat two-minute mark.
+  it('keeps a lease past two minutes while the platform call may still be running', () => {
+    vi.useFakeTimers();
+    acquireLease('groq', 'llama-3.3-70b', 1, 100);
+    expect(inFlightForKey('groq', 1)).toBe(1);
+
+    vi.advanceTimersByTime(5 * 60 * 1000);
+    expect(inFlightForKey('groq', 1)).toBe(1);
+  });
+
+  it('keeps a lease for a ten-minute call (AMD Radeon is built with a 600s timeout)', () => {
+    vi.useFakeTimers();
+    acquireLease('radeon', 'some-reasoning-model', 1, 100);
+    vi.advanceTimersByTime(12 * 60 * 1000);
+    expect(inFlightForKey('radeon', 1)).toBe(1);
+  });
+
+  it('never ages out a lease for a platform configured with no timeout', () => {
+    vi.useFakeTimers();
+    process.env.PROVIDER_TIMEOUT_GROQ = '0';
+    acquireLease('groq', 'llama-3.3-70b', 1, 100);
+
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    expect(inFlightForKey('groq', 1)).toBe(1);
+  });
+
   it('ages out a leaked lease so a key cannot be blocked forever', () => {
     vi.useFakeTimers();
     acquireLease('groq', 'llama-3.3-70b', 1, 100);
     expect(inFlightForKey('groq', 1)).toBe(1);
 
-    // Past LEASE_MAX_AGE_MS (2 min) — the backstop for a release that never came.
-    vi.advanceTimersByTime(3 * 60 * 1000);
+    // Past the backstop age (30 min floor for a 120s platform timeout).
+    vi.advanceTimersByTime(31 * 60 * 1000);
     expect(inFlightForKey('groq', 1)).toBe(0);
   });
 });
