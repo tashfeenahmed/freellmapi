@@ -66,6 +66,7 @@ exports[`tool generators > setup-claude has stable golden output 1`] = `
           "ANTHROPIC_DEFAULT_SONNET_MODEL": "fast-coder",
           "ANTHROPIC_MODEL": "fast-coder",
           "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "131072",
+          "CLAUDE_CODE_AUTO_MODE_SERVER": "0",
           "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1",
         },
       },

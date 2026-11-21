@@ -56,8 +56,15 @@ On Windows (PowerShell), with the unified key from the dashboard:
 ```powershell
 $env:ANTHROPIC_BASE_URL = "http://127.0.0.1:31415"
 $env:ANTHROPIC_AUTH_TOKEN = "<unified-key>"
+$env:CLAUDE_CODE_AUTO_MODE_SERVER = "0"
 claude
 ```
+
+`CLAUDE_CODE_AUTO_MODE_SERVER=0` keeps Claude Code's auto mode working behind
+FreeLLMAPI: Anthropic's server-side action review cannot run on non-Anthropic
+models, so Claude Code checks actions with its own classifier requests through
+the gateway and does not show the "isn't eligible" notice. `setup-claude` and
+`launch` set it for you. See the [REST API notes](../api/01-rest-api.md).
 
 Use the generator instead of hand-editing a client configuration:
 
