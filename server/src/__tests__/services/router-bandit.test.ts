@@ -12,6 +12,7 @@ import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
 import { addToActiveChain } from '../helpers/chain.js';
 import { benchForTools, resetToolCapability, toolCapabilityKey } from '../../lib/tool-capability.js';
+import { recordProviderCircuitFailure, resetProviderCircuitBreakers } from '../../lib/provider-circuit-breaker.js';
 
 vi.mock('../../services/ratelimit.js', async () => {
   const actual = await vi.importActual('../../services/ratelimit.js');
@@ -92,6 +93,7 @@ describe('bandit router', () => {
     (ratelimit.canMakeRequest as any).mockReturnValue(true);
     (ratelimit.canUseTokens as any).mockReturnValue(true);
     (ratelimit.isOnCooldown as any).mockReturnValue(false);
+    resetProviderCircuitBreakers();
   });
 
   afterEach(() => {
@@ -114,6 +116,16 @@ describe('bandit router', () => {
     refreshStatsCache(getDb(), true);
     const counts = pickCounts(50);
     expect(counts['a']).toBe(50); // priority 1 always wins regardless of intelligence
+  });
+
+  it('skips a provider with an open outage circuit without admitting unsupported routes', () => {
+    addModel({ platform: 'google', modelId: 'outage', name: 'Outage', intelligenceRank: 1, sizeLabel: 'Large', budget: '~10M', priority: 1 });
+    addModel({ platform: 'groq', modelId: 'healthy', name: 'Healthy', intelligenceRank: 2, sizeLabel: 'Large', budget: '~10M', priority: 2 });
+    setRoutingStrategy('priority');
+    const now = Date.now();
+    for (let i = 0; i < 3; i++) recordProviderCircuitFailure('google', '', now + i);
+
+    expect(routeRequest(100).modelId).toBe('healthy');
   });
 
   it('balanced strategy favors the more reliable model', () => {

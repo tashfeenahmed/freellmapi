@@ -3,6 +3,7 @@ import { getAllPenalties, clearAllPenalties } from './router.js';
 import { rateLimitFactor } from './scoring.js';
 import { clearAllCooldowns } from './ratelimit.js';
 import { clearModelFailureWindows } from '../lib/fallback-loop.js';
+import { clearProviderCircuitBreakers } from '../lib/provider-circuit-breaker.js';
 
 const INSPECTOR_LOOKBACK_MINUTES = 30;
 const MAX_ERRORS_PER_MODEL = 5;
@@ -100,21 +101,22 @@ export interface RouterPressureClearResult {
   penalties: number;
   /** Models whose cross-key failure streak was reset. */
   failureWindows: number;
+  /** Persisted provider/deployment outage circuits cleared. */
+  providerCircuits: number;
 }
 
 /**
  * The "Clear all" action behind the Router pressure panel (#952). One click
- * releases everything the router accumulated against a pool: cooldowns (and
- * the ladder counters behind them), score penalties, and the model-failure
- * streaks that re-bench a model across keys. Pressure rebuilds from the next
- * live results, so the worst case of a premature clear is one more round of
- * failures — far better than a pool that cannot route for a day.
+ * releases the router's accumulated cooldowns, penalties, model-failure
+ * streaks, and provider outage circuits. Pressure rebuilds from the next live
+ * results, so the worst case of a premature clear is another round of failures.
  */
 export function clearRouterPressure(): RouterPressureClearResult {
   return {
     cooldowns: clearAllCooldowns(),
     penalties: clearAllPenalties(),
     failureWindows: clearModelFailureWindows(),
+    providerCircuits: clearProviderCircuitBreakers(),
   };
 }
 

@@ -50,9 +50,9 @@ fallbackRouter.get('/penalty-inspector', (_req: Request, res: Response) => {
   res.json(getPenaltyInspector());
 });
 
-// DELETE /penalty-inspector → lift every cooldown, penalty and failure streak
-// at once (#952). The per-key DELETE /api/keys/:id/cooldowns stays for the
-// surgical case; this is the escape hatch for a pool that cannot route at all.
+// DELETE /penalty-inspector → lift every cooldown, penalty, failure streak,
+// and provider circuit at once (#952). The per-key DELETE /api/keys/:id/cooldowns
+// stays for the surgical case; this is the escape hatch for a pool that cannot route.
 fallbackRouter.delete('/penalty-inspector', (_req: Request, res: Response) => {
   res.json(clearRouterPressure());
 });
