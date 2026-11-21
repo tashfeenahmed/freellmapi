@@ -486,6 +486,7 @@ export const platformColors: Record<string, string> = {
   xkiro:       '#a855f7',
   anyapi:      '#0891b2',
   powertokens: '#7c3aed',
+  puter:       '#496bcb',
   cheapllm:    '#c8102e',
   modelscope:  '#624aff',
   aihorde:     '#dc2626',

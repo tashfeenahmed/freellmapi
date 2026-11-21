@@ -624,7 +624,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         continue;
       }
 
-      if ((m.platform === 'ovh' && specialistTask(m.modelId)) || m.platform === 'custom' || !hasProvider(m.platform as Platform)) {
+      if (specialistTask(m.modelId, m.platform) || m.platform === 'custom' || !hasProvider(m.platform as Platform)) {
         // An older binary may receive models for providers it cannot route yet;
         // skip them — they will appear after the user updates the app.
         counts.skippedUnknownPlatform++;
@@ -762,7 +762,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     // A separate registry: older binaries ignore it rather than treating it as chat.
     const specialistIds = new Set<string>();
     for (const m of catalog.specialistTextModels ?? []) {
-      if (m.platform !== 'ovh' || specialistTask(m.modelId) !== m.task) { counts.skippedUnknownPlatform++; continue; }
+      if (specialistTask(m.modelId, m.platform) !== m.task) { counts.skippedUnknownPlatform++; continue; }
       if (isCatalogModelTombstoned(db, 'media', m.platform, m.modelId)) continue;
       specialistIds.add(m.modelId);
       const row = selectMedia.get(m.platform, m.modelId) as {id:number;enabled:number}|undefined;
@@ -771,7 +771,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
       else { insertMedia.run({...fields, platform:m.platform, modelId:m.modelId, enabled:m.enabled ? 1 : 0}); counts.inserted++; }
     }
     // A downgrade to a free snapshot lacking the registry must revoke these rows.
-    for (const row of db.prepare("SELECT id,model_id FROM media_models WHERE platform='ovh' AND modality IN ('translation','summarization')").all() as {id:number;model_id:string}[]) {
+    for (const row of db.prepare("SELECT id,model_id FROM media_models WHERE platform IN ('ovh','cloudflare','xkiro') AND modality IN ('translation','summarization')").all() as {id:number;model_id:string}[]) {
       if (!specialistIds.has(row.model_id)) { db.prepare('DELETE FROM media_models WHERE id=?').run(row.id); counts.removed++; }
     }
 
