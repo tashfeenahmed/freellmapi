@@ -36,7 +36,9 @@ const MAX_RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
 export function parseRetryAfterMs(value: string | null | undefined): number | undefined {
   if (!value) return undefined;
   const trimmed = value.trim();
-  if (/^\d+$/.test(trimmed)) return Math.min(Number(trimmed) * 1000, MAX_RETRY_AFTER_MS);
+  // Delta-seconds, fractional ones too: Date.parse('1.5') reads as a date in 2001 and would
+  // turn a 1.5 s back-off into an immediate retry.
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) return Math.min(Math.round(Number(trimmed) * 1000), MAX_RETRY_AFTER_MS);
   const when = Date.parse(trimmed);
   if (!Number.isNaN(when)) {
     return Math.min(Math.max(0, when - Date.now()), MAX_RETRY_AFTER_MS);
