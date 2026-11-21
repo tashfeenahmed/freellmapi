@@ -1570,7 +1570,7 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
   // `let`: abortInFlight aborts only the in-flight attempt and replaces the
-  // controller, so a silent-window failover gets a fresh signal (RC3).
+  // controller, so a silent-window failover gets a fresh signal (#1960).
   let hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
@@ -1694,8 +1694,6 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
             if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
               ttfbMs = Date.now() - start;
             }
-            // RC3: the first upstream token clears the per-attempt silent-window cap.
-            if (text.length > 0 || reasoning.length > 0) ctx.markFirstByte?.();
             const finish = (chunk as any)?.choices?.[0]?.finish_reason;
             if (finish) upstreamFinish = finish;
             // #764: reasoning tokens are real output consumption — count them
@@ -2569,7 +2567,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
   // `let`: abortInFlight aborts only the in-flight attempt and replaces the
-  // controller, so a silent-window failover gets a fresh signal (RC3).
+  // controller, so a silent-window failover gets a fresh signal (#1960).
   let hedgeAbort = new AbortController();
 
   // Decision routing (#1354): with the 'decision' strategy on, a decision
@@ -2849,10 +2847,6 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
               ttfbMs = Date.now() - start;
             }
-            // RC3: any upstream token (text, reasoning or a tool-call delta —
-            // tool calls are held until stream end) proves the attempt alive and
-            // clears the per-attempt silent-window cap.
-            if (text.length > 0 || reasoning.length > 0 || (Array.isArray(choice.delta?.tool_calls) && choice.delta.tool_calls.length > 0)) ctx.markFirstByte?.();
 
             if (text.length === 0) {
               // Role preamble / keep-alive: hold until first payload decides

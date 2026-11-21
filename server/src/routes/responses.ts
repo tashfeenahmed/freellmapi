@@ -959,7 +959,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
   // `let`: abortInFlight aborts only the in-flight attempt and replaces the
-  // controller, so a silent-window failover gets a fresh signal (RC3).
+  // controller, so a silent-window failover gets a fresh signal (#1960).
   let hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
@@ -1389,9 +1389,6 @@ export async function handleResponses(req: Request, res: Response): Promise<void
             if (ttfbMs === null && (text.length > 0 || reasoning.length > 0)) {
               ttfbMs = Date.now() - start;
             }
-            // RC3: any upstream token (text, reasoning or a tool-call delta) proves
-            // the attempt alive and clears the per-attempt silent-window cap.
-            if (text.length > 0 || reasoning.length > 0 || (Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0)) ctx.markFirstByte?.();
             if (text) {
               totalOutputTokens += Math.ceil((text.length + reasoning.length) / 4);
               if (reasoning.length > 0) totalReasoningTokens += Math.ceil(reasoning.length / 4);
