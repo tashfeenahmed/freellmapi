@@ -73,11 +73,12 @@ function readSecrets(): { key: [string, string, string]; profile: [string, strin
   };
 }
 
-function runScript(args: string[]): { status: number | null; stdout: string; stderr: string } {
+function runScript(args: string[], extraEnv: Record<string, string> = {}): { status: number | null; stdout: string; stderr: string } {
   // The script must not silently inherit the harness's own ENCRYPTION_KEY:
   // --old-key has to carry the whole story.
-  const env = { ...process.env };
+  const env: NodeJS.ProcessEnv = { ...process.env, ...extraEnv };
   delete env.ENCRYPTION_KEY;
+  if (!('FREEAPI_DB_PATH' in extraEnv)) delete env.FREEAPI_DB_PATH;
   const res = spawnSync(process.execPath, [TSX_CLI, SCRIPT, ...args], { encoding: 'utf8', env });
   return { status: res.status, stdout: res.stdout ?? '', stderr: res.stderr ?? '' };
 }
@@ -134,6 +135,30 @@ describe('rotate-encryption-key CLI (end to end)', () => {
     // And the old key still opens everything.
     expect(decryptWith(OLD_KEY, ...after.key)).toBe(API_KEY_SECRET);
     expect(decryptWith(OLD_KEY, ...after.relay)).toBe(RELAY_TOKEN);
+  }, 60_000);
+
+  it('refuses to rotate while a server still has the database open', () => {
+    // A live server caches the OLD key: rotating under it breaks every decrypt
+    // until restart, and a key it writes meanwhile is lost on the new key.
+    const before = readSecrets();
+    process.env.ENCRYPTION_KEY = OLD_HEX;
+    const live = initDb(dbPath);
+    live.prepare('SELECT COUNT(*) FROM api_keys').get(); // idle, like a running server between requests
+    try {
+      const run = runScript(['--old-key', OLD_HEX, '--new-key', NEW_HEX, '--db', dbPath]);
+      expect(run.status).toBe(1);
+      expect(run.stderr).toMatch(/Stop the FreeLLMAPI server first/);
+    } finally {
+      live.close?.();
+    }
+    expect(readSecrets()).toEqual(before);
+  }, 60_000);
+
+  it('rotates the database FREEAPI_DB_PATH points at when --db is omitted', () => {
+    const run = runScript(['--old-key', OLD_HEX, '--new-key', NEW_HEX], { FREEAPI_DB_PATH: dbPath });
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
+    expect(decryptWith(NEW_KEY, ...readSecrets().key)).toBe(API_KEY_SECRET);
   }, 60_000);
 
   it('exits non-zero and writes nothing when the old key is wrong', () => {
