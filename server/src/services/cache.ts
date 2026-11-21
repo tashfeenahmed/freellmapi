@@ -189,6 +189,7 @@ export interface CacheKeyInput {
   logprobs?: unknown;
   top_logprobs?: unknown;
   reasoning_effort?: unknown;
+  thinking_budget?: unknown;
   // Request-side compression runs before cache lookup. Include its resolved
   // mode/config fingerprint so a settings change cannot replay an answer
   // produced from a different compressed prompt shape.
@@ -231,6 +232,7 @@ export function computeCacheKey(input: CacheKeyInput): string {
     // Absent for requests without the knob (stableStringify drops undefined),
     // so pre-existing cache keys are unaffected.
     reasoning_effort: input.reasoning_effort,
+    thinking_budget: input.thinking_budget,
     compression: input.compression,
   });
   return crypto.createHash('sha256').update(canonical).digest('hex');

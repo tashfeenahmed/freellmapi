@@ -5,6 +5,7 @@ import {
   supportedParametersFor,
   supportedParametersForPlatforms,
   normalizeReasoningEffort,
+  reasoningCapabilitiesFor,
   EXTENDED_SAMPLING_KEYS,
   REASONING_EFFORTS,
 } from '../../lib/sampling-params.js';
@@ -166,6 +167,47 @@ describe('reasoning_effort (request-side reasoning control)', () => {
     expect(supportedParametersFor('cerebras')).toContain('reasoning_effort');
     expect(supportedParametersFor('mistral')).not.toContain('reasoning_effort');
     expect(supportedParametersFor('cohere')).not.toContain('reasoning_effort');
+    expect(supportedParametersFor('google')).toContain('thinking_budget');
+    expect(supportedParametersFor('groq')).not.toContain('thinking_budget');
+  });
+
+  it('picks thinking_budget without forwarding it in extendedBodyParams', () => {
+    expect(pickSamplingParams({ reasoning_effort: 'medium', thinking_budget: 8192 }))
+      .toEqual({ reasoning_effort: 'medium', thinking_budget: 8192 });
+    expect(pickSamplingParams({ thinking_budget: 0 })).toEqual({ thinking_budget: 0 });
+    expect(pickSamplingParams({ thinking_budget: null })).toEqual({});
+    expect(extendedBodyParams('cerebras', { reasoning_effort: 'medium', thinking_budget: 8192 }))
+      .toEqual({ reasoning_effort: 'medium' });
+  });
+
+  it('reasoningCapabilitiesFor reports per-platform efforts and thinking budget support', () => {
+    expect(reasoningCapabilitiesFor('google')).toEqual({
+      supported: true,
+      efforts: ['none', 'low', 'medium', 'high'],
+      supportsThinkingBudget: true,
+    });
+    expect(reasoningCapabilitiesFor('groq')).toEqual({
+      supported: true,
+      efforts: ['low', 'medium', 'high'],
+      supportsThinkingBudget: false,
+    });
+    expect(reasoningCapabilitiesFor('radeon')).toEqual({
+      supported: true,
+      efforts: ['low', 'medium'],
+      supportsThinkingBudget: false,
+    });
+    expect(reasoningCapabilitiesFor('sail')).toEqual({
+      supported: true,
+      efforts: ['none', 'low', 'medium', 'high', 'max'],
+      supportsThinkingBudget: false,
+    });
+    for (const unsupported of ['mistral', 'cohere', 'cloudflare', 'gizmo', 'aihorde']) {
+      expect(reasoningCapabilitiesFor(unsupported)).toEqual({
+        supported: false,
+        efforts: [],
+        supportsThinkingBudget: false,
+      });
+    }
   });
 });
 

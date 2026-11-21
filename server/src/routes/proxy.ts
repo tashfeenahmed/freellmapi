@@ -2327,9 +2327,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         logit_bias: req.body?.logit_bias ?? undefined,
         logprobs: req.body?.logprobs ?? undefined,
         top_logprobs: req.body?.top_logprobs ?? undefined,
-        // Normalized reasoning knob (flat field or object form) — a different
-        // effort asks for a different answer, so it must never collide.
+        // Normalized reasoning knobs (flat field or object form) — a different
+        // effort or thinking budget asks for a different answer, so it must
+        // never collide.
         reasoning_effort: samplingParams.reasoning_effort ?? undefined,
+        thinking_budget: samplingParams.thinking_budget ?? undefined,
         compression: compressionResult.cacheKey,
       })
     : null;

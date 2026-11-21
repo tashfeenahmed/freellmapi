@@ -114,6 +114,11 @@ export const samplingParamSchemaFields = {
   reasoning: z.object({
     effort: z.unknown().optional(),
   }).passthrough().nullable().optional(),
+  // Optional explicit thinking token budget for providers that support it
+  // (e.g. Google Gemini's generationConfig.thinkingConfig.thinkingBudget).
+  // Kept out of EXTENDED_SAMPLING_KEYS so OpenAI-compat providers without a
+  // token-budget knob never receive an unknown top-level field.
+  thinking_budget: z.number().int().min(0).max(1_000_000).nullable().optional(),
   // OpenAI's newer alias for max_tokens; surfaces resolve it into max_tokens
   // themselves (it is not a forwarded param of its own).
   max_completion_tokens: z.number().int().nullable().optional(),
@@ -140,6 +145,7 @@ export interface ExtendedSamplingOptions {
   top_logprobs?: number;
   response_format?: ResponseFormat;
   reasoning_effort?: ReasoningEffort;
+  thinking_budget?: number;
 }
 
 export const EXTENDED_SAMPLING_KEYS = [
@@ -155,6 +161,7 @@ type ParsedSamplingBody = {
   // Object-form reasoning alias (see samplingParamSchemaFields); resolved into
   // reasoning_effort below, never forwarded as-is.
   reasoning?: { effort?: unknown } | null;
+  thinking_budget?: unknown;
 };
 
 /**
@@ -182,6 +189,9 @@ export function pickSamplingParams(body: ParsedSamplingBody): ExtendedSamplingOp
   if (out.reasoning_effort === undefined) {
     const effort = normalizeReasoningEffort(body.reasoning?.effort);
     if (effort !== undefined) out.reasoning_effort = effort;
+  }
+  if (typeof body.thinking_budget === 'number' && Number.isInteger(body.thinking_budget) && body.thinking_budget >= 0) {
+    out.thinking_budget = body.thinking_budget;
   }
   return out as ExtendedSamplingOptions;
 }
@@ -212,6 +222,12 @@ export interface PlatformParamPolicy {
   // supported value instead of being forwarded into a 400 (#619). Omitted =
   // forward whatever the client asked for.
   reasoningEfforts?: readonly ReasoningEffort[];
+  // Whether the platform accepts a 'max' reasoning effort option in addition
+  // to the standard OpenAI scale (e.g. Sail's gpt-oss Responses API).
+  supportsMaxReasoning?: boolean;
+  // Whether the platform natively honors an explicit thinking token budget
+  // (`thinking_budget`, e.g. Google Gemini's thinkingConfig.thinkingBudget).
+  supportsThinkingBudget?: boolean;
   // Output-token floor sent when — and ONLY when — the client omitted
   // max_tokens entirely (#553). Some providers apply a tiny server-side
   // default in that case and cut the answer off mid-sentence, which clients
@@ -259,6 +275,7 @@ export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPoli
   sail: {
     drop: ['top_k', 'min_p', 'seed', 'presence_penalty', 'frequency_penalty', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'],
     jsonObjectToSchema: true,
+    supportsMaxReasoning: true,
   },
   // Mistral's API is strict (422 on unknown body keys) and names its seed
   // `random_seed`. It has no top_k/min_p/logit_bias/logprobs equivalents, and
@@ -280,8 +297,11 @@ export const PLATFORM_PARAM_POLICIES: Partial<Record<Platform, PlatformParamPoli
   },
   // Gemini's generationConfig has no equivalents for these; the adapter
   // translates the rest natively (topK, seed, penalties, responseSchema, and
-  // reasoning_effort → thinkingConfig — see toGeminiExtendedConfig).
-  google: { drop: ['min_p', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'] },
+  // reasoning_effort / thinking_budget → thinkingConfig — see toGeminiExtendedConfig).
+  google: {
+    drop: ['min_p', 'repetition_penalty', 'logit_bias', 'logprobs', 'top_logprobs'],
+    supportsThinkingBudget: true,
+  },
   // Cohere's OpenAI-compat endpoint covers seed/penalties/response_format;
   // the rest (incl. reasoning_effort — Cohere's own knob is a non-OpenAI
   // `thinking` object) have no mapping there.
@@ -434,6 +454,37 @@ export function platformDropsResponseFormat(platform: string): boolean {
   return PLATFORM_PARAM_POLICIES[platform as Platform]?.drop?.includes('response_format') ?? false;
 }
 
+export type ReasoningEffortOption = 'none' | 'low' | 'medium' | 'high' | 'max';
+
+export interface ReasoningCapabilities {
+  supported: boolean;
+  efforts: ReasoningEffortOption[];
+  supportsThinkingBudget: boolean;
+}
+
+/**
+ * Reasoning controls a platform supports, derived from PLATFORM_PARAM_POLICIES.
+ * Used by /api/fallback so the Playground can automatically adapt its
+ * reasoning effort selector and thinking budget control per model/provider.
+ */
+export function reasoningCapabilitiesFor(platform: string): ReasoningCapabilities {
+  const policy = PLATFORM_PARAM_POLICIES[platform as Platform];
+  if (policy?.drop?.includes('reasoning_effort')) {
+    return { supported: false, efforts: [], supportsThinkingBudget: false };
+  }
+  const base: ReasoningEffortOption[] = policy?.reasoningEfforts
+    ? policy.reasoningEfforts.filter((e): e is Exclude<ReasoningEffort, 'minimal'> => e !== 'minimal')
+    : ['none', 'low', 'medium', 'high'];
+  const efforts: ReasoningEffortOption[] = policy?.supportsMaxReasoning && !base.includes('max')
+    ? [...base, 'max']
+    : base;
+  return {
+    supported: efforts.length > 0,
+    efforts,
+    supportsThinkingBudget: policy?.supportsThinkingBudget === true,
+  };
+}
+
 /** The advertised parameter list for a model on `platform` — the base set
  *  every surface supports, plus tools when the model does, minus the
  *  platform's droplist. */
@@ -446,6 +497,9 @@ export function supportedParametersFor(platform: string, caps: { tools?: boolean
     'temperature', 'top_p', 'max_tokens', 'max_completion_tokens', 'stop', 'stream',
     ...EXTENDED_SAMPLING_KEYS.filter(k => !dropped.has(k)),
   ];
+  if (policy?.supportsThinkingBudget) {
+    params.push('thinking_budget');
+  }
   if (caps.tools) {
     params.push('tools', 'tool_choice');
     if (platform !== 'jamai') params.push('parallel_tool_calls');

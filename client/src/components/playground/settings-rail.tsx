@@ -12,6 +12,11 @@ import {
   type SamplingField,
   type SamplingSettings,
 } from '@/lib/playground-sampling'
+import {
+  THINKING_BUDGET_RANGE,
+  type ReasoningCapabilities,
+  type ReasoningEffortLevel,
+} from '@/lib/playground-reasoning'
 import { useI18n } from '@/i18n'
 
 // The Playground's right-hand settings rail: everything that shapes the NEXT
@@ -31,6 +36,14 @@ const FIELD_LABEL_KEYS: Record<SamplingField, string> = {
   temperature: 'playground.temperature',
   topP: 'playground.topP',
   maxTokens: 'playground.maxTokens',
+}
+
+const EFFORT_LABEL_KEYS: Record<ReasoningEffortLevel, string> = {
+  none: 'playground.reasoningOff',
+  low: 'playground.reasoningLow',
+  medium: 'playground.reasoningMedium',
+  high: 'playground.reasoningHigh',
+  max: 'playground.reasoningMax',
 }
 
 // The open panel and the collapsed strip are stacked inside one container whose
@@ -57,6 +70,15 @@ export interface SettingsRailProps {
   onSystemPromptChange: (value: string) => void
   sampling: SamplingSettings
   onSamplingChange: (next: SamplingSettings) => void
+  /** Detected reasoning capabilities for the currently selected model. */
+  reasoningCapabilities: ReasoningCapabilities
+  reasoningEffort: ReasoningEffortLevel | null
+  onReasoningEffortChange: (effort: ReasoningEffortLevel) => void
+  thinkingBudgetEnabled: boolean
+  onThinkingBudgetEnabledChange: (enabled: boolean) => void
+  thinkingBudget: number
+  onThinkingBudgetChange: (budget: number) => void
+  reasoningCustomized: boolean
   /** Look the question up with POST /v1/search before answering (#1174). */
   webSearch: boolean
   onWebSearchChange: (enabled: boolean) => void
@@ -154,6 +176,14 @@ export function SettingsRail({
   onSystemPromptChange,
   sampling,
   onSamplingChange,
+  reasoningCapabilities,
+  reasoningEffort,
+  onReasoningEffortChange,
+  thinkingBudgetEnabled,
+  onThinkingBudgetEnabledChange,
+  thinkingBudget,
+  onThinkingBudgetChange,
+  reasoningCustomized,
   webSearch,
   onWebSearchChange,
   webSearchAvailable,
@@ -163,7 +193,10 @@ export function SettingsRail({
   const { t } = useI18n()
   // Anything the collapsed strip should own up to: a system prompt riding on
   // every request, or a knob overriding the provider's default.
-  const tweaked = samplingActiveCount(sampling) > 0 || systemPrompt.trim().length > 0 || webSearch
+  const tweaked = samplingActiveCount(sampling) > 0
+    || reasoningCustomized
+    || systemPrompt.trim().length > 0
+    || webSearch
 
   return (
     <div
@@ -282,6 +315,86 @@ export function SettingsRail({
                 onChange={onSamplingChange}
               />
             ))}
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-0.5">
+              <span className="block text-xs font-medium">{t('playground.reasoningHeading')}</span>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                {reasoningCapabilities.supported
+                  ? t('playground.reasoningHelp')
+                  : t('playground.reasoningUnsupported')}
+              </p>
+            </div>
+            {reasoningCapabilities.supported && (
+              <>
+                <div
+                  role="radiogroup"
+                  aria-label={t('playground.reasoningEffort')}
+                  className="flex flex-wrap gap-1 rounded-xl border p-1"
+                >
+                  {reasoningCapabilities.efforts.map(level => {
+                    const active = reasoningEffort === level
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        data-effort={level}
+                        onClick={() => onReasoningEffortChange(level)}
+                        className={`flex-1 whitespace-nowrap rounded-lg px-2 py-1 text-xs transition-colors ${
+                          active
+                            ? 'bg-foreground text-background font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {t(EFFORT_LABEL_KEYS[level])}
+                      </button>
+                    )
+                  })}
+                </div>
+                {reasoningCapabilities.supportsThinkingBudget && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor="playground-thinking-budget"
+                        className={`flex-1 truncate text-xs font-medium transition-colors ${
+                          thinkingBudgetEnabled && reasoningEffort !== 'none' ? '' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {t('playground.thinkingBudget')}
+                      </label>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {thinkingBudgetEnabled && reasoningEffort !== 'none'
+                          ? t('playground.thinkingBudgetTokens', { count: thinkingBudget })
+                          : t('playground.samplingDefault')}
+                      </span>
+                      <Switch
+                        size="sm"
+                        aria-label={t('playground.thinkingBudget')}
+                        checked={thinkingBudgetEnabled && reasoningEffort !== 'none'}
+                        disabled={reasoningEffort === 'none'}
+                        onCheckedChange={onThinkingBudgetEnabledChange}
+                      />
+                    </div>
+                    <input
+                      id="playground-thinking-budget"
+                      type="number"
+                      inputMode="numeric"
+                      min={THINKING_BUDGET_RANGE.min}
+                      max={THINKING_BUDGET_RANGE.max}
+                      step={THINKING_BUDGET_RANGE.step}
+                      disabled={!thinkingBudgetEnabled || reasoningEffort === 'none'}
+                      value={thinkingBudget}
+                      onChange={e => onThinkingBudgetChange(Number(e.target.value))}
+                      aria-label={t('playground.thinkingBudget')}
+                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 font-mono text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
