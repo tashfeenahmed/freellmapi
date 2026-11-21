@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { classifyIp, assessProviderUrl, assertProviderUrlAllowed, isLoopbackOrPrivateUrl, isLoopbackOrPrivateHostname } from '../../lib/url-guard.js';
 
 // SSRF guard for user-supplied custom-provider base URLs (#440). Metadata and
@@ -183,6 +183,15 @@ describe('assessProviderUrl', () => {
       allowUnresolved: true,
     });
     expect(verdict.allowed).toBe(false);
+  });
+
+  it('treats *.localhost as loopback without asking DNS (RFC 6761)', async () => {
+    const resolve = vi.fn(async () => { throw new Error('ENOTFOUND'); });
+    expect(await assessProviderUrl('http://ollama.localhost:11434/v1', { resolve })).toEqual({ allowed: true });
+    expect(await assessProviderUrl('http://localhost.:11434/v1', { resolve })).toEqual({ allowed: true });
+    expect(resolve).not.toHaveBeenCalled();
+    const blocked = await assessProviderUrl('http://ollama.localhost/v1', { resolve, blockPrivate: true });
+    expect(blocked.allowed).toBe(false);
   });
 
   it('assertProviderUrlAllowed throws for a name that cannot resolve', async () => {

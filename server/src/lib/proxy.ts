@@ -909,6 +909,45 @@ export async function openProviderWebSocket(url: string, platform: string, optio
 }
 
 /** Route the request through the configured proxy (or straight to fetch). */
+/**
+ * True for `*.localhost` names (e.g. `ollama.localhost`). RFC 6761 §6.3 makes
+ * them loopback, but many resolvers (glibc without nss-myhostname, minimal
+ * containers, Alpine) answer ENOTFOUND for subdomains. Plain `localhost` is
+ * left to the system resolver, which always maps it via /etc/hosts.
+ */
+export function isLocalhostSubdomainUrl(rawUrl: string): boolean {
+  try {
+    const host = new URL(rawUrl).hostname.replace(/\.$/, '').toLowerCase();
+    return host.endsWith('.localhost');
+  } catch {
+    return false;
+  }
+}
+
+type LookupCallback = (err: NodeJS.ErrnoException | null, address: string | { address: string; family: number }[], family?: number) => void;
+
+/** DNS lookup that answers every name with loopback (used only for *.localhost). */
+export function loopbackLookup(_hostname: string, options: { all?: boolean; family?: number | string } | LookupCallback, cb?: LookupCallback): void {
+  const callback = (typeof options === 'function' ? options : cb) as LookupCallback;
+  const opts = typeof options === 'function' ? {} : options;
+  const family = opts.family === 6 || opts.family === 'IPv6' ? 6 : opts.family === 4 || opts.family === 'IPv4' ? 4 : 0;
+  const addrs = [
+    { address: '127.0.0.1', family: 4 },
+    { address: '::1', family: 6 },
+  ].filter(a => family === 0 || a.family === family);
+  if (opts.all) callback(null, addrs);
+  else callback(null, addrs[0].address, addrs[0].family);
+}
+
+let _localhostDispatcher: unknown;
+async function getLocalhostDispatcher(): Promise<unknown> {
+  if (!_localhostDispatcher) {
+    const { Agent } = await import('undici');
+    _localhostDispatcher = new Agent({ connect: { lookup: loopbackLookup as never } });
+  }
+  return _localhostDispatcher;
+}
+
 async function dispatchFetch(
   url: string,
   init: RequestInit | undefined,
@@ -948,6 +987,10 @@ async function dispatchFetch(
   if (shouldBypassProxy(url, platform)) {
     if (proxyRequired) {
       throw proxyRequiredError(platform, 'proxy routing disabled or bypassed');
+    }
+    if (isLocalhostSubdomainUrl(url)) {
+      const dispatcher = await getLocalhostDispatcher();
+      return fetch(url, { ...init, dispatcher } as unknown as RequestInit);
     }
     return fetch(url, init);
   }

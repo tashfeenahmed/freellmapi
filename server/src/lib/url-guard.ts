@@ -238,6 +238,12 @@ export async function assessProviderUrl(rawUrl: string, opts: AssessOptions = {}
   let addresses: string[];
   if (net.isIP(hostname)) {
     addresses = [hostname];
+  } else if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+    // RFC 6761 §6.3: every *.localhost name is loopback. Many resolvers (glibc
+    // without nss-myhostname, minimal containers) do not answer for subdomains
+    // like ollama.localhost, so classify by name rather than block as
+    // "unresolved". The private-address check below still applies.
+    addresses = ['127.0.0.1', '::1'];
   } else {
     try {
       addresses = await (opts.resolve ?? defaultResolve)(hostname);
