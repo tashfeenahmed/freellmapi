@@ -31,6 +31,7 @@ import {
   getModelForbiddenCooldownMs,
   learnLimitFromError,
   learnContextWindowFromError,
+  pacificMidnight,
   type CooldownDecision,
   type CooldownSource,
 } from '../services/ratelimit.js';
@@ -274,23 +275,10 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
   return Math.max(next - now, 60_000);
 }
 
-const pacificDate = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric', day: 'numeric',
-});
-const pacificHour = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/Los_Angeles', hour: 'numeric', hourCycle: 'h23',
-});
-
 /** Gemini daily quotas reset at midnight Pacific, including DST transitions.
  * https://ai.google.dev/gemini-api/docs/rate-limits */
 export function msUntilNextPacificMidnight(now = Date.now()): number {
-  const parts = pacificDate.formatToParts(now);
-  const part = (name: string) => Number(parts.find(p => p.type === name)!.value);
-  // 08:00 UTC on the next Pacific date is either midnight (PST) or 01:00
-  // (PDT). Read the offset on that date, not now: DST days have 23/25 hours.
-  const candidate = Date.UTC(part('year'), part('month') - 1, part('day') + 1, 8);
-  const midnight = candidate - Number(pacificHour.format(candidate)) * 3_600_000;
-  return Math.max(midnight - now, 60_000);
+  return Math.max(pacificMidnight(now, 1) - now, 60_000);
 }
 
 /**
