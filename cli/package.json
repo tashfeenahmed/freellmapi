@@ -38,6 +38,8 @@
     "dist/index.d.ts",
     "dist/config-files.js",
     "dist/config-files.d.ts",
+    "dist/detect.js",
+    "dist/detect.d.ts",
     "dist/doctor.js",
     "dist/doctor.d.ts",
     "dist/keys.js",
