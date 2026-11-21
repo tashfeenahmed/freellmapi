@@ -71,6 +71,12 @@ function claude(ctx: GenerateContext): Generation {
           ANTHROPIC_DEFAULT_HAIKU_MODEL: model.id,
           CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(contextWindow(model)),
           CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: '1',
+          // #2011: the routed models are not Anthropic's, so auto mode's
+          // server-side review cannot run behind this gateway. Anthropic's
+          // documented setting for that case: Claude Code checks actions with
+          // its own classifier requests (sent here, to the free pool) and
+          // skips the "isn't eligible" notice.
+          CLAUDE_CODE_AUTO_MODE_SERVER: '0',
         },
       },
     }],
