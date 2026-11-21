@@ -436,6 +436,7 @@
     "familyHaiku": "হাইকু",
     "selectPlatform": "একটি প্রদানকারী নির্বাচন করুন",
     "addKey": "কী যোগ করুন",
+    "addAnotherKey": "আরেকটি API কী যোগ করুন",
     "keyAdded": "কী যোগ করা হয়েছে",
     "endpointKeysShareModels": "একই এন্ডপয়েন্টের কীগুলি একই মডেল ভাগ করে।",
     "export": "রপ্তানি",

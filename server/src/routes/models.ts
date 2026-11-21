@@ -97,6 +97,7 @@ const createModelSchema = z.object({
   rpdLimit: z.number().int().positive().nullable().optional(),
   tpmLimit: z.number().int().positive().nullable().optional(),
   tpdLimit: z.number().int().positive().nullable().optional(),
+  monthlyTokenBudget: z.string().max(80).optional(),
   supportsVision: z.boolean().optional(),
   supportsTools: z.boolean().optional(),
   keyId: z.number().int().positive().nullable().optional(),
@@ -178,7 +179,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
         enabled, supports_vision, supports_tools, key_id, source, endpoint_scope
       ) VALUES (
         @platform, @modelId, @displayName, @intelligenceRank, @speedRank, @sizeLabel,
-        @rpmLimit, @rpdLimit, @tpmLimit, @tpdLimit, '', @contextWindow,
+        @rpmLimit, @rpdLimit, @tpmLimit, @tpdLimit, @monthlyTokenBudget, @contextWindow,
         1, @supportsVision, @supportsTools, @keyId, 'user', @endpointScope
       )
     `).run({
@@ -192,6 +193,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       rpdLimit: data.rpdLimit ?? null,
       tpmLimit: data.tpmLimit ?? null,
       tpdLimit: data.tpdLimit ?? null,
+      monthlyTokenBudget: data.monthlyTokenBudget?.trim() ?? '',
       contextWindow: data.contextWindow ?? null,
       supportsVision: data.supportsVision ? 1 : 0,
       supportsTools: data.supportsTools !== undefined ? (data.supportsTools ? 1 : 0) : 1,
@@ -226,6 +228,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       rpdLimit: data.rpdLimit ?? null,
       tpmLimit: data.tpmLimit ?? null,
       tpdLimit: data.tpdLimit ?? null,
+      monthlyTokenBudget: data.monthlyTokenBudget?.trim() ?? '',
       supportsVision: Boolean(data.supportsVision),
       supportsTools: data.supportsTools ?? true,
       enabled: true,

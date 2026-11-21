@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Pasirinkite paslaugų teikėją",
     "addKey": "Pridėti klavišą",
+    "addAnotherKey": "Pridėti dar vieną API raktą",
     "keyAdded": "Pridėtas raktas",
     "endpointKeysShareModels": "To paties galinio taško raktai dalijasi jo modeliais.",
     "export": "Eksportas",

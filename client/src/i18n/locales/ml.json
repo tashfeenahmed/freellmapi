@@ -436,6 +436,7 @@
     "familyHaiku": "ഹൈക്കു",
     "selectPlatform": "ഒരു ദാതാവിനെ തിരഞ്ഞെടുക്കുക",
     "addKey": "കീ ചേർക്കുക",
+    "addAnotherKey": "മറ്റൊരു API കീ ചേർക്കുക",
     "keyAdded": "കീ ചേർത്തു",
     "endpointKeysShareModels": "ഒരേ എൻഡ്‌പോയിന്റിന്റെ കീകൾ അതിന്റെ മോഡലുകൾ പങ്കിടുന്നു.",
     "export": "കയറ്റുമതി",

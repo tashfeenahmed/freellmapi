@@ -436,6 +436,7 @@
     "familyHaiku": "Xayku",
     "selectPlatform": "Provayderni tanlang",
     "addKey": "Kalit qo'shing",
+    "addAnotherKey": "Boshqa API kalitini qo‘shish",
     "keyAdded": "Kalit qo'shildi",
     "endpointKeysShareModels": "Bir xil endpoint kalitlari uning modellarini baham ko'radi.",
     "export": "Eksport",

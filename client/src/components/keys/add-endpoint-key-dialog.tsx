@@ -38,7 +38,7 @@ export function AddEndpointKeyDialog({
       body: JSON.stringify({ baseUrl, apiKey, label: label.trim() || undefined }),
     }),
     onSuccess: () => {
-      for (const key of ['keys', 'health']) {
+      for (const key of ['keys', 'health', 'fallback']) {
         queryClient.invalidateQueries({ queryKey: [key] })
       }
       invalidateSearchQueries(queryClient)

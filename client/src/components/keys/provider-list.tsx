@@ -18,7 +18,7 @@ import {
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import { ChevronDown, CircleAlert, Copy, ExternalLink, FlaskConical, Info, KeyRound, Layers, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Zap } from 'lucide-react'
-import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
+import type { ApiKey, ApiKeyModel, Platform } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
@@ -78,7 +78,7 @@ const METRIC_LABEL_KEY = {
 // The Providers tab body: a filter toolbar over a list of collapsible provider
 // groups. Owns the keys/health/proxy queries and every per-key mutation so
 // KeysPage stays a thin shell. `onAddKey` opens the shared Add key dialog.
-export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
+export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => void }) {
   const { t, locale } = useI18n()
   const queryClient = useQueryClient()
 
@@ -138,6 +138,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
       // Deleting the last key of a platform flips it back to unconfigured in
       // the checklist strip.
       queryClient.invalidateQueries({ queryKey: ['keys-providers'] })
@@ -434,7 +435,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
         icon={KeyRound}
         title={t('keys.noProviderKeys')}
         action={
-          <Button size="sm" onClick={onAddKey}>
+          <Button size="sm" onClick={() => onAddKey()}>
             <Plus className="size-3.5" />
             {t('keys.addKey')}
           </Button>
@@ -548,6 +549,23 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (group.platform === 'custom') {
+                              const baseUrls = [...new Set(group.keys.map(k => k.baseUrl).filter((u): u is string => Boolean(u)))]
+                              if (baseUrls.length === 1) {
+                                setAddKeyBaseUrl(baseUrls[0])
+                                return
+                              }
+                              onAddKey()
+                              return
+                            }
+                            onAddKey(group.platform as Platform)
+                          }}
+                        >
+                          {t('keys.addAnotherKey')}
+                          <KeyRound className="ml-auto size-3.5" />
+                        </DropdownMenuItem>
                         {/* Test every model this provider serves, one real ping each
                             (custom endpoints test per key from the row instead). */}
                         {group.platform !== 'custom' && !group.search && (

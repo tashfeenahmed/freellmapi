@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Odaberite pružatelja usluga",
     "addKey": "Dodaj ključ",
+    "addAnotherKey": "Dodaj drugi API ključ",
     "keyAdded": "Ključ dodan",
     "endpointKeysShareModels": "Ključevi iste krajnje točke dijele njezine modele.",
     "export": "Izvoz",

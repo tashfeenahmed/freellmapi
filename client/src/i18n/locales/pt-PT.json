@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Selecione um fornecedor",
     "addKey": "Adicionar a tecla",
+    "addAnotherKey": "Adicionar outra chave API",
     "keyAdded": "Chave adicionada",
     "endpointKeysShareModels": "As chaves do mesmo endpoint partilham os seus modelos.",
     "export": "Exportação",
