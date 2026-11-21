@@ -162,6 +162,7 @@ export type Platform =
   // tier of at least 5,000 input + 1,000 output tokens per hour per account.
   // Email sign-up, no card. Hosted catalog only (no migration seed).
   | 'cheapllm'
+  | 'puter'
   // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
   // rotating public-model roster is free without consuming instance credits,
   // with recurring account-level allowance and request/concurrency controls.
@@ -218,9 +219,8 @@ export type Platform =
   // BazaarLink — OpenAI-compatible aggregator. Free 'auto:free' route picks an
   // available zero-cost model. Key from bazaarlink.ai (no card).
   | 'bazaarlink'
-  // AINative Studio — OpenAI-compatible aggregator. Advertises a recurring
-  // ~10M tokens/month free allocation (no card); quota unverified. Key from
-  // ainative.studio.
+  // AINative Studio — OpenAI-compatible aggregator. Paid plans only (#2019);
+  // no free allocation to advertise. Key from ainative.studio.
   | 'ainative'
   // Aion Labs — OpenAI-compatible aggregator with a no-card free API key.
   // Catalog rows live in the Oracle catalog (premium now, free after 30 days).

@@ -30,6 +30,7 @@ import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
 import { NOVAI_BASE_URL } from '../providers/novai.js';
 import { VarosityMediaError, varosityImage, varositySpeech, varosityVideo } from './media-varosity.js';
 import { RimeMediaError, rimeSpeech, rimeTranscription } from './media-rime.js';
+import { googleLiveTranscription } from './media-google-live.js';
 import { solariaTranscription } from './media-solaria.js';
 import { FreeTtsMediaError, freeTtsSpeech } from './media-freetts.js';
 import { VoiceGatewayMediaError, voiceGatewaySpeech, cartesiaTranscription } from './media-voice-gateways.js';
@@ -38,7 +39,7 @@ import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neu
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia', 'silvr']);
+export const MEDIA_PLATFORMS = new Set(['aihorde', 'xkiro', 'nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia', 'silvr']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -46,7 +47,7 @@ export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 
 export const VIDEO_PLATFORMS = new Set(['pollinations', 'huggingface', 'novai', 'varosity']);
 
 /** Platforms whose free media path needs no API key (anonymous). */
-const KEYLESS_CAPABLE = new Set(['pollinations']);
+const KEYLESS_CAPABLE = new Set(['pollinations','aihorde']);
 
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
@@ -281,7 +282,7 @@ async function mediaFetch(
     timeoutMs,
   );
   if (!r.ok) {
-    if (platform === 'silvr' || platform === 'electronhub' || platform === 'speechflow') {
+    if (platform === 'xkiro' || platform === 'aihorde' || platform === 'silvr' || platform === 'electronhub' || platform === 'speechflow') {
       await r.body?.cancel();
       throw new MediaError(`${platform} ${modality} request failed (${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
     }
@@ -461,6 +462,9 @@ async function callImageProvider(
   const key = credential.key;
   const [w, h] = parseSize(p.size);
   switch (row.platform) {
+    case 'aihorde':
+    case 'xkiro':
+      return queuedImage(row.platform, row.model_id, key, p);
     case 'electronhub': {
       if (!key) throw new MediaError('ElectronHub API key required', 401);
       if (!['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0', 'flux-2-klein-base-4b'].includes(row.model_id)) throw new MediaError('Unknown ElectronHub image model', 400);
@@ -660,6 +664,45 @@ async function boundedMediaJson(response: Response, maximum: number): Promise<un
 /** CogView returns a signed UFile URL, sometimes labelled PNG while containing
  * JPEG bytes. Decode a bounded image and return normalized PNG base64 so SDKs
  * do not inherit that incorrect MIME type or an expiring upstream URL. */
+async function queuedImage(platform:'aihorde'|'xkiro',model:string,key:string|null,p:ImageParams){
+  const horde=platform==='aihorde',size=horde?'512x512':'1024x1024';
+  const allowed=horde?['Flat-2D Animerge','stable_diffusion','Deliberate','Dreamshaper','AbsoluteReality']:['sensenova/sensenova-u1.5-lite'];
+  if(!allowed.includes(model)||p.n!=null&&p.n!==1||p.size!=null&&p.size!==size)throw new MediaError(platform+' requires one '+size+' image on a supported route',400);
+  if(!horde&&!key)throw new MediaError('xKiro key required',401);
+  if(!cpuCanRunSharp())throw new MediaError('Image decoder unavailable',502);
+  const sharp=(await import('sharp')).default,base=horde?'https://aihorde.net/api/v2/generate/':'https://api.xkiro.com/v1/images/generations';
+  const headers:Record<string,string>=horde?{apikey:'0000000000','Client-Agent':'FreeLLMAPI:1:freellmapi.co'}:{Authorization:'Bearer '+key};
+  const deadline=Date.now()+120000, remaining=()=>{const t=deadline-Date.now();if(t<=0)throw new MediaError('Image generation timed out',504);return t;};
+  const json=async(path:string,body?:unknown,max=256000)=>await boundedMediaJson(await mediaFetch(base+path,platform,'image',{method:body?'POST':'GET',headers:{...headers,'Content-Type':'application/json'},redirect:'error',...(body?{body:JSON.stringify(body)}:{})},remaining()),max) as
+    {id?:string;model?:string;status?:string;faulted?:boolean;done?:boolean;generations?:{model?:string;censored?:boolean;img?:string}[];data?:{url?:string}[]};
+  const job=await json(horde?'async':'',horde?{prompt:p.prompt,models:[model],params:{width:512,height:512,steps:10,n:1},nsfw:false,censor_nsfw:true,r2:false,shared:false}:{prompt:p.prompt,model,n:1,size});
+  if(typeof job?.id!=='string'||!/^[a-zA-Z0-9-]{4,120}$/.test(job.id)||!horde&&job.model!==model)throw new MediaError('Invalid image job',502);
+  for(;;){
+    await new Promise(r=>setTimeout(r,Math.min(remaining(),horde?5000:3000)));
+    const info=await json((horde?'check/':'/')+job.id);
+    let bytes:Buffer;
+    if(horde){
+      if(info.faulted)throw new MediaError('Horde job failed',502);
+      if(!info.done)continue;
+      const g=(await json('status/'+job.id,undefined,16*1024*1024)).generations?.[0];
+      if(!g||g.censored||g.model!==model||typeof g.img!=='string'||!g.img.length||!/^[A-Za-z0-9+/]+=*$/.test(g.img))throw new MediaError('Horde returned no matching inline image',502);
+      bytes=Buffer.from(g.img,'base64');
+    }else{
+      if(['pending','processing','queued'].includes(info.status??''))continue;
+      if(info.status!=='succeeded'||info.model!==model||!info.data?.[0]?.url)throw new MediaError('xKiro image job did not produce the requested model',502);
+      const url=new URL(info.data[0].url);
+      if(url.origin!=='https://cdn.xkiro.com'||url.username||url.password||!(await assessProviderUrl(url.href)).allowed)throw new MediaError('Invalid image download origin',502);
+      const r=await mediaFetch(url.href,platform,'image',{redirect:'error'},remaining());
+      if(!r.body)throw new MediaError('Missing image body',502);
+      const reader=r.body.getReader(),chunks:Buffer[]=[];let n=0;
+      try{for(;;){const {done,value}=await reader.read();if(done)break;n+=value.length;if(n>16*1024*1024)throw new MediaError('Image exceeds size limit',502);chunks.push(Buffer.from(value));}}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+      bytes=Buffer.concat(chunks);
+    }
+    const normalized=await sharp(bytes,{limitInputPixels:16*1024*1024,failOn:'warning'}).png().toBuffer();
+    if(normalized.length>16*1024*1024)throw new MediaError('Image exceeds size limit',502);
+    return [{b64_json:normalized.toString('base64')}];
+  }
+}
 async function callNovaiImage(row: MediaModelRow, key: string | null, p: ImageParams): Promise<Array<{ b64_json: string }>> {
   if (!key) throw new MediaError('NovAI API key required', 401);
   if (row.model_id !== 'cogview-3-flash') throw new MediaError('NovAI images support only the tested free CogView 3 Flash route', 400);
@@ -1594,6 +1637,7 @@ async function callTranscriptionProvider(
     case 'cartesia':
       return nativeMediaResult(cartesiaTranscription(m.modelId, key, p));
     case 'google': {
+      if (m.modelId === 'gemini-3.5-transcribe-live') return nativeMediaResult(googleLiveTranscription(key, p));
       if (m.modelId !== 'gemini-3.5-transcribe') throw new MediaError('Unknown Google transcription model', 400);
       const r = await mediaFetch('https://generativelanguage.googleapis.com/v1beta/interactions', 'google', 'transcription', {
         method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key ?? '' },

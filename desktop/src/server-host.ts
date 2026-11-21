@@ -8,6 +8,7 @@
 // relative imports in sync with the repo-root default in main.ts.
 import '../../server/src/env.js';
 import tls from 'node:tls';
+import { X509Certificate } from 'node:crypto';
 import type { Server } from 'node:http';
 import { createApp } from '../../server/src/app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../server/src/db/index.js';
@@ -59,6 +60,21 @@ export interface ServerHandle {
 }
 
 /**
+ * True when a PEM certificate is outside its validity window at `now`. An
+ * entry that cannot be parsed counts as valid: only provably dead ones go.
+ */
+export function isCertificateOutOfDate(pem: string, now: number = Date.now()): boolean {
+  try {
+    const cert = new X509Certificate(pem);
+    const from = Date.parse(cert.validFrom);
+    const to = Date.parse(cert.validTo);
+    return (Number.isFinite(to) && to < now) || (Number.isFinite(from) && from > now);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Trust the OS certificate store for outbound TLS, on top of Node's bundled
  * roots (#1373). Antivirus that scans HTTPS (Kaspersky, ESET, Avast, …) and
  * corporate TLS inspection re-sign traffic with a root they install into the
@@ -67,16 +83,36 @@ export interface ServerHandle {
  * (SELF_SIGNED_CERT_IN_CHAIN). Desktop only: the server image keeps Node's
  * default and can opt in with NODE_USE_SYSTEM_CA=1. Best effort — a runtime
  * without these APIs (Node < 22.19) keeps the default behaviour.
+ *
+ * Expired and not-yet-valid certificates are left out (#2041). On Windows,
+ * Node also reads the "CA" (intermediate) stores and does not check dates,
+ * so the list can hold certificates Windows cached long ago, such as the
+ * ISRG Root X2 cross-signed by X1 that expired on 15 Sep 2025. Electron's
+ * Node uses BoringSSL, which can pick that certificate as the issuer even
+ * when a valid one with the same name is also trusted, and then rejects the
+ * chain: Let's Encrypt "Y" chains (… ← Root YE ← ISRG Root X2) failed with
+ * CERT_HAS_EXPIRED. A certificate outside its validity window can never
+ * complete a chain, so dropping it removes nothing that could ever work.
  */
-export function trustSystemCertificates(tlsModule: Pick<typeof tls, 'getCACertificates' | 'setDefaultCACertificates'> = tls): number {
+export function trustSystemCertificates(
+  tlsModule: Pick<typeof tls, 'getCACertificates' | 'setDefaultCACertificates'> = tls,
+  now: number = Date.now(),
+): number {
   try {
     if (typeof tlsModule.getCACertificates !== 'function' || typeof tlsModule.setDefaultCACertificates !== 'function') return 0;
     const system = tlsModule.getCACertificates('system');
     if (system.length === 0) return 0;
+    // 'default' is the bundled roots plus NODE_EXTRA_CA_CERTS.
     const merged = [...new Set([...tlsModule.getCACertificates('default'), ...system])];
-    tlsModule.setDefaultCACertificates(merged);
-    console.log(`[tls] trusting ${system.length} certificate(s) from the OS store`);
-    return system.length;
+    const usable = merged.filter((pem) => !isCertificateOutOfDate(pem, now));
+    tlsModule.setDefaultCACertificates(usable);
+    const trusted = system.filter((pem) => !isCertificateOutOfDate(pem, now)).length;
+    const skipped = merged.length - usable.length;
+    console.log(
+      `[tls] trusting ${trusted} certificate(s) from the OS store` +
+        (skipped > 0 ? `, skipped ${skipped} expired or not yet valid` : ''),
+    );
+    return trusted;
   } catch (err) {
     console.warn(`[tls] could not load the OS certificate store: ${(err as Error)?.message ?? err}`);
     return 0;
