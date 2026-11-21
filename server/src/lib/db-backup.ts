@@ -212,6 +212,22 @@ async function writeTarget(target: string, payload: Buffer): Promise<void> {
   }
 }
 
+// Set when this process found no backup at boot and so started on an empty
+// database. "No backup" can be temporary — a NAS mounted after the server, an
+// HTTP target answering 404 for a moment — so until the process restarts it
+// overwrites only what it uploaded itself (hash below), never a backup that
+// appears at the target later.
+let bootedWithoutBackup = false;
+let lastUploadedSha256: string | null = null;
+
+const sha256 = (buf: Buffer) => crypto.createHash('sha256').update(buf).digest('hex');
+
+/** Test hook: forget the boot state between cases. */
+export function _resetDbBackupStateForTesting(): void {
+  bootedWithoutBackup = false;
+  lastUploadedSha256 = null;
+}
+
 export async function restoreDbBackupIfNeeded(dbPath = getDefaultDbPath()): Promise<DbBackupResult> {
   const target = backupTarget();
   if (!target) return { ok: true, skipped: 'not configured' };
@@ -219,7 +235,10 @@ export async function restoreDbBackupIfNeeded(dbPath = getDefaultDbPath()): Prom
   if (fs.existsSync(dbPath) && fs.statSync(dbPath).size > 0) return { ok: true, target, skipped: 'database already exists' };
 
   const payload = await readTarget(target);
-  if (!payload || payload.length === 0) return { ok: true, target, skipped: 'no backup found' };
+  if (!payload || payload.length === 0) {
+    bootedWithoutBackup = true;
+    return { ok: true, target, skipped: 'no backup found' };
+  }
 
   let restored: Buffer;
   try {
@@ -233,7 +252,12 @@ export async function restoreDbBackupIfNeeded(dbPath = getDefaultDbPath()): Prom
   // This is the decrypted database — provider keys and the dashboard password
   // hash in the clear. connectDb hardens it too, but that is a later call and
   // sometimes a later process; the file must not be readable in between.
-  fs.writeFileSync(dbPath, restored, { mode: 0o600 });
+  // Written beside it and renamed into place: a crash mid-write must not leave
+  // a partial file, which the size check above would then take for a real
+  // database and never restore over again.
+  const tmpPath = `${dbPath}.restoring`;
+  fs.writeFileSync(tmpPath, restored, { mode: 0o600 });
+  fs.renameSync(tmpPath, dbPath);
   if (!restrictToOwner(dbPath)) {
     console.warn(`[db-backup] could not restrict permissions on the restored database at ${dbPath}`);
   }
@@ -253,9 +277,18 @@ export async function backupDbNow(db: Db, dbPath = getDefaultDbPath()): Promise<
     // Best effort: reading the main DB still works for rollback-journal or quiet WAL DBs.
   }
 
+  if (bootedWithoutBackup) {
+    const existing = await readTarget(target);
+    if (existing && existing.length > 0 && sha256(existing) !== lastUploadedSha256) {
+      console.warn(`[db-backup] a backup this server did not write is now at ${target} (it started empty because none was found at boot). Not overwriting it: restart the server to restore from it.`);
+      return { ok: false, target, skipped: 'foreign backup at target' };
+    }
+  }
+
   const plain = fs.readFileSync(dbPath);
   const payload = encryptBackup(gzipSync(plain));
   await writeTarget(target, payload);
+  lastUploadedSha256 = sha256(payload);
   console.log(`[db-backup] uploaded ${plain.length} bytes to ${target}`);
   return { ok: true, target, bytes: plain.length };
 }
