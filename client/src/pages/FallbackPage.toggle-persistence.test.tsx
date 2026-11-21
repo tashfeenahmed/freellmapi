@@ -125,7 +125,7 @@ describe('FallbackPage per-model "On" switch persistence (#2024)', () => {
       if (url === '/api/fallback?profile=7' && (!init || !init.method || init.method === 'GET')) {
         return serverEntries.map(e => ({ ...e }))
       }
-      if (url === '/api/fallback' && init?.method === 'PUT') {
+      if (url === '/api/fallback?profile=7' && init?.method === 'PUT') {
         const body = JSON.parse(String(init.body)) as { modelDbId: number; priority: number; enabled: boolean }[]
         putPayloads.push(body)
         const byId = new Map(body.map(item => [item.modelDbId, item]))
@@ -151,11 +151,9 @@ describe('FallbackPage per-model "On" switch persistence (#2024)', () => {
     act(() => { switchesBefore[0].click() })
     await flush()
 
+    // Only the clicked row, at its saved priority, pinned to the shown chain.
     expect(putPayloads).toHaveLength(1)
-    expect(putPayloads[0]).toEqual([
-      { modelDbId: 101, priority: 1, enabled: true },
-      { modelDbId: 102, priority: 2, enabled: true },
-    ])
+    expect(putPayloads[0]).toEqual([{ modelDbId: 101, priority: 1, enabled: true }])
     expect(container.textContent).not.toContain('Save changes')
 
     // Simulate a full page reload / app restart with a fresh QueryClient.
@@ -181,7 +179,7 @@ describe('FallbackPage per-model "On" switch persistence (#2024)', () => {
       if (url === '/api/fallback?profile=7' && (!init || !init.method || init.method === 'GET')) {
         return serverEntries.map(e => ({ ...e }))
       }
-      if (url === '/api/fallback' && init?.method === 'PUT') {
+      if (url === '/api/fallback?profile=7' && init?.method === 'PUT') {
         const body = JSON.parse(String(init.body)) as { modelDbId: number; priority: number; enabled: boolean }[]
         await new Promise<void>(resolve => {
           pendingPuts.push(() => {
@@ -231,7 +229,7 @@ describe('FallbackPage per-model "On" switch persistence (#2024)', () => {
       if (url === '/api/fallback?profile=7' && (!init || !init.method || init.method === 'GET')) {
         return serverEntries.map(e => ({ ...e }))
       }
-      if (url === '/api/fallback' && init?.method === 'PUT') {
+      if (url === '/api/fallback?profile=7' && init?.method === 'PUT') {
         throw new Error('server unavailable')
       }
       if (url === '/api/fallback/routing') return { strategy: 'balanced', scores: [] }
@@ -247,5 +245,103 @@ describe('FallbackPage per-model "On" switch persistence (#2024)', () => {
     await flush()
 
     expect(getSwitches()[0].getAttribute('aria-checked')).toBe('false')
+  })
+  it('lands rapid clicks on one switch in click order', async () => {
+    let serverEntries: FallbackEntry[] = [
+      makeEntry({ modelDbId: 101, modelId: 'gemini-3.8-flash', displayName: 'Gemini 3.8 Flash', priority: 1, enabled: false }),
+    ]
+    const pendingPuts: Array<() => void> = []
+    let concurrent = 0
+    let maxConcurrent = 0
+
+    apiFetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/profiles/active') return { activeProfileId: 7 }
+      if (url === '/api/fallback?profile=7' && (!init || !init.method || init.method === 'GET')) {
+        return serverEntries.map(e => ({ ...e }))
+      }
+      if (url === '/api/fallback?profile=7' && init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body)) as { modelDbId: number; enabled: boolean }[]
+        concurrent += 1
+        maxConcurrent = Math.max(maxConcurrent, concurrent)
+        await new Promise<void>(resolve => pendingPuts.push(() => {
+          serverEntries = serverEntries.map(e => (e.modelDbId === body[0].modelDbId ? { ...e, enabled: body[0].enabled } : e))
+          concurrent -= 1
+          resolve()
+        }))
+        return { success: true }
+      }
+      if (url === '/api/fallback/routing') return { strategy: 'balanced', scores: [] }
+      if (url === '/api/fallback/token-usage') return { totalBudget: 0, totalUsed: 0, models: [] }
+      if (url === '/api/fallback/rate-limit-usage') return { rows: [] }
+      return {}
+    })
+
+    await mountPage()
+    // on, off, on: three writes for the same row, the last one must win.
+    for (let i = 0; i < 3; i++) {
+      act(() => { getSwitches()[0].click() })
+      await flush(2)
+    }
+    expect(getSwitches()[0].getAttribute('aria-checked')).toBe('true')
+    while (pendingPuts.length > 0 || concurrent > 0) {
+      const next = pendingPuts.shift()
+      if (next) act(() => next())
+      await flush(3)
+    }
+    expect(maxConcurrent).toBe(1)
+    expect(serverEntries[0].enabled).toBe(true)
+    expect(getSwitches()[0].getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('keeps an unsaved bulk edit staged instead of committing it with a switch', async () => {
+    const serverEntries: FallbackEntry[] = [
+      makeEntry({ modelDbId: 101, modelId: 'gemini-3.8-flash', displayName: 'Gemini 3.8 Flash', priority: 1, enabled: true }),
+      makeEntry({ modelDbId: 102, modelId: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', priority: 2, enabled: true }),
+      makeEntry({ modelDbId: 103, modelId: 'gemma-4', displayName: 'Gemma 4', priority: 3, enabled: true }),
+    ]
+    const putPayloads: Array<{ modelDbId: number; priority: number; enabled: boolean }[]> = []
+
+    apiFetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/profiles/active') return { activeProfileId: 7 }
+      if (url === '/api/fallback?profile=7' && (!init || !init.method || init.method === 'GET')) {
+        return serverEntries.map(e => ({ ...e }))
+      }
+      if (url.startsWith('/api/fallback') && init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body)) as { modelDbId: number; priority: number; enabled: boolean }[]
+        putPayloads.push(body)
+        for (const item of body) {
+          const row = serverEntries.find(e => e.modelDbId === item.modelDbId)
+          if (row) row.enabled = item.enabled
+        }
+        return { success: true }
+      }
+      if (url === '/api/fallback/routing') return { strategy: 'balanced', scores: [] }
+      if (url === '/api/fallback/token-usage') return { totalBudget: 0, totalUsed: 0, models: [] }
+      if (url === '/api/fallback/rate-limit-usage') return { rows: [] }
+      return {}
+    })
+
+    await mountPage()
+    // "Disable all" stages every row off and shows the Save bar.
+    const disableAll = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Disable all')!
+    act(() => { disableAll.click() })
+    await flush()
+    expect(putPayloads).toHaveLength(0)
+    expect(container.textContent).toContain('Save changes')
+
+    // Turning one model back on saves that one row only.
+    act(() => { getSwitches()[0].click() })
+    await flush()
+    expect(putPayloads).toEqual([[{ modelDbId: 101, priority: 1, enabled: true }]])
+    expect(serverEntries.map(e => e.enabled)).toEqual([true, true, true])
+    // The bulk edit is still pending, with the click applied to it.
+    expect(container.textContent).toContain('Save changes')
+    expect(getSwitches().map(s => s.getAttribute('aria-checked'))).toEqual(['true', 'false', 'false'])
+
+    // Discarding it drops the bulk edit but not the saved click.
+    const discard = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Discard')!
+    act(() => { discard.click() })
+    await flush()
+    expect(getSwitches().map(s => s.getAttribute('aria-checked'))).toEqual(['true', 'true', 'true'])
   })
 })

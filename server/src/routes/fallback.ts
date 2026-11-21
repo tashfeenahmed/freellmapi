@@ -363,7 +363,21 @@ fallbackRouter.put('/', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const activeProfileId = getActiveProfileId(db);
+  let activeProfileId = getActiveProfileId(db);
+  // An explicit ?profile= pins the write to that chain, like the read (#1047):
+  // the Models page saves a switch the moment it is clicked (#2024), and a
+  // write still queued when another chain is activated must land in the chain
+  // the click was made on, not "whichever is active by now".
+  const requestedRaw = req.query.profile;
+  if (requestedRaw !== undefined) {
+    const requested = Number.parseInt(String(requestedRaw), 10);
+    if (!Number.isInteger(requested) || requested <= 0
+      || !db.prepare('SELECT 1 FROM profiles WHERE id = ?').get(requested)) {
+      res.status(404).json({ error: { message: `no such profile: ${String(requestedRaw)}` } });
+      return;
+    }
+    activeProfileId = requested;
+  }
 
   // Writing to the active chain UPSERTS: the row may not be in the chain yet,
   // which is the normal state of every model in a hand-built one. The old
