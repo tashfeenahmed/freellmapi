@@ -231,6 +231,51 @@ describe('Backups API', () => {
     expect((getDb().prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n).toBeGreaterThan(0);
   });
 
+  it('refuses the INSERT OR REPLACE, REPLACE INTO and main.users spellings too', () => {
+    const db = getDb();
+    for (const statement of [
+      'INSERT OR REPLACE INTO users (id) VALUES (1);',
+      'REPLACE INTO "users" (id) VALUES (1);',
+      'UPDATE OR IGNORE main.users SET email = NULL;',
+      'DELETE FROM "main"."sessions";',
+      // An apostrophe in a comment must not open a "literal" that hides the
+      // statement after it from the check.
+      "-- the owner's note\nDELETE FROM \"users\";\nINSERT INTO \"settings\" (key, value) VALUES ('x', 'y');",
+    ]) {
+      const created = createBackup(db);
+      const file = dumpPath(created.id);
+      fs.writeFileSync(file, `${fs.readFileSync(file, 'utf8')}${statement}\n`, 'utf8');
+      expect(() => restoreBackup(db, created.id), statement).toThrow(/backups never include/);
+    }
+  });
+
+  it('restores a dump whose row values merely mention an account table', () => {
+    // A Playground chat, a profile prompt or a setting is free text: asking
+    // "how do I update users?" must not make every later backup unrestorable.
+    const db = getDb();
+    const text = "how do I UPDATE users SET role = 'admin'; or DELETE FROM sessions?";
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('audit_free_text', ?)").run(text);
+    const created = createBackup(db);
+    db.prepare("DELETE FROM settings WHERE key = 'audit_free_text'").run();
+
+    restoreBackup(db, created.id);
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'audit_free_text'").get()).toEqual({ value: text });
+  });
+
+  it('restores request history without charging the per-model monthly ledger twice', () => {
+    const db = getDb();
+    const model = 'backup-model-ledger-test';
+    db.prepare(`INSERT INTO requests (platform, model_id, key_id, status, input_tokens, output_tokens, latency_ms)
+      VALUES ('groq', ?, 851902, 'success', 10, 5, 1)`).run(model);
+    const usage = () => db.prepare('SELECT tokens FROM model_monthly_usage WHERE platform = ? AND model_id = ?').get('groq', model);
+    expect(usage()).toEqual({ tokens: 15 });
+
+    restoreBackup(db, createBackup(db).id);
+    expect(usage()).toEqual({ tokens: 15 });
+    restoreBackup(db, createBackup(db, { tables: ['requests'] }).id);
+    expect(usage()).toEqual({ tokens: 15 });
+  });
+
   it('rejects a backup path outside the database directory', async () => {
     for (const backupPath of ['../escape', '/tmp/freeapi-escape', '../../etc']) {
       const put = await request(app, 'PUT', '/api/backups/schedule', {
