@@ -21,6 +21,7 @@ export class FreeAiProvider extends BaseProvider {
   readonly supportsChat = false;
   readonly platform = 'freeai' as const;
   readonly name = 'Free.ai';
+  override get apiBaseUrl(): string { return FREEAI_BASE_URL; }
 
   // No published endpoint distinguishes genuine from bogus keys. Skip
   // scheduled health probes instead of persisting an inconclusive error.

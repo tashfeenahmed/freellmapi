@@ -38,6 +38,10 @@ export class ZhipuProvider extends OpenAICompatProvider {
     });
   }
 
+  override getApiBaseUrl(apiKey?: string): string {
+    return apiKey && this.globalKeys.has(apiKey) ? GLOBAL_BASE_URL : DOMESTIC_BASE_URL;
+  }
+
   /**
    * Recover the bearer from a request this provider built. OpenAICompatProvider
    * composes every URL from its own private base URL, so this is the only place

@@ -50,6 +50,7 @@ function unsupportedRequest(message: string): Error {
 export class AclideProvider extends BaseProvider {
   readonly platform: Platform = 'aclide';
   readonly name = 'ACLIDE';
+  override get apiBaseUrl(): string { return BASE_URL; }
 
   private headers(apiKey: string): Record<string, string> {
     return { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };

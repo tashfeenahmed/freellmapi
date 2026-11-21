@@ -17,6 +17,7 @@ function checkModel(requested: string, returned: unknown): void {
 export class MoondreamProvider extends BaseProvider {
   readonly platform: Platform = 'moondream';
   readonly name = 'Moondream';
+  override get apiBaseUrl(): string { return BASE_URL; }
 
   private headers(apiKey: string): Record<string, string> {
     return { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
