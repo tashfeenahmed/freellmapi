@@ -57,7 +57,7 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
-    "node": ">=20.18.0 <25.0.0"
+    "node": ">=20.18.0"
   },
   "dependencies": {
     "cross-spawn": "^7.0.6",
