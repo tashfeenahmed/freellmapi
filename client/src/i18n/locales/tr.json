@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Bir sağlayıcı seçin",
     "addKey": "Anahtar ekle",
+    "addAnotherKey": "Başka bir API anahtarı ekle",
     "keyAdded": "Anahtar eklendi",
     "endpointKeysShareModels": "Aynı uç noktanın anahtarları onun modellerini paylaşır.",
     "export": "Dışa aktar",

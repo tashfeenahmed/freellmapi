@@ -134,7 +134,7 @@ export interface TokenUsageData {
   totalUsed: number
   /** Served smartest-first (intelligenceRank 1 = smartest); the bar and its
    *  legend keep that order. */
-  models: { displayName: string; platform: string; modelId?: string; intelligenceRank?: number; budget: number; used?: number }[]
+  models: { modelDbId?: number; displayName: string; platform: string; modelId?: string; intelligenceRank?: number; budget: number; used?: number }[]
 }
 
 // Custom endpoints all share the generic 'custom' platform id, so show the

@@ -52,6 +52,20 @@ export function parseBudget(s: string): number {
   return perDay ? tokens * 30 : tokens;
 }
 
+// Effective per-key monthly token budget in tokens. Prefers a parsed
+// `monthly_token_budget` label when present; falls back to `tpd_limit * 30`
+// when a concrete daily token cap is configured (e.g. custom models or local
+// overrides). Returns 0 when neither yields a positive token budget.
+export function effectiveMonthlyBudget(m: {
+  monthly_token_budget?: string | null;
+  tpd_limit?: number | null;
+}): number {
+  const fromLabel = parseBudget(m.monthly_token_budget ?? '');
+  if (fromLabel > 0) return fromLabel;
+  if (m.tpd_limit != null && m.tpd_limit > 0) return m.tpd_limit * 30;
+  return 0;
+}
+
 // Sort score for the "budget" preset on the fallback/profiles dashboards.
 // Shares parseBudget so rate-limit labels can't masquerade as budgets: the
 // per-route copies this replaced multiplied the bare number in

@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Válassz szolgáltatót",
     "addKey": "Add hozzá kulcsot",
+    "addAnotherKey": "Másik API-kulcs hozzáadása",
     "keyAdded": "Kulcs hozzáadva",
     "endpointKeysShareModels": "Ugyanazon végpont kulcsai közösen használják annak modelljeit.",
     "export": "Export",

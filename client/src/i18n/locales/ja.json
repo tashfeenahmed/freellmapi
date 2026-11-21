@@ -436,6 +436,7 @@
     "familyHaiku": "俳句",
     "selectPlatform": "プロバイダーを選択してください",
     "addKey": "キーを追加",
+    "addAnotherKey": "別のAPIキーを追加",
     "keyAdded": "キーが追加されました",
     "endpointKeysShareModels": "同じエンドポイントのキーはそのモデルを共有します。",
     "export": "エクスポート",
