@@ -78,7 +78,7 @@ const routingSchema = z.object({
   // How to pick between several keys of one platform (#919). Independent of
   // `strategy`, which ranks MODELS — the two are set from the same form, so
   // they round-trip through the same request.
-  keySelectionStrategy: z.enum(['auto', 'least-remaining']).optional(),
+  keySelectionStrategy: z.enum(['auto', 'least-remaining', 'round-robin']).optional(),
   // Ceiling on automatic cooldowns (#952): 1 min .. 24 h in ms, null = no cap
   // (the escalation ladder keeps its 24h top step and 402/403 bench a day).
   cooldownCeilingMs: z.number().int()
