@@ -70,6 +70,7 @@ export class AIHordeProvider extends BaseProvider {
    * bearer. A stored real horde key replaces the sentinel for higher priority. */
   keyless = true;
   private readonly baseUrl = 'https://oai.aihorde.net/v1';
+  override get apiBaseUrl(): string { return this.baseUrl; }
 
   /** Map the stored credential to the bearer we send upstream. The keyless flow
    * stores `'no-key'` (or nothing) for the anonymous case → send AI Horde's

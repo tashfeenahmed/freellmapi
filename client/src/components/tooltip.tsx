@@ -80,7 +80,7 @@ export function Tooltip({ text, children, side = 'top', className }: {
             transform: side === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
             zIndex: 9999,
           }}
-          className="pointer-events-none w-56 rounded-lg bg-foreground px-2.5 py-1.5 text-xs leading-snug text-background shadow-md whitespace-pre-line"
+          className="pointer-events-none w-56 rounded-lg bg-foreground px-2.5 py-1.5 text-xs leading-snug text-background shadow-md whitespace-pre-line break-words"
         >
           {text}
         </span>,
