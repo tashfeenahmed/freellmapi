@@ -42,7 +42,7 @@
 | `siliconflow` | SiliconFlow | 带密钥 | OpenAI 兼容 | 主要为 FREE 生成媒体模型而注册（FLUX.1-schnell 图像、CosyVoice2 TTS），经由 `services/media.ts` 路由。 |
 | `routeway` | Routeway | 带密钥 | OpenAI 兼容 | 要求浏览器风格的 User-Agent（Cloudflare 对其他值报错误 1010）；实测免费池约 5 rpm，比文档写的 20 rpm / 200 rpd 更严。 |
 | `bazaarlink` | BazaarLink | 带密钥 | OpenAI 兼容 | 只有 `auto:free` 路由进了目录——直接指定模型 id 是付费的（#385）。 |
-| `ainative` | AINative Studio | 带密钥 | OpenAI 兼容 | 宣称每月循环约 1000 万词元的免费配额；在真实账号确认之前按未核实处理。 |
+| `ainative` | AINative Studio | 带密钥 | OpenAI 兼容 | 仅有付费套餐（Pro/Business/Enterprise，截至 2026-11 无免费额度，#2019）；新用户的设置清单不再推荐，已有密钥继续可用。 |
 | `aion` | Aion Labs | 带密钥 | OpenAI 兼容 | 无需信用卡的免费密钥；可用性在 30 天观察期之后交由目录管理。 |
 | `requesty` | Requesty | 带密钥 | OpenAI 兼容 | 路由端点位于 `router.requesty.ai/v1`；免费行随月度目录逐步纳入；免费档为所有免费模型共享每天 200 次请求。 |
 | `navy` | NavyAI | 带密钥 | OpenAI 兼容 | 免费计划：每日 15 万词元、20 RPM；线上冒烟测试需要显式 User-Agent 头。 |

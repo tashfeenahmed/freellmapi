@@ -505,10 +505,9 @@ register(new OpenAICompatProvider({
 }));
 
 // AINative Studio — OpenAI-compatible aggregator (api.ainative.studio/api/v1).
-// Advertises a recurring ~10M tokens/month free allocation (no card), though
-// its own pages disagree on scale; treat the quota as unverified until a real
-// account confirms it. Bearer auth works (X-API-Key also accepted). Catalog
-// rows live in the catalog (premium → age into free).
+// No free tier: its pricing page lists paid plans only (#2019), so the setup
+// checklist stops suggesting it to new users. Bearer auth works (X-API-Key
+// also accepted). Catalog rows live in the catalog (premium → age into free).
 register(new OpenAICompatProvider({
   platform: 'ainative',
   name: 'AINative Studio',

@@ -46,7 +46,7 @@ Of the 43 built-in platforms, **10 use dedicated adapters** and **33 ride `OpenA
 | `siliconflow` | SiliconFlow | Keyed | OpenAI-compat | Registered mainly for FREE generative-media models (FLUX.1-schnell image, CosyVoice2 TTS) routed via `services/media.ts`. |
 | `routeway` | Routeway | Keyed | OpenAI-compat | Requires browser-style User-Agent (Cloudflare rejects others with error 1010); free pool observed stricter (~5 rpm) than the documented 20 rpm / 200 rpd. |
 | `bazaarlink` | BazaarLink | Keyed | OpenAI-compat | Only the `auto:free` route is cataloged — direct model ids are paid (#385). |
-| `ainative` | AINative Studio | Keyed | OpenAI-compat | Advertises recurring ~10M tokens/month free allocation; quota treated as unverified until confirmed by a real account. |
+| `ainative` | AINative Studio | Keyed | OpenAI-compat | Paid plans only (Pro/Business/Enterprise, no free tier as of 2026-11, #2019); hidden from the setup checklist for new users, existing keys keep working. |
 | `aion` | Aion Labs | Keyed | OpenAI-compat | No-card free key; availability catalog-managed behind the 30-day age gate. |
 | `requesty` | Requesty | Keyed | OpenAI-compat | Router endpoint at `router.requesty.ai/v1`; free rows age into the monthly catalog; the free tier is 200 requests/day shared across all free models. |
 | `navy` | NavyAI | Keyed | OpenAI-compat | Free plan: 150K tokens/day and 20 RPM; live smoke tests require an explicit User-Agent header. |

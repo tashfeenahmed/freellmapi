@@ -85,7 +85,7 @@ describe('GET /api/keys/providers — provider checklist (#543)', () => {
   });
 
   // Unavailable key creation must not remove existing keys or catalog models.
-  it.each(['aclide', 'waterfall'])('hides unconfigured %s but preserves configured keys and models (#1768)', async platform => {
+  it.each(['aclide', 'waterfall', 'ainative'])('hides unconfigured %s but preserves configured keys and models (#1768, #2019)', async platform => {
     const db = getDb();
     db.prepare('INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, enabled) VALUES (?, ?, ?, 1, 1, 1)')
       .run(platform, 'existing-test-model', 'Existing model');
