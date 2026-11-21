@@ -84,7 +84,12 @@ describe('trustSystemCertificates date filter', () => {
     expect(setDefaultCACertificates).toHaveBeenCalledWith([ISRG_ROOT_X1]);
   });
 
-  it('works on the real tls module and keeps every bundled root', () => {
+  // Electron's Node has tls.getCACertificates; the plain Node that runs desktop
+  // tests in CI may not (it landed in Node 22.15 / 23.2).
+  const hasCaApi = typeof (tls as { getCACertificates?: unknown }).getCACertificates === 'function'
+    && typeof (tls as { setDefaultCACertificates?: unknown }).setDefaultCACertificates === 'function';
+
+  it.skipIf(!hasCaApi)('works on the real tls module and keeps every bundled root', () => {
     const before = tls.getCACertificates('default');
     try {
       trustSystemCertificates(tls, NOW);
