@@ -63,6 +63,7 @@ export interface ExtractionRequest {
 }
 
 export const CLAIRIC_MODEL = '@cf/cloudflare/clairic';
+export const isClairic = (id?: string) => id === CLAIRIC_MODEL || id === CLAIRIC_MODEL + '-flash';
 
 export interface DecisionResponse {
   /** The decision model that answered (its catalog id). */
@@ -592,19 +593,19 @@ function checkedDecisionResult(raw: unknown, platform: string, model: string, bo
 
 /** Clairic extracts typed fields; it cannot answer choice/noul/score questions.
  * Text + numeric fields are the live-tested subset exposed here. */
-async function extractClairic(cred: ReservedProviderCredential, body: ExtractionRequest, signal?: AbortSignal): Promise<AdapterResult> {
+async function extractClairic(cred: ReservedProviderCredential, model: string, body: ExtractionRequest, signal?: AbortSignal): Promise<AdapterResult> {
   const { accountId, token } = cloudflareKey(cred.key);
-  const payload = JSON.stringify({ model: 'clairic', state: body.state, fields: body.fields });
+  const payload = JSON.stringify({ ...(model === CLAIRIC_MODEL ? { model: 'clairic' } : {}), state: body.state, fields: body.fields });
   const json = await meterCloudflare(
-    cred.key, CLAIRIC_MODEL, { inputTokens: roughTokens(payload) },
-    () => upstream(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${CLAIRIC_MODEL}`, 'cloudflare', {
+    cred.key, model, { inputTokens: roughTokens(payload) },
+    () => upstream(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${model}`, 'cloudflare', {
       method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: payload,
     }, signal) as Promise<{ success?: boolean; result?: { model?: unknown; answers?: unknown; usage?: unknown; truncated?: boolean } } | null>,
     j => (j?.result ? { inputTokens: usageOf(j.result.usage).input_tokens || roughTokens(payload) } : null),
     capAsDecisionError,
   );
-  if (!json?.success || json.result?.model !== 'clairic') throw new DecisionError('cloudflare returned an invalid Clairic result', 502);
+  if (!json?.success || !json.result || json.result.model !== model.split('/').at(-1)) throw new DecisionError('cloudflare returned an invalid Clairic result', 502);
   const answers = answersOf(json.result.answers, 'cloudflare');
   for (const [id, field] of Object.entries(body.fields)) {
     const a = answers[id] as { type?: unknown; value?: unknown } | undefined;
@@ -664,7 +665,7 @@ function hasUsableKey(platform: string): boolean {
  *  any key of platform 'custom', so it checks that key specifically. */
 export function decisionsAvailable(): boolean {
   return allDecisionRows().some(r => {
-    if (r.enabled !== 1 || r.model_id === CLAIRIC_MODEL || !ADAPTERS[r.platform]) return false;
+    if (r.enabled !== 1 || isClairic(r.model_id) || !ADAPTERS[r.platform]) return false;
     if (r.platform === 'custom') {
       if (r.key_id == null) return false;
       return !!getDb()
@@ -676,7 +677,7 @@ export function decisionsAvailable(): boolean {
 }
 
 function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>, rowId?: number, extraction = false): DecisionModelRow[] {
-  const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform] && (r.model_id === CLAIRIC_MODEL) === extraction);
+  const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform] && (isClairic(r.model_id)) === extraction);
   if (rowId !== undefined) {
     const pinned = enabled.find(r => r.id === rowId);
     if (!pinned) throw new DecisionError('Decision model is unavailable or turned off', 400);
@@ -699,8 +700,8 @@ function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<st
 export async function runDecision(body: DecisionRequest | ExtractionRequest, opts: DecisionOptions = {}): Promise<DecisionResponse> {
   const extraction = 'fields' in body;
   if (extraction && body.questions !== undefined) throw new DecisionError('Send fields or questions, not both', 400);
-  if (!extraction && opts.model === CLAIRIC_MODEL) throw new DecisionError('Clairic requires fields, not questions', 400);
-  if (extraction && opts.model && !['auto', CLAIRIC_MODEL].includes(opts.model)) throw new DecisionError('This model does not support extraction fields', 400);
+  if (!extraction && isClairic(opts.model)) throw new DecisionError('Clairic requires fields, not questions', 400);
+  if (extraction && opts.model && opts.model !== 'auto' && !isClairic(opts.model)) throw new DecisionError('This model does not support extraction fields', 400);
   const chain = decisionChain(opts.model, opts.skipPlatforms, opts.rowId, extraction);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
   const questionCount = Object.keys(extraction ? body.fields : body.questions).length;
@@ -730,7 +731,7 @@ export async function runDecision(body: DecisionRequest | ExtractionRequest, opt
       attempted++;
       const started = Date.now();
       try {
-        const out = extraction ? await extractClairic(credential, body, opts.signal)
+        const out = extraction ? await extractClairic(credential, row.model_id, body, opts.signal)
           : await ADAPTERS[row.platform]!(credential, row.model_id, body, opts.signal);
         logDecision(row, credential.id, 'ok', Date.now() - started, questionCount, out.usage.input_tokens, clientAgent, null);
         // A served decision is evidence the key works, the same as a served

@@ -162,6 +162,7 @@ export type Platform =
   // tier of at least 5,000 input + 1,000 output tokens per hour per account.
   // Email sign-up, no card. Hosted catalog only (no migration seed).
   | 'cheapllm'
+  | 'puter'
   // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
   // rotating public-model roster is free without consuming instance credits,
   // with recurring account-level allowance and request/concurrency controls.
