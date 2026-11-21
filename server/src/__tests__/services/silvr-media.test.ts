@@ -33,7 +33,7 @@ describe('SilvR renewable media routes', () => {
     expect(TRANSCRIPTION_PLATFORMS.has('silvr')).toBe(true);
     expect(CATALOG_DECISION_PLATFORMS.has('silvr')).toBe(true);
   });
-  it.each([['gemini-embedding-2', 3072], ['gemini-embedding-001', 3072], ['text-embedding-3-small', 1536]] as const)('routes %s with exact native dimensions and sorted input order', async (id, dimensions) => {
+  it.each([['nemotron-3-5-embed-1b', 2048], ['nemotron-3-5-embed-8b', 4096], ['gemini-embedding-2', 3072], ['gemini-embedding-001', 3072], ['text-embedding-3-small', 1536]] as const)('routes %s with exact native dimensions and sorted input order', async (id, dimensions) => {
     embedding(id, dimensions);
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ model: id, data: [{ index: 1, embedding: Array(dimensions).fill(0.2) }, { index: 0, embedding: Array(dimensions).fill(0.1) }], usage: { prompt_tokens: 4 } }));
     expect(await runEmbeddings('test-family', ['one', 'two'])).toMatchObject({ platform: 'silvr', modelId: id, dimensions, inputTokens: 4 });
@@ -54,13 +54,18 @@ describe('SilvR renewable media routes', () => {
     embedding(); const fetch = vi.spyOn(global, 'fetch');
     await expect(runEmbeddings('test-family', ['one'], 256)).rejects.toThrow('native dimensions'); expect(fetch).not.toHaveBeenCalled();
   });
-  it('uploads Whisper multipart without claiming native subtitle support', async () => {
-    seed('whisper-large-v3-turbo', 'transcription');
-    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ model: 'whisper-large-v3-turbo', text: 'Hello', duration: 1 }));
-    expect(await runTranscription('whisper-large-v3-turbo', transcription)).toMatchObject({ platform: 'silvr', text: 'Hello', duration: 1 });
+  it.each(['whisper-large-v3-turbo', 'whisper-large-v3'])('uploads %s multipart without claiming native subtitle support', async modelId => {
+    seed(modelId, 'transcription');
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ model: modelId, text: 'Hello', duration: 1 }));
+    expect(await runTranscription(modelId, transcription)).toMatchObject({ platform: 'silvr', modelId, text: 'Hello', duration: 1 });
     const [url, init] = fetch.mock.calls[0]; expect(url).toBe('https://api.silvrai.net/v1/audio/transcriptions'); expect(init?.redirect).toBe('error');
-    const form = init?.body as FormData; expect(form.get('model')).toBe('whisper-large-v3-turbo'); expect(form.get('response_format')).toBe('json'); expect(form.get('language')).toBe('en');
+    const form = init?.body as FormData; expect(form.get('model')).toBe(modelId); expect(form.get('response_format')).toBe('json'); expect(form.get('language')).toBe('en');
     expect(Buffer.from(await (form.get('file') as File).arrayBuffer())).toEqual(transcription.file);
+  });
+  it('rejects untested transcription routes without spending the shared allowance', async () => {
+    seed('whisper-1', 'transcription'); const fetch = vi.spyOn(global, 'fetch');
+    await expect(runTranscription('whisper-1', transcription)).rejects.toMatchObject({ status: 400 });
+    expect(fetch).not.toHaveBeenCalled();
   });
   it.each([null, { text: 5 }, { text: 'Hi', error: 'failed' }, { text: 'Hi', model: 'substituted' }, { text: 'Hi', duration: -1 }])('rejects invalid transcription success %j', async body => {
     seed('whisper-large-v3-turbo', 'transcription'); vi.spyOn(global, 'fetch').mockResolvedValue(Response.json(body));

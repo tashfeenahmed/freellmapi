@@ -480,6 +480,18 @@ export class OpenAICompatProvider extends BaseProvider {
         `Check the base URL (for Ollama use http://host:11434/v1, for llama.cpp/vLLM/LM Studio the /v1 path).`,
       );
     }
+    // A 200 that carries only an OpenAI-style error envelope (no choices) is a
+    // failure, not an empty answer. cheapllm.shop does this when its queue is
+    // full: it holds the connection, then answers 200 with
+    // {"error":{"code":"overloaded"}}. Give it the status it would have had so
+    // the fallback loop applies the right cooldown instead of an empty-completion streak.
+    const inBodyError = inBandErrorEnvelope(data);
+    if (inBodyError) {
+      throw Object.assign(
+        new Error(`${this.name} API error ${inBodyError.status}: ${inBodyError.message} (upstream returned 200 with an error body)`),
+        { status: inBodyError.status, providerRejection: 'upstream' as const },
+      );
+    }
     normalizeChoices(data);
     // #pollinations-inband: a 200 whose body is really an out-of-credits notice
     // must fail over, not be returned as the answer. The "402 ... insufficient
@@ -744,6 +756,21 @@ export class OpenAICompatProvider extends BaseProvider {
  * Other providers (Mistral magistral-medium) return `message.content` as an
  * array of text segments instead of a string. Flatten to string.
  */
+/** An error envelope returned with HTTP 200 and no choices, mapped to the
+ *  status the upstream should have sent. Exported for tests. */
+export function inBandErrorEnvelope(data: unknown): { status: number; message: string } | null {
+  const d = data as { choices?: unknown; error?: { message?: unknown; code?: unknown; type?: unknown } } | null;
+  if (!d || typeof d !== 'object') return null;
+  if (Array.isArray(d.choices) && d.choices.length > 0) return null;
+  const e = d.error;
+  if (!e || typeof e !== 'object' || typeof e.message !== 'string' || !e.message) return null;
+  const tag = `${String(e.code ?? '')} ${String(e.type ?? '')}`.toLowerCase();
+  const status = /overload|busy|capacity|unavailable/.test(tag) ? 503
+    : /rate_limit|too_many/.test(tag) ? 429
+    : 502;
+  return { status, message: e.message };
+}
+
 function normalizeChoices(data: ChatCompletionResponse): void {
   for (const choice of data.choices ?? []) {
     const msg = choice.message as ChatMessage & {

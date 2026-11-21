@@ -46,6 +46,7 @@ export interface ParseResult {
 export const PREFIX_MAP: Record<string, string> = {
   ACLIDE_: 'aclide',
   SPEKA_: 'speka',
+  MELDPORT_: 'meldport',
   KENARI_: 'kenari',
   KIOSAPI_: 'kiosapi',
   KIOS_: 'kiosapi',
@@ -165,6 +166,8 @@ export const PREFIX_MAP: Record<string, string> = {
   ANY_API_: 'anyapi',
   POWERTOKENS_: 'powertokens',
   POWER_TOKENS_: 'powertokens',
+  PUTER_: 'puter',
+  CHEAPLLM_: 'cheapllm',
   AIHORDE_: 'aihorde',
   QIANFAN_: 'qianfan',
   BAIDU_: 'qianfan',
@@ -214,6 +217,9 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   'moonmath.ai': 'zro',
   novai: 'novai',
   varosity: 'varosity',
+  speechflow: 'speechflow',
+  meldport: 'meldport',
+  'meldport.com': 'meldport',
   rime: 'rime',
   typecast: 'typecast',
   'typecast.ai': 'typecast',
@@ -291,6 +297,9 @@ export const AUTH_JSON_PROVIDER_MAP: Record<string, string> = {
   'any-api': 'anyapi',
   powertokens: 'powertokens',
   'power-tokens': 'powertokens',
+  puter: 'puter',
+  cheapllm: 'cheapllm',
+  'cheapllm.shop': 'cheapllm',
   qianfan: 'qianfan',
   baidu: 'qianfan',
   ernie: 'qianfan',
@@ -824,7 +833,7 @@ function toParsedKeys(pairs: KeyPair[]): ParseResult {
     const value = project && /^JAMAI_(API_KEY|PAT|KEY)$/i.test(key) && !rawValue.includes(':')
       ? `${project}:${rawValue.trim()}` : rawValue;
     const prefix = extractPrefix(key);
-    const platform = statedPlatform ?? detectPlatform(prefix);
+    const platform = statedPlatform ?? (/^SPEECHFLOW_(API_)?KEY$/i.test(key) ? 'speechflow' : detectPlatform(prefix));
     // The name before `=` becomes the stored label (splitRawKey in the import
     // route). Formats that carry a display name — export JSON and CSV column 3
     // — use it here, exactly as parseExportJson does, so an export/import

@@ -4,10 +4,11 @@ import { app, dialog, ipcMain, clipboard, nativeTheme, net, screen, shell, type 
 import { startServer, ensureSessionToken, getUnifiedApiKey, isAutoUpdateCheckEnabled, backupBeforeUpdate, outboundProxyUrl, setCatalogFallbackFetch } from './server.mjs';
 import { loadConfig, saveConfig } from './config.js';
 import { installFileLogger } from './logger.js';
-import { buildTray, refreshTrayLocale } from './tray.js';
+import { buildTray, refreshTrayLocale, refreshTrayMenu } from './tray.js';
 import { trayIsInMenuBar } from './tray-visibility.js';
 import { shouldOpenDashboardOnLaunch } from './tray-platform.js';
-import { openDashboard } from './window.js';
+import { registerAgentSetup } from './agent-setup.js';
+import { getDashboardWindow, openDashboard } from './window.js';
 import { todayStats, hourlyRequests, successRateToday } from './stats.js';
 import { normalizeLocale, nativeStrings, type NativeLocale } from './i18n.js';
 import { installGpuRecovery } from './gpu-recovery-host.js';
@@ -107,6 +108,8 @@ if (!app.requestSingleInstanceLock()) {
       }
     });
   });
+
+  registerAgentSetup({ port: () => resolvedPort, key: getUnifiedApiKey, dashboard: getDashboardWindow });
 
   // ── popover IPC ──────────────────────────────────────────────────────────
   ipcMain.handle('freeapi:snapshot', () => {
@@ -257,6 +260,7 @@ if (!app.requestSingleInstanceLock()) {
     const next = !(loadConfig().showInDock ?? true);
     saveConfig({ ...loadConfig(), showInDock: next });
     applyDockVisibility(next);
+    refreshTrayMenu();
   }
 
   app.whenReady().then(async () => {
@@ -293,6 +297,8 @@ if (!app.requestSingleInstanceLock()) {
         try { return outboundProxyUrl(); } catch { return ''; }
       },
       getLocale: () => locale,
+      // The Linux tray menu is attached, not rebuilt per click (#1804).
+      onChange: () => refreshTrayMenu(),
     });
 
     // License activation and catalog sync retry through Chromium's network
@@ -352,7 +358,6 @@ if (!app.requestSingleInstanceLock()) {
       if (tray && process.env.FREEAPI_SHOT && !app.isPackaged) {
         const fs = await import('node:fs');
         const { togglePopover, getPopoverWindow } = await import('./popover.js');
-        const { getDashboardWindow } = await import('./window.js');
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
         await sleep(800);
         togglePopover(tray);

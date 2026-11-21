@@ -376,3 +376,64 @@ describe('sanitizeForGemini items shapes (#1334)', () => {
     expect(JSON.stringify(sanitizeForGemini(input))).toBe(JSON.stringify(input));
   });
 });
+
+// #1874: Gemini has no oneOf/allOf. Dropping them left an empty schema, so the
+// model never saw the allowed shapes.
+describe('sanitizeForGemini oneOf / allOf (#1874)', () => {
+  it('turns oneOf into anyOf, sanitizing each branch', () => {
+    const out = sanitizeForGemini({
+      type: 'object',
+      properties: {
+        target: {
+          description: 'a path or an id',
+          oneOf: [{ type: 'string', $comment: 'x' }, { type: 'object', properties: { id: { type: 'integer' } }, additionalProperties: false }],
+        },
+      },
+    }) as any;
+    expect(out.properties.target).toEqual({
+      description: 'a path or an id',
+      anyOf: [{ type: 'string' }, { type: 'object', properties: { id: { type: 'integer' } } }],
+    });
+  });
+
+  it('drops oneOf when a branch would accept anything, or when anyOf is already there', () => {
+    expect(sanitizeForGemini({ oneOf: [{ type: 'string' }, {}] })).toEqual({});
+    expect(sanitizeForGemini({ anyOf: [{ type: 'string' }], oneOf: [{ type: 'number' }] })).toEqual({ anyOf: [{ type: 'string' }] });
+  });
+
+  it('merges allOf branches: properties and required combine, own keywords win', () => {
+    const out = sanitizeForGemini({
+      description: 'options',
+      allOf: [
+        { type: 'object', properties: { a: { type: 'string' } }, required: ['a'], description: 'first' },
+        { properties: { b: { type: 'integer' } }, required: ['b', 'a'] },
+      ],
+    });
+    expect(out).toEqual({
+      description: 'options',
+      type: 'object',
+      properties: { a: { type: 'string' }, b: { type: 'integer' } },
+      required: ['a', 'b'],
+    });
+  });
+
+  it('merges allOf beside the schema\'s own properties and resolves refs inside it', () => {
+    const out = sanitizeForGemini({
+      $defs: { Base: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] } },
+      type: 'object',
+      properties: {
+        item: { allOf: [{ $ref: '#/$defs/Base' }], properties: { note: { type: 'string' } } },
+      },
+    }) as any;
+    expect(out.properties.item).toEqual({
+      type: 'object',
+      properties: { id: { type: 'string' }, note: { type: 'string' } },
+      required: ['id'],
+    });
+  });
+
+  it('still treats a parameter literally named oneOf or allOf as a parameter', () => {
+    const input = { type: 'object', properties: { oneOf: { type: 'string' }, allOf: { type: 'boolean' } } };
+    expect(sanitizeForGemini(input)).toEqual(input);
+  });
+});

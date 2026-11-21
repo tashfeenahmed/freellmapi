@@ -171,6 +171,52 @@ describe('/v1/messages shared-loop convergence', () => {
     expect(text).not.toContain('<function=');
   });
 
+  it('non-stream: rescues a <dots_function_call> block into a typed tool_use (#1949)', async () => {
+    const dots = '<dots_function_call>\n  <invoke name="get_weather">\n    <parameter name="city">Paris</parameter>\n    <parameter name="days">3</parameter>\n  </invoke>\n</dots_function_call>';
+    mockRouteRequest.mockReturnValue(fakeRoute(jsonProvider({
+      id: 'c', object: 'chat.completion', created: 0, model: 'fake-model',
+      choices: [{ index: 0, message: { role: 'assistant', content: dots }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 5, completion_tokens: 9, total_tokens: 14 },
+    })));
+
+    const { status, body } = await post(app, {
+      model: 'claude-sonnet-4-5', max_tokens: 64,
+      messages: [{ role: 'user', content: 'weather in Paris?' }],
+      tools: [WEATHER_TOOL],
+    }, key);
+
+    expect(status).toBe(200);
+    expect(body.stop_reason).toBe('tool_use');
+    const toolUse = body.content.find((b: any) => b.type === 'tool_use');
+    expect(toolUse).toMatchObject({ type: 'tool_use', name: 'get_weather', input: { city: 'Paris', days: 3 } });
+    expect(JSON.stringify(body.content)).not.toContain('dots_function_call');
+  });
+
+  it('stream: rescues a <dots_function_call> block split across chunks (#1949)', async () => {
+    mockRouteRequest.mockReturnValue(fakeRoute(streamProvider(async function* () {
+      yield chunk({ role: 'assistant' });
+      yield chunk({ content: '<dots_fun' });
+      yield chunk({ content: 'ction_call>\n  <invoke name="get_weather">\n    <parameter name="city">Ber' });
+      yield chunk({ content: 'lin</parameter>\n  </invoke>\n</dots_function_call>' });
+      yield chunk({}, 'stop');
+    })));
+
+    const { status, text } = await post(app, {
+      model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'weather?' }],
+      tools: [WEATHER_TOOL],
+    }, key);
+
+    expect(status).toBe(200);
+    const events = sseEvents(text);
+    const toolStart = events.find(e => e.event === 'content_block_start' && e.data.content_block?.type === 'tool_use');
+    expect(toolStart!.data.content_block).toMatchObject({ type: 'tool_use', name: 'get_weather' });
+    const jsonDelta = events.filter(e => e.event === 'content_block_delta' && e.data.delta?.type === 'input_json_delta').map(e => e.data.delta.partial_json).join('');
+    expect(JSON.parse(jsonDelta)).toEqual({ city: 'Berlin' });
+    expect(events.find(e => e.event === 'message_delta')!.data.delta.stop_reason).toBe('tool_use');
+    expect(text).not.toContain('dots_fun');
+  });
+
   it('stream: preserves provider thought_signature on tool_use blocks (#487)', async () => {
     mockRouteRequest.mockReturnValue(fakeRoute(streamProvider(async function* () {
       yield chunk({ role: 'assistant' });

@@ -160,6 +160,10 @@ jobs:
           # root-hiding below; also makes local `desktop:dist:win` work on Windows.
           npm --prefix desktop run stage:client
 
+      - name: Test all 21 desktop agent setup flows
+        if: runner.os == 'macOS' || runner.os == 'Windows'
+        run: npm --prefix desktop run test:agent-setup
+
       - name: Validate macOS signing credentials
         id: maccreds
         if: runner.os == 'macOS' && startsWith(github.ref, 'refs/tags/')
@@ -538,7 +542,13 @@ jobs:
         run: |
           set -euo pipefail
           ls -l store-package
-          args=(publish store-package --inputDirectory store-package --appId 9PBN6G8K2B7F --output-stream stdout)
+          # Pass the .msix FILE: given a directory, msstore looks for a source
+          # project and fails with "could not find a project publisher".
+          shopt -s nullglob
+          pkgs=(store-package/*.msix)
+          if [ "${#pkgs[@]}" -ne 1 ]; then echo "::error::expected exactly one .msix, found ${#pkgs[@]}"; exit 1; fi
+          # ~160 MB package; the default 100 s blob upload timeout is too tight.
+          args=(publish "${pkgs[0]}" --appId 9PBN6G8K2B7F --uploadTimeout 1800 --output-stream stdout)
           if [ "$MODE" != auto ]; then args+=(--noCommit); fi
           msstore "${args[@]}"
 

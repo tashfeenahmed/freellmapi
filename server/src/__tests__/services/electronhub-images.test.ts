@@ -14,12 +14,17 @@ beforeEach(async () => {
 });
 afterEach(() => { vi.restoreAllMocks(); getDb().close(); });
 describe('ElectronHub image dispatch', () => {
-  it.each(['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0'])('routes catalog-managed %s to the correct image endpoint', async model => {
+  it.each(['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0', 'flux-2-klein-base-4b'])('routes catalog-managed %s to the correct image endpoint', async model => {
     seed(model); const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ model, data: [{ b64_json: image }] }));
     expect(await runImageGeneration(model, { prompt: 'A blue circle' })).toMatchObject({ platform: 'electronhub', modelId: model, images: [{ b64_json: image }] });
     const [url, init] = fetch.mock.calls[0]; expect(url).toBe('https://api.electronhub.ai/v1/images/generations'); expect(init?.redirect).toBe('error');
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer electronhub-synthetic-key');
     expect(JSON.parse(String(init?.body))).toEqual({ model, prompt: 'A blue circle', n: 1, size: '1024x1024', response_format: 'b64_json' });
+  });
+  it('does not send an untested premium image route upstream', async () => {
+    seed('krea-2-raw'); const fetch = vi.spyOn(global, 'fetch');
+    await expect(runImageGeneration('krea-2-raw', { prompt: 'circle' })).rejects.toMatchObject({ status: 400 });
+    expect(fetch).not.toHaveBeenCalled();
   });
   it.each([null, { data: [] }, { model: 'wrong', data: [{ b64_json: 'AAAA' }] }, { data: [{ url: 'http://169.254.169.254/' }] }, { data: [{ b64_json: Buffer.from('{}').toString('base64') }] }, { data: [{ b64_json: Buffer.from([255, 216, 255, 224, 1, 2, 3, 4, 255, 217]).toString('base64') }] }])('rejects invalid responses without following asset URLs %j', async body => {
     seed('qwen-image-2512'); const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json(body));
