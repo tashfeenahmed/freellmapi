@@ -258,6 +258,31 @@ describe('readCappedBody (#488)', () => {
     });
     await expect(readCappedBody(new Response(body))).rejects.toBeInstanceOf(ModelDiscoveryError);
   });
+
+  it('reads a 5 MB catalog within the default 10 MB limit (#1975)', async () => {
+    // A 5 MB catalog would have failed under the legacy 2048 KB limit
+    const largeBody = JSON.stringify({ data: [{ id: 'local-large-catalog' }] }) + ' '.repeat(5 * 1024 * 1024);
+    const res = new Response(largeBody, { headers: { 'content-type': 'application/json' } });
+    const text = await readCappedBody(res);
+    expect(text.startsWith('{"data":[{"id":"local-large-catalog"}]}')).toBe(true);
+  });
+
+  it('respects CUSTOM_MODEL_CATALOG_MAX_MB environment variable override (#1975)', async () => {
+    const prev = process.env.CUSTOM_MODEL_CATALOG_MAX_MB;
+    try {
+      process.env.CUSTOM_MODEL_CATALOG_MAX_MB = '1'; // 1 MB cap
+      const res = new Response('{}', {
+        headers: { 'content-length': String(1.5 * 1024 * 1024) },
+      });
+      await expect(readCappedBody(res)).rejects.toThrow(/larger than 1024 KB/);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.CUSTOM_MODEL_CATALOG_MAX_MB;
+      } else {
+        process.env.CUSTOM_MODEL_CATALOG_MAX_MB = prev;
+      }
+    }
+  });
 });
 
 // #1051: an upstream that returns bare ids gives visionOf nothing to read, so

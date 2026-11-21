@@ -17,9 +17,19 @@ import type { ChatCompletionResponse, ChatMessage, ChatToolDefinition } from '@f
 // the body, cap the list, accept every envelope we've actually seen, and turn
 // any surprise into a clean error instead of a 500.
 
-/** Hard cap on the catalog body we will read. The largest real OpenAI-style
- *  catalog (OpenRouter, ~400 models with metadata) is well under 1 MB. */
-export const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
+/** Hard cap on the catalog body we will read (#488, #1975). Raised default to
+ *  10 MB to accommodate extensive local model listings (Ollama, vLLM, local gateways),
+ *  configurable via CUSTOM_MODEL_CATALOG_MAX_MB. */
+export const DEFAULT_MAX_CATALOG_BYTES = 10 * 1024 * 1024;
+export const MAX_CATALOG_BYTES = DEFAULT_MAX_CATALOG_BYTES;
+
+export function getMaxCatalogBytes(): number {
+  const envVal = Number(process.env.CUSTOM_MODEL_CATALOG_MAX_MB);
+  if (Number.isFinite(envVal) && envVal > 0) {
+    return Math.round(envVal * 1024 * 1024);
+  }
+  return DEFAULT_MAX_CATALOG_BYTES;
+}
 
 /** Hard cap on how many ids we hand back — a checkbox list, not a data dump. */
 export const MAX_DISCOVERED_MODELS = 500;
@@ -410,7 +420,7 @@ export function parseModelCatalog(payload: unknown): DiscoveredModel[] {
  * the moment it runs past the cap, so a base_url pointed at something that
  * never stops can't take the process with it.
  */
-export async function readCappedBody(res: Response, maxBytes = MAX_CATALOG_BYTES): Promise<string> {
+export async function readCappedBody(res: Response, maxBytes = getMaxCatalogBytes()): Promise<string> {
   const tooLarge = () => new ModelDiscoveryError(
     502, `The endpoint's model list is larger than ${Math.round(maxBytes / 1024)} KB — refusing to read it.`,
   );
