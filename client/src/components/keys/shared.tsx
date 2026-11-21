@@ -101,7 +101,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'siliconflow', label: 'SiliconFlow (image + TTS)', url: 'https://siliconflow.com' },
   { value: 'routeway', label: 'Routeway (free key)', url: 'https://routeway.ai' },
   { value: 'bazaarlink', label: 'BazaarLink (free key)', url: 'https://bazaarlink.ai' },
-  { value: 'ainative', label: 'AINative Studio (free key)', url: 'https://ainative.studio' },
+  { value: 'ainative', label: 'AINative Studio (paid credits)', url: 'https://ainative.studio', hidden: true },
   { value: 'aion', label: 'Aion Labs (free key)', url: 'https://www.aionlabs.ai' },
   { value: 'requesty', label: 'Requesty (free key)', url: 'https://www.requesty.ai' },
   { value: 'navy', label: 'NavyAI (free key)', url: 'https://api.navy' },

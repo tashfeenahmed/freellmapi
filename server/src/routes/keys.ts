@@ -49,7 +49,9 @@ export const keysRouter = Router();
 // cannot create a key (#1565, #1768). The API still serves existing keys.
 // Waterfall: users report being unable to create new keys (#1768). A working
 // public site/models endpoint does not establish that key creation works.
-const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall']);
+// AINative Studio: no free tier — its pricing page lists paid plans only
+// (#2019). Existing keys keep working.
+const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall', 'ainative']);
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
