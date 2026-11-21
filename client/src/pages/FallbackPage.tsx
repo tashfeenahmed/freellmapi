@@ -178,6 +178,64 @@ export default function FallbackPage() {
     },
   })
 
+  // Per-model "On" switches persist immediately (#2024), matching the model
+  // detail page and media tabs. Writes are serialized through toggleQueueRef so
+  // rapid clicks never land out of order, and invalidation waits until the last
+  // in-flight toggle settles so an earlier response cannot clobber a newer one.
+  const toggleQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const inFlightTogglesRef = useRef(0)
+
+  const toggleMutation = useMutation({
+    mutationFn: (vars: {
+      profileId: number | null
+      nextEntries: FallbackEntry[]
+      hadStaged: boolean
+    }) => {
+      const payload = vars.nextEntries.map(e => ({
+        modelDbId: e.modelDbId,
+        priority: e.priority,
+        enabled: e.enabled,
+      }))
+      const run = () => apiFetch('/api/fallback', { method: 'PUT', body: JSON.stringify(payload) })
+      const queued = toggleQueueRef.current.then(run, run)
+      toggleQueueRef.current = queued.catch(() => {})
+      return queued
+    },
+    onMutate: ({ profileId, nextEntries, hadStaged }) => {
+      inFlightTogglesRef.current += 1
+      const queryKey = ['fallback', 'chain', profileId] as const
+      void queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<FallbackEntry[]>(queryKey)
+      const previousStaged = hadStaged ? staged : null
+      queryClient.setQueryData(queryKey, nextEntries)
+      if (hadStaged) setLocalEntries(nextEntries)
+      return { profileId, previous, previousStaged, nextEntries, hadStaged }
+    },
+    onError: (_err, _vars, context) => {
+      inFlightTogglesRef.current = Math.max(0, inFlightTogglesRef.current - 1)
+      if (!context) return
+      const queryKey = ['fallback', 'chain', context.profileId] as const
+      if (inFlightTogglesRef.current === 0) {
+        if (context.previous !== undefined) {
+          queryClient.setQueryData(queryKey, context.previous)
+        }
+        if (context.hadStaged) {
+          setStaged(prev => (prev && prev.entries === context.nextEntries ? context.previousStaged : prev))
+        }
+        queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      }
+    },
+    onSuccess: (_data, vars) => {
+      inFlightTogglesRef.current = Math.max(0, inFlightTogglesRef.current - 1)
+      if (vars.hadStaged) {
+        setStaged(prev => (prev && prev.entries === vars.nextEntries ? null : prev))
+      }
+      if (inFlightTogglesRef.current === 0) {
+        queryClient.invalidateQueries({ queryKey: ['fallback'] })
+      }
+    },
+  })
+
   const strategyMutation = useMutation({
     mutationFn: (payload: {
       strategy: RoutingStrategy; weights?: RoutingWeights; exploreEnabled?: boolean
@@ -283,7 +341,12 @@ export default function FallbackPage() {
 
   function handleGroupToggle(memberIds: number[], enabled: boolean) {
     const ids = new Set(memberIds)
-    setLocalEntries(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
+    const nextEntries = allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e))
+    toggleMutation.mutate({
+      profileId: activeProfileId,
+      nextEntries,
+      hadStaged: localEntries !== null,
+    })
   }
 
   // Bulk on/off over what is currently on screen (#895). Curating a chain by
