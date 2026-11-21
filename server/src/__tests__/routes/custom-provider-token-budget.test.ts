@@ -99,6 +99,52 @@ describe('Custom provider monthly token budget (#2030)', () => {
     expect(fbEntry.monthlyTokenBudgetTokens).toBe(30_000_000);
   });
 
+  it('stores a plain digit budget in unit form and rejects text that is not a token budget', async () => {
+    const add = await request(app, 'POST', '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:18085/v1',
+      models: ['digits-model'],
+      apiKey: 'sk-digits-1',
+      monthlyTokenBudget: '30000000',
+    });
+    expect(add.status).toBe(201);
+    const usage = await request(app, 'GET', '/api/fallback/token-usage');
+    expect(usage.body.models.find((m: any) => m.modelId === 'digits-model')?.budget).toBe(30_000_000);
+    const fallback = await request(app, 'GET', '/api/fallback');
+    const row = fallback.body.find((m: any) => m.modelId === 'digits-model');
+    expect(row.monthlyTokenBudget).toBe('30M');
+    expect(row.monthlyTokenBudgetDerived).toBe(false);
+
+    const bad = await request(app, 'POST', '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:18086/v1',
+      models: ['bad-model'],
+      apiKey: 'sk-bad-1',
+      monthlyTokenBudget: '40 RPM',
+    });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.message).toMatch(/monthlyTokenBudget/);
+
+    const badModel = await request(app, 'POST', '/api/models', {
+      platform: 'custom', modelId: 'bad-model-2', monthlyTokenBudget: 'lots',
+    });
+    expect(badModel.status).toBe(400);
+    expect(badModel.body.error.message).toMatch(/monthlyTokenBudget/);
+  });
+
+  it('flags a tpd-derived budget so the model table prints the number, not the empty label', async () => {
+    const add = await request(app, 'POST', '/api/keys/custom', {
+      baseUrl: 'http://127.0.0.1:18087/v1',
+      models: ['derived-model'],
+      apiKey: 'sk-derived-1',
+    });
+    const modelId = add.body.models[0].modelDbId;
+    await request(app, 'PATCH', `/api/models/${modelId}`, { tpdLimit: 100_000 });
+    const fallback = await request(app, 'GET', '/api/fallback');
+    const row = fallback.body.find((m: any) => m.modelDbId === modelId);
+    expect(row.monthlyTokenBudget).toBe('');
+    expect(row.monthlyTokenBudgetTokens).toBe(3_000_000);
+    expect(row.monthlyTokenBudgetDerived).toBe(true);
+  });
+
   it('uses key monthlyTokenCap when custom models have no model-level budget, without double-counting', async () => {
     const add = await request(app, 'POST', '/api/keys/custom', {
       baseUrl: 'http://127.0.0.1:18082/v1',

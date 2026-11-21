@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy } from '../services/router.js';
 import { BANDIT_PRESETS, isValidTimezone, type RoutingStrategy } from '../services/scoring.js';
-import { effectiveMonthlyBudget, monthlyBudgetScore } from '../lib/budget.js';
+import { effectiveMonthlyBudget, monthlyBudgetScore, parseBudget } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
 import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-inspector.js';
 import { getCooldownCeilingMs, setCooldownCeilingMs, MIN_COOLDOWN_CEILING_MS, MAX_COOLDOWN_CEILING_MS } from '../services/ratelimit.js';
@@ -322,6 +322,9 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
       // budget-label parsing; 0 for rate-limited/placeholder labels. See lib/budget.ts.
       // Scaled by healthy/enabled key count for multi-account pooled capacity.
       monthlyTokenBudgetTokens: effectiveMonthlyBudget(r) * Math.max(1, rowKeyCount),
+      // True when the figure comes from tpd_limit × 30 rather than the label
+      // (#2030), so the dashboard prints the number instead of the label text.
+      monthlyTokenBudgetDerived: parseBudget(r.monthly_token_budget ?? '') === 0 && effectiveMonthlyBudget(r) > 0,
       supportsVision: r.supports_vision === 1,
       supportsTools: r.supports_tools === 1,
       // 'discovered' (#1348): fetched from a built-in provider's /models because

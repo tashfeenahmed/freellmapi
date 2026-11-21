@@ -23,6 +23,9 @@ export interface FallbackEntry {
   // Parsed token count from the server (single source of truth — see
   // server/src/lib/budget.ts). Optional only because the dev mock omits it.
   monthlyTokenBudgetTokens?: number
+  // True when the server derived the budget from tpdLimit × 30 because the
+  // label carries no token figure (#2030); show the number, not the label.
+  monthlyTokenBudgetDerived?: boolean
   // Max context length in tokens (catalog value), or null when unrecorded.
   // Drives the catalog context-window filter on the Models page.
   contextWindow?: number | null

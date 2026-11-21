@@ -11,6 +11,7 @@ import { getSyncState } from '../services/catalog-sync.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
+import { budgetInputSchema } from '../lib/budget-input.js';
 import { verifyCredentials, recordReauthFailure, clearReauthFailures } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
@@ -926,7 +927,7 @@ const modelEntrySchema = z.union([
     displayName: z.string().optional(),
     supportsTools: z.boolean().optional(),
     supportsVision: z.boolean().optional(),
-    monthlyTokenBudget: z.string().trim().max(80).optional(),
+    monthlyTokenBudget: budgetInputSchema.optional(),
     tpdLimit: z.number().int().positive().nullable().optional(),
     // #1506: a kind forwarded from discovery metadata (the endpoint's own
     // `type`/metadata) so an id with no media keyword still routes to the
@@ -951,7 +952,7 @@ const customProviderSchema = z.object({
   // (object form) overrides them for that one model.
   supportsTools: z.boolean().optional(),
   supportsVision: z.boolean().optional(),
-  monthlyTokenBudget: z.string().trim().max(80).optional(),
+  monthlyTokenBudget: budgetInputSchema.optional(),
   tpdLimit: z.number().int().positive().nullable().optional(),
   // Endpoint group (#1176). Absent keeps the endpoint's current group; '' moves
   // it back to the single "Custom" group.

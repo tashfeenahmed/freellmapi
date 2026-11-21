@@ -5,6 +5,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { getProvider, hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
+import { budgetInputSchema } from '../lib/budget-input.js';
 import {
   isCatalogManagedModel,
   overriddenFieldNames,
@@ -97,7 +98,7 @@ const createModelSchema = z.object({
   rpdLimit: z.number().int().positive().nullable().optional(),
   tpmLimit: z.number().int().positive().nullable().optional(),
   tpdLimit: z.number().int().positive().nullable().optional(),
-  monthlyTokenBudget: z.string().max(80).optional(),
+  monthlyTokenBudget: budgetInputSchema.optional(),
   supportsVision: z.boolean().optional(),
   supportsTools: z.boolean().optional(),
   keyId: z.number().int().positive().nullable().optional(),
