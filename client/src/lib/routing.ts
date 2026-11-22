@@ -23,6 +23,9 @@ export interface FallbackEntry {
   // Parsed token count from the server (single source of truth — see
   // server/src/lib/budget.ts). Optional only because the dev mock omits it.
   monthlyTokenBudgetTokens?: number
+  // True when the server derived the budget from tpdLimit × 30 because the
+  // label carries no token figure (#2030); show the number, not the label.
+  monthlyTokenBudgetDerived?: boolean
   // Max context length in tokens (catalog value), or null when unrecorded.
   // Drives the catalog context-window filter on the Models page.
   contextWindow?: number | null
@@ -134,7 +137,7 @@ export interface TokenUsageData {
   totalUsed: number
   /** Served smartest-first (intelligenceRank 1 = smartest); the bar and its
    *  legend keep that order. */
-  models: { displayName: string; platform: string; modelId?: string; intelligenceRank?: number; budget: number; used?: number }[]
+  models: { modelDbId?: number; displayName: string; platform: string; modelId?: string; intelligenceRank?: number; budget: number; used?: number }[]
 }
 
 // Custom endpoints all share the generic 'custom' platform id, so show the
@@ -486,6 +489,7 @@ export const platformColors: Record<string, string> = {
   xkiro:       '#a855f7',
   anyapi:      '#0891b2',
   powertokens: '#7c3aed',
+  puter:       '#496bcb',
   cheapllm:    '#c8102e',
   modelscope:  '#624aff',
   aihorde:     '#dc2626',

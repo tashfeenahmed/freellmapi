@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Valitse palveluntarjoaja",
     "addKey": "Lisää avain",
+    "addAnotherKey": "Lisää toinen API-avain",
     "keyAdded": "Avain lisätty",
     "endpointKeysShareModels": "Saman päätepisteen avaimet jakavat sen mallit.",
     "export": "Vienti",

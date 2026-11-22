@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "選擇提供者",
     "addKey": "新增金鑰",
+    "addAnotherKey": "新增另一個 API 金鑰",
     "keyAdded": "金鑰已新增",
     "endpointKeysShareModels": "同一端點的金鑰共用其模型。",
     "export": "匯出",

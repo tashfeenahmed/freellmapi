@@ -245,7 +245,7 @@ export function autoRegistrable(models: DiscoveredModel[], platform?: string): {
   let nonChat = 0;
   let paid = 0;
   for (const model of models) {
-    if (model.kind !== undefined || (platform === 'ovh' && specialistTask(model.id))) { nonChat += 1; continue; }
+    if (model.kind !== undefined || specialistTask(model.id, platform)) { nonChat += 1; continue; }
     if (model.priceNote !== undefined && model.isFree !== true) { paid += 1; continue; }
     if (freePatterns.length > 0 && !freePatterns.some(p => patternMatches(p, model.id))) { paid += 1; continue; }
     accepted.push(model);

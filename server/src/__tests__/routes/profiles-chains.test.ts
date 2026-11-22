@@ -211,6 +211,45 @@ describe('named fallback chains', () => {
     expect(seenFromA.filter(row => row.enabled).length).toBe(2);
   });
 
+  it('saves a single switch into an empty chain so auto:<name> can route (#2024)', async () => {
+    const chain = (await request('POST', '/api/profiles', { name: 'private', empty: true })).body;
+    await request('POST', '/api/profiles/active', { profileId: chain.id });
+    expect(() => resolveRoutingChain('auto:private')).toThrow(/no enabled models/i);
+
+    // What the Models page sends for one click: only that row, at its listed priority.
+    const listed = (await request('GET', `/api/fallback?profile=${chain.id}`)).body as { modelDbId: number; priority: number }[];
+    const pick = listed[3];
+    const saved = await request('PUT', `/api/fallback?profile=${chain.id}`, [
+      { modelDbId: pick.modelDbId, priority: pick.priority, enabled: true },
+    ]);
+    expect(saved.status).toBe(200);
+
+    // Only the clicked row was written, and a fresh read shows it on.
+    expect(chainSize(chain.id)).toBe(1);
+    const reread = (await request('GET', `/api/fallback?profile=${chain.id}`)).body as { modelDbId: number; enabled: boolean }[];
+    expect(reread.filter(r => r.enabled).map(r => r.modelDbId)).toEqual([pick.modelDbId]);
+    expect(() => resolveRoutingChain('auto:private')).not.toThrow();
+  });
+
+  it('pins a save to ?profile= even after another chain was activated (#2024)', async () => {
+    const a = (await request('POST', '/api/profiles', { name: 'pin-a', empty: true })).body;
+    const b = (await request('POST', '/api/profiles', { name: 'pin-b', empty: true })).body;
+    await request('POST', '/api/profiles/active', { profileId: a.id });
+    const listed = (await request('GET', `/api/fallback?profile=${a.id}`)).body as { modelDbId: number; priority: number }[];
+
+    // The click was made on A; B became active before the queued write ran.
+    await request('POST', '/api/profiles/active', { profileId: b.id });
+    const saved = await request('PUT', `/api/fallback?profile=${a.id}`, [
+      { modelDbId: listed[0].modelDbId, priority: listed[0].priority, enabled: true },
+    ]);
+    expect(saved.status).toBe(200);
+    expect(chainSize(a.id)).toBe(1);
+    expect(chainSize(b.id)).toBe(0);
+
+    expect((await request('PUT', '/api/fallback?profile=999999', [])).status).toBe(404);
+    expect((await request('PUT', '/api/fallback?profile=abc', [])).status).toBe(404);
+  });
+
   it('sorts an empty chain into the chain, not the global table (#1021)', async () => {
     const chain = (await request('POST', '/api/profiles', { name: 'sorted', empty: true })).body;
     await request('POST', '/api/profiles/active', { profileId: chain.id });

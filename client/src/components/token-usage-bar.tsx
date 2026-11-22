@@ -63,7 +63,7 @@ export function TokenUsageBar({ data }: { data: TokenUsageData }) {
       <div className="flex h-2.5 rounded-full overflow-hidden bg-muted">
         {rows.map(m => (
           <div
-            key={`${m.platform}:${m.modelId ?? m.displayName}`}
+            key={m.modelDbId ?? `${m.platform}:${m.modelId ?? m.displayName}`}
             title={`${m.displayName} (${m.platform}): ${formatTokens(m.remainingTokens)} ${t('models.remaining')}, ${formatTokens(m.usedTokens)} ${t('models.used')}`}
             style={{
               width: `${m.widthPct}%`,
@@ -87,7 +87,7 @@ export function TokenUsageBar({ data }: { data: TokenUsageData }) {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-1.5 text-xs tabular-nums">
           {rows.map(m => (
-            <div key={`${m.platform}:${m.modelId ?? m.displayName}`} className="flex items-center gap-2 min-w-0">
+            <div key={m.modelDbId ?? `${m.platform}:${m.modelId ?? m.displayName}`} className="flex items-center gap-2 min-w-0">
               <span
                 className="size-2 rounded-sm flex-shrink-0"
                 style={{ backgroundColor: platformColors[m.platform] ?? '#94a3b8' }}

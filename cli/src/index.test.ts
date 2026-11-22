@@ -136,6 +136,15 @@ describe('CLI arguments and launchers', () => {
     expect(fallback.ANTHROPIC_BASE_URL).toBe('http://localhost:3000');
   });
 
+  it('turns off auto mode server review unless the caller set it (#2011)', () => {
+    const defaulted = claudeLaunchEnv(baseOptions, 'unified-key', models, {}, '/home/tester');
+    expect(defaulted.CLAUDE_CODE_AUTO_MODE_SERVER).toBe('0');
+    const empty = claudeLaunchEnv(baseOptions, 'unified-key', models, { CLAUDE_CODE_AUTO_MODE_SERVER: '' }, '/home/tester');
+    expect(empty.CLAUDE_CODE_AUTO_MODE_SERVER).toBe('0');
+    const explicit = claudeLaunchEnv(baseOptions, 'unified-key', models, { CLAUDE_CODE_AUTO_MODE_SERVER: '1' }, '/home/tester');
+    expect(explicit.CLAUDE_CODE_AUTO_MODE_SERVER).toBe('1');
+  });
+
   it('never uses the profile name as a model id', () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'freellmapi-cli-'));
     temporary.push(home);

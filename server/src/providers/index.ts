@@ -16,6 +16,7 @@ import { AIHordeProvider } from './aihorde.js';
 import { ModelScopeProvider } from './modelscope.js';
 import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
+import { PuterProvider } from './puter.js';
 import { SailProvider } from './sail.js';
 import { AclideProvider } from './aclide.js';
 import { SpekaProvider } from './speka.js';
@@ -96,6 +97,7 @@ register(new OpenAICompatProvider({
 // usage beyond that grant is pay-as-you-go. Live-tested 2026-09-01. Model rows
 // stay in Oracle so the existing Premium-now / Free-after-30-days gate applies.
 register(new SailProvider());
+register(new PuterProvider());
 register(new AclideProvider());
 register(new SpekaProvider());
 register(new KenariProvider());
@@ -503,10 +505,9 @@ register(new OpenAICompatProvider({
 }));
 
 // AINative Studio — OpenAI-compatible aggregator (api.ainative.studio/api/v1).
-// Advertises a recurring ~10M tokens/month free allocation (no card), though
-// its own pages disagree on scale; treat the quota as unverified until a real
-// account confirms it. Bearer auth works (X-API-Key also accepted). Catalog
-// rows live in the catalog (premium → age into free).
+// No free tier: its pricing page lists paid plans only (#2019), so the setup
+// checklist stops suggesting it to new users. Bearer auth works (X-API-Key
+// also accepted). Catalog rows live in the catalog (premium → age into free).
 register(new OpenAICompatProvider({
   platform: 'ainative',
   name: 'AINative Studio',

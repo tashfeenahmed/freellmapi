@@ -436,6 +436,7 @@
     "familyHaiku": "هايكو",
     "selectPlatform": "حدد مزودًا",
     "addKey": "إضافة مفتاح",
+    "addAnotherKey": "إضافة مفتاح API آخر",
     "keyAdded": "تمت إضافة المفتاح",
     "endpointKeysShareModels": "المفاتيح لنقطة النهاية نفسها تتشارك نماذجها.",
     "export": "تصدير",
