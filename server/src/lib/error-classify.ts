@@ -5,6 +5,12 @@
 
 export function isRetryableError(err: any): boolean {
   const msg = (err.message ?? '').toLowerCase();
+  // A provider-side rejection the provider layer explicitly marked as such
+  // (providerRejection: 'upstream' | 'request' | 'model') is a fail-over
+  // signal, not a fatal client error: another route in the chain may well
+  // serve the request. Only EXPLICITLY marked 400s qualify — a bare 400 or
+  // 401 stays fatal.
+  if (err?.status === 400 && (err?.providerRejection === 'upstream' || err?.providerRejection === 'request' || err?.providerRejection === 'model')) return true;
   // Trust the upstream HTTP status the provider attached to the error first
   // (providerHttpError in providers/base.ts sets err.status on every adapter).
   // This structured check is the robust primary signal; the message-substring
@@ -15,13 +21,14 @@ export function isRetryableError(err: any): boolean {
   // the chain — because the old code matched specific substrings and ignored
   // err.status for every code except 403. 408 (request timeout), 409 (conflict),
   // 410 (model pulled upstream), 429 (rate limit) and all 5xx are transient or
-  // fail-over-able; 400/401 stay fatal (status 0 here, handled by the absence of a
-  // matching rule) and 403 is handled by isModelAccessForbiddenError below.
+  // fail-over-able. Bare 400 and 401 stay fatal; explicitly marked provider-side
+  // 400s may fail over (see the providerRejection rule at the top). 403 is
+  // handled by isModelAccessForbiddenError below.
   // 422 (notably Mistral's strict validation) is a provider-side request-shape
   // rejection: fail over to another provider, but if the whole chain rejects it
   // exhaustedRetryError renders a client-facing 400 via isProviderBadRequestError.
   const status = typeof err?.status === 'number' ? err.status : 0;
-  if (status === 408 || status === 409 || status === 410 || status === 413 || status === 422 || status === 429 || status >= 500) return true;
+  if (status === 404 || status === 408 || status === 409 || status === 410 || status === 413 || status === 422 || status === 429 || status >= 500) return true;
   if (msg.includes('request too large') || msg.includes('too large for model') || msg.includes('context length') || msg.includes('maximum context')) return true;
   return msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')
     || msg.includes('quota') || msg.includes('resource_exhausted')
@@ -432,7 +439,7 @@ export function isProviderBadRequestError(err: any): boolean {
   if (isProviderDegradedError(err)) return false;
   const status = typeof err?.status === 'number' ? err.status : 0;
   const msg = (err?.message ?? '').toLowerCase();
-  if (status === 400) return msg.includes('api error 400');
+  if (status === 400) return err?.providerRejection === 'upstream' || err?.providerRejection === 'request' || msg.includes('api error 400');
   if (status === 422) return msg.includes('api error 422') || msg.includes('unprocessable entity');
   if (status !== 0) return false;
   return msg.includes('api error 400') || msg.includes('api error 422') || msg.includes('unprocessable entity');
@@ -493,6 +500,38 @@ export function isPaymentRequiredError(err: any): boolean {
     || msg.includes('insufficient balance');
 }
 
+// Extract a structured error code from an error object, independent of which
+// provider layer produced it. Providers attach the machine-readable code in
+// one of three shapes:
+//   - flat:        { code: 'model_not_found' }
+//   - nested body: { error: { code: 'model_not_found' } }
+//   - wrapped:     { body: { error: { code: 'model_not_found' } } }
+// No provider file in this repo sets err.code itself, so the classifier must
+// read the code wherever the provider layer happens to stash it. Returns the
+// lowercased code string, or undefined when the error carries none.
+export function structuredErrorCode(err: any): string | undefined {
+  if (!err || typeof err !== 'object') return undefined;
+  const read = (v: any): string | undefined => {
+    if (typeof v === 'string' && v.trim()) return v.trim().toLowerCase();
+    return undefined;
+  };
+  // Flat shape first — the common case.
+  const flat = read(err.code);
+  if (flat) return flat;
+  // Nested shapes: error.code, body.code, body.error.code, error.body.code.
+  for (const container of [err.error, err.body, err.response, err.data]) {
+    if (!container || typeof container !== 'object') continue;
+    const direct = read(container.code);
+    if (direct) return direct;
+    for (const inner of [container.error, container.body, container.data]) {
+      if (!inner || typeof inner !== 'object') continue;
+      const nested = read(inner.code);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
 // A 404 "model removed/deprecated upstream" error. It's a MODEL-level failure,
 // not a key-level one: every key for the platform will 404 the same way, so the
 // retry loop skips the entire model for the rest of the request instead of
@@ -504,6 +543,12 @@ export function isModelNotFoundError(err: any): boolean {
   // of the request instead of burning one fallback attempt per sibling key. 410
   // added for #339 (Ollama Cloud "Gone"); prefer the structured status when present.
   if (err?.status === 404 || err?.status === 410) return true;
+  // Structured error code from providers (e.g. OpenRouter's { error: { code: 'model_not_found' } }).
+  if (structuredErrorCode(err) === 'model_not_found') return true;
+  // A provider that explicitly marks a 400 as a MODEL rejection says the model
+  // itself is unusable on that route, so every sibling key fails identically —
+  // model-level, not request-level.
+  if (err?.status === 400 && err?.providerRejection === 'model') return true;
   const msg = (err?.message ?? '').toLowerCase();
   return msg.includes('404') || msg.includes('not found') || msg.includes('no endpoints found')
     || msg.includes('410') || msg.includes('gone');

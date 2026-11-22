@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   isRetryableError,
   isTransportError,
+  isModelNotFoundError,
+  isPaymentRequiredError,
+  structuredErrorCode,
   newClientAbortError,
   newHedgeAbortError,
 } from '../../lib/error-classify.js';
@@ -143,5 +146,110 @@ describe('transport errors carried in err.cause', () => {
     it('a generic wrapper with no transport evidence stays non-retryable', () => {
       expect(isTransportError(wrapped(3, new Error('model refused the prompt')))).toBe(false);
     });
+  });
+});
+
+// ── Structured provider error codes ───────────────────────────────────────
+// Regression for the model-lifecycle correction: a provider that answers
+// "this model does not exist" with a MACHINE-READABLE code (not an HTTP 404)
+// must be recognized as model-not-found, so the fallback loop skips the whole
+// model instead of burning one attempt per key. Synthesized here so the
+// contract is covered without any provider file having to set `.code`.
+describe('structured provider error codes', () => {
+  it('treats a nested model_not_found code as model-not-found', () => {
+    const err: any = new Error('Provider request failed');
+    err.status = 400;
+    err.body = { error: { code: 'model_not_found' } };
+    expect(isModelNotFoundError(err)).toBe(true);
+  });
+
+  it('treats a flat model_not_found code as model-not-found', () => {
+    const err: any = new Error('Provider request failed');
+    err.status = 400;
+    err.code = 'model_not_found';
+    expect(isModelNotFoundError(err)).toBe(true);
+  });
+
+  it('treats a body-level model_not_found code as model-not-found', () => {
+    const err: any = new Error('Provider request failed');
+    err.body = { code: 'model_not_found' };
+    expect(isModelNotFoundError(err)).toBe(true);
+  });
+
+  it('keeps a structured model_not_found out of the payment-required bucket', () => {
+    // A 400 must never bench the model+key for a full day.
+    const err: any = new Error('Provider request failed');
+    err.status = 400;
+    err.body = { error: { code: 'model_not_found' } };
+    expect(isPaymentRequiredError(err)).toBe(false);
+  });
+
+  it('does not confuse an unrelated structured code with model-not-found', () => {
+    const err: any = new Error('Provider request failed');
+    err.status = 400;
+    err.body = { error: { code: 'invalid_request_error' } };
+    expect(isModelNotFoundError(err)).toBe(false);
+  });
+
+  it('reads the structured code wherever the provider stashed it', () => {
+    expect(structuredErrorCode({ code: 'model_not_found' })).toBe('model_not_found');
+    expect(structuredErrorCode({ body: { error: { code: 'model_not_found' } } })).toBe('model_not_found');
+    expect(structuredErrorCode({ error: { code: 'MODEL_NOT_FOUND' } })).toBe('model_not_found');
+    expect(structuredErrorCode({ code: '  model_not_found  ' })).toBe('model_not_found');
+    expect(structuredErrorCode({ status: 500 })).toBeUndefined();
+    expect(structuredErrorCode(null)).toBeUndefined();
+    expect(structuredErrorCode('model_not_found')).toBeUndefined();
+  });
+
+  it('falls back to continuation when the code is absent', () => {
+    // Nothing structured to act on → the error is not model-not-found.
+    const err: any = new Error('Provider request failed');
+    err.status = 400;
+    expect(structuredErrorCode(err)).toBeUndefined();
+    expect(isModelNotFoundError(err)).toBe(false);
+  });
+});
+
+describe('HTTP status retryability', () => {
+  it('treats a 404 as retryable so the chain can fail over', () => {
+    const err: any = new Error('Not Found');
+    err.status = 404;
+    expect(isRetryableError(err)).toBe(true);
+  });
+
+  it('treats a 410 as retryable', () => {
+    const err: any = new Error('Gone');
+    err.status = 410;
+    expect(isRetryableError(err)).toBe(true);
+  });
+
+  it('keeps a bare 400 fatal', () => {
+    const err: any = new Error('Bad Request');
+    err.status = 400;
+    expect(isRetryableError(err)).toBe(false);
+  });
+
+  it('keeps a 401 fatal', () => {
+    const err: any = new Error('Invalid API key');
+    err.status = 401;
+    expect(isRetryableError(err)).toBe(false);
+  });
+
+  it('fails over an explicitly marked provider-side 400', () => {
+    for (const kind of ['upstream', 'request', 'model'] as const) {
+      const err: any = new Error('API error 400');
+      err.status = 400;
+      err.providerRejection = kind;
+      expect(isRetryableError(err)).toBe(true);
+    }
+  });
+
+  it('does not bench a marked provider-side 400 as payment-required', () => {
+    // PAYMENT_REQUIRED_COOLDOWN_MS is a full day — a provider-side 400 is a
+    // normal fail-over signal and must never reach that bucket.
+    const err: any = new Error('API error 400');
+    err.status = 400;
+    err.providerRejection = 'upstream';
+    expect(isPaymentRequiredError(err)).toBe(false);
   });
 });
