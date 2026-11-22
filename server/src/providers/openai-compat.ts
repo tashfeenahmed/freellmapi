@@ -115,6 +115,23 @@ function pinnedToolChoiceRetry(options?: CompletionOptions): CompletionOptions |
   return { ...options, tools, tool_choice: 'required' };
 }
 
+const CUSTOM_REASONING_MODEL_RE = /^(?:gpt-5|o[134])(?:$|[-._:])/;
+
+/**
+ * Whether a model on a custom OpenAI-compatible endpoint requires
+ * `max_completion_tokens` instead of `max_tokens` (#2056). OpenAI's GPT-5 and
+ * o-series reasoning models (`gpt-5*`, `o1*`, `o3*`, `o4*`) reject `max_tokens`
+ * with HTTP 400 `unsupported_parameter`, while ordinary Chat Completions models
+ * and open-weight relays (`gpt-4o`, `gpt-4.1`, `gpt-oss-*`, Llama, Qwen,
+ * DeepSeek) expect `max_tokens`. Strips any slash-delimited gateway prefix
+ * (`openai/gpt-5`, `azure:openai/o3-mini`) or leading `openai:` vendor prefix.
+ */
+export function usesCustomMaxCompletionTokens(modelId: string): boolean {
+  const normalized = modelId.trim().toLowerCase();
+  const leaf = normalized.slice(normalized.lastIndexOf('/') + 1).replace(/^openai:/, '');
+  return CUSTOM_REASONING_MODEL_RE.test(leaf);
+}
+
 /**
  * Generic provider for platforms that use an OpenAI-compatible API.
  * Covers: Groq, Cerebras, NVIDIA NIM, Mistral, OpenRouter,
@@ -283,6 +300,21 @@ export class OpenAICompatProvider extends BaseProvider {
     return { temperature: options?.temperature, topP: options?.top_p };
   }
 
+  /** Resolve the output-budget wire field (#2056). Built-in platforms and
+   * ordinary custom models keep `max_tokens`; custom endpoints targeting OpenAI
+   * GPT-5 / o-series reasoning models emit `max_completion_tokens` instead so
+   * upstream does not reject the request with 400 `unsupported_parameter`. When
+   * no budget is resolved, `JSON.stringify` omits the undefined property. */
+  private outputBudgetForModel(
+    modelId: string,
+    options?: CompletionOptions,
+  ): { max_tokens?: number; max_completion_tokens?: number } {
+    const budget = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
+    return this.platform === 'custom' && usesCustomMaxCompletionTokens(modelId)
+      ? { max_completion_tokens: budget }
+      : { max_tokens: budget };
+  }
+
   /**
    * OpenAI-compatible endpoints that are strict about unknown nested fields:
    * Mistral returns 422 for provider-private replay fields, Groq rejects
@@ -382,7 +414,7 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        ...this.outputBudgetForModel(modelId, options),
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
@@ -527,7 +559,7 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        ...this.outputBudgetForModel(modelId, options),
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
