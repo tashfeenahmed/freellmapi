@@ -4,6 +4,11 @@ import { BaseProvider, providerHttpError, type CompletionOptions } from './base.
 
 // Wire IDs only. No route is discovered or enabled without the signed catalog.
 const pinned: Record<string,string> = {
+  "gemini-3.7-flash": "google:google/gemini-3.7-flash",
+  "gpt-4o-mini": "openai:openai/gpt-4o-mini",
+  "qwen3.5-flash": "alibaba:qwen/qwen3.5-flash",
+  "qwen3.5-27b": "alibaba:qwen/qwen3.5-27b",
+  "qwen3.5-35b-a3b": "alibaba:qwen/qwen3.5-35b-a3b",
   "gemini-3.8-flash": "google:google/gemini-3.8-flash",
   "gpt-5.4-nano": "azure:openai/gpt-5.4-nano",
   "qwen3.8-flash": "alibaba:qwen/qwen3.8-flash",

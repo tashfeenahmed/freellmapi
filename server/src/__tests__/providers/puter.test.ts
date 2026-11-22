@@ -7,6 +7,26 @@ import {isClairic} from '../../services/decision.js';
 const model='gemini-3.8-flash', messages=[{role:'user' as const,content:'Hi'}];
 describe('native Puter wire protocol',()=>{
   afterEach(()=>vi.unstubAllGlobals());
+  it.each([
+    ['gemini-3.7-flash', 'google:google/gemini-3.7-flash'],
+    ['gpt-4o-mini', 'openai:openai/gpt-4o-mini'],
+    ['qwen3.5-flash', 'alibaba:qwen/qwen3.5-flash'],
+    ['qwen3.5-27b', 'alibaba:qwen/qwen3.5-27b'],
+    ['qwen3.5-35b-a3b', 'alibaba:qwen/qwen3.5-35b-a3b'],
+  ])('pins %s for both ordinary and streamed chat',async(id,nativeId)=>{
+    const f=vi.fn()
+      .mockResolvedValueOnce(Response.json({result:{message:{content:'Hi'}}}))
+      .mockResolvedValueOnce(new Response('{"type":"text","text":"Hi"}\n{"type":"usage","finish_reason":"stop"}\n'));
+    vi.stubGlobal('fetch',f);
+    const p=new PuterProvider();
+    expect((await p.chatCompletion('test',messages,id)).model).toBe(id);
+    const chunks=[];for await(const chunk of p.streamChatCompletion('test',messages,id)) chunks.push(chunk);
+    expect(chunks.at(-1)?.choices[0].finish_reason).toBe('stop');
+    expect(f.mock.calls.map(([,init])=>JSON.parse(init.body).args)).toEqual([
+      expect.objectContaining({model:nativeId,stream:false,refusalFallback:false}),
+      expect.objectContaining({model:nativeId,stream:true,refusalFallback:false}),
+    ]);
+  });
   it('pins issuer, native ID and refusal behavior; preserves returned usage',async()=>{
     const f=vi.fn().mockResolvedValue(Response.json({result:{message:{content:[{text:'Hi'}]},usage:{prompt_tokens:2,completion_tokens:1}}}));
     vi.stubGlobal('fetch',f);
