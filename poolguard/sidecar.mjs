@@ -58,7 +58,7 @@ function loadCounters() {
     const c = JSON.parse(fs.readFileSync(COUNTERS_FILE, "utf8"));
     if (c.date === dayKey()) return c;
   } catch (_) { /* fresh day or first run */ }
-  return { date: dayKey(), openrouter: 0, google: 0, or402: false, google429: false, rerouted: 0 };
+  return { date: dayKey(), openrouter: 0, google: 0, or402: false, google429: false, rerouted: 0, spentModels: [] };
 }
 
 function saveCounters(c) {
@@ -77,9 +77,9 @@ function estInputTokens(bodyBuf) {
 
 function modelPlatform(model) {
   if (/gemini/i.test(model)) return "google";
-  // OpenRouter ids are "vendor/model" (often ":free"); explicit calls only —
-  // auto: profiles are platform-unknown until the pool picks a member.
-  if (/^[a-z0-9.-]+\/.+$/i.test(model) && !model.startsWith("auto:")) return "openrouter";
+  // 2026-10-22: only ":free"-suffixed ids are the billable-via-OR case; vendor-prefixed
+  // ids (groq openai/..., nvidia moonshotai/...) are OTHER platforms - do not reroute them.
+  if (model.endsWith(":free") || model.startsWith("openrouter/")) return "openrouter";
   return null;
 }
 
@@ -99,7 +99,10 @@ function applyFreeTierGuards(bodyBuf, counters) {
 
   let reason = null;
   // A. oversized input: any OR-explicit or pool-profile request (the pool may pick OR)
-  if ((platform === "openrouter" || isProfile) && estInputTokens(bodyBuf) > OR_INPUT_MAX) {
+  //    v3 (2026-10-24): the lexi lane is OR-free by routing policy (no openrouter
+  //    members in any lexi-* profile; flash carries a 200k ctx) — skip it there
+  const isLexiLane = model === "auto:lexi" || model.startsWith("auto:lexi-");
+  if ((platform === "openrouter" || (isProfile && !isLexiLane)) && estInputTokens(bodyBuf) > OR_INPUT_MAX) {
     reason = `or-input-guard(${estInputTokens(bodyBuf)}>${OR_INPUT_MAX})`;
   }
   // B. daily caps for explicit models
@@ -107,9 +110,15 @@ function applyFreeTierGuards(bodyBuf, counters) {
   if (!reason && platform === "google" && counters.google > GOOGLE_RPD) reason = `google-rpd(${counters.google}>${GOOGLE_RPD})`;
   // C. wall flags block explicit AND profile traffic for the day
   if (!reason && (counters.or402 || counters.google429)) {
-    if (platform === "openrouter" || (isProfile && counters.or402) || (/gemini|google/.test(model) && counters.google429)) {
+    if (platform === "openrouter" || (isProfile && !isLexiLane && counters.or402) || (/gemini|google/.test(model) && counters.google429)) {
       reason = `day-flag(or402=${counters.or402},google429=${counters.google429})`;
     }
+  }
+  // D. 2026-10-24 (Eddie): spent subscription models (e.g. MiniMax coding plan
+  // "Token Plan usage limit reached") must be routed around for the rest of the
+  // day - the smart selector defeats itself retrying a drained member.
+  if (!reason && Array.isArray(counters.spentModels) && counters.spentModels.includes(model)) {
+    reason = `spent-model(${model} plan-limit, rerouted until reset)`;
   }
   if (!reason) return { body: bodyBuf, rerouted: null };
   const rewritten = text.replace(mm[0], `"model":"${SAFE_MODEL}"`);
@@ -117,7 +126,55 @@ function applyFreeTierGuards(bodyBuf, counters) {
   return { body: Buffer.from(rewritten, "utf8"), rerouted: reason };
 }
 
-const state = { requests: 0, retries: 0, absorbed: 0, finalFailures: 0, startedAt: new Date().toISOString(), lastEventAt: null };
+// ── Routing v3 (2026-10-24, Eddie Q2/Q3/Q4): per-fire task-aware Lexi lane ──────
+//
+// The Lexi gateway sends ONE umbrella string (auto:lexi). This sidecar is the only
+// component that sees every fire's body before the pool, so per-fire classification
+// lives HERE: body -> task class -> rewrite model to the class profile
+// auto:lexi-<class>. Writer rides chat (plans/model-routing-v3-enforcing).
+//   lexi-chat   [custom/glm-5.3-flash, cerebras/qwen-3.8-27b]
+//   lexi-coder  [custom/glm-5.3-flash, custom/MiniMax-M3]
+//   lexi-reason [custom/glm-5.3-flash, nvidia/moonshotai/kimi-k3]
+//   lexi-vision [cloudflare/@cf/mistralai/mistral-small-3.1-24b-instruct, zhipu/glm-4.6v-flash]
+// Member ORDER + benches (2 consecutive fails -> 30-min skip, canary un-bench) are
+// jev-lite's job (:3301, projects/jev-lite); the pool's native 3-in-15m/10-min
+// circuit stays as backstop. Classification is deterministic body heuristics:
+// image/audio parts -> vision; code fences or dense code vocabulary -> coder;
+// explicit reasoning vocabulary -> reason; everything else (incl. writer) -> chat.
+
+function classifyTask(bodyText) {
+  if (/"image_url"|"input_image"|"input_audio"/.test(bodyText)) return "vision";
+  const fences = (bodyText.match(/```/g) || []).length;
+  const codeKw = ["def ", "function ", "import ", "class ", "return ", "SELECT ", "npm ", "git ", "traceback", "TypeError", "compile"].filter((k) => bodyText.includes(k)).length;
+  const reasonKw = ["step by step", "think through", "reason", "prove", "derive", "analyz", "strateg", "why does", "explain why", "math"].filter((k) => bodyText.includes(k)).length;
+  if (fences >= 1 || codeKw >= 3) return "coder";
+  if (reasonKw >= 2 && reasonKw > codeKw) return "reason";
+  return "chat";
+}
+
+// classify + rewrite in one pass: umbrella auto:lexi -> auto:lexi-<class>;
+// already-classed strings pass through unchanged. Returns { body, model, cls }.
+function applyLexiRouting(bodyBuf) {
+  const text = bodyBuf.toString("utf8");
+  const m = /"model"\s*:\s*"auto:lexi(?:-([a-z]+))?"/.exec(text);
+  if (!m) return { body: bodyBuf, model: null, cls: null };
+  if (m[1]) return { body: bodyBuf, model: `auto:lexi-${m[1]}`, cls: m[1] };
+  const cls = classifyTask(text);
+  const target = `auto:lexi-${cls}`;
+  return { body: Buffer.from(text.replace(m[0], `"model":"${target}"`), "utf8"), model: target, cls };
+}
+
+// v3 events share the events file but must not touch failure counters (fixloop pages on those)
+function appendEvent(entry) {
+  try {
+    fs.mkdirSync(path.dirname(EVENTS_FILE), { recursive: true });
+    fs.appendFileSync(EVENTS_FILE, JSON.stringify(entry) + "\n");
+  } catch (e) {
+    log(`V3-EVENT-WRITE-FAILED ${e.message}`);
+  }
+}
+
+const state = { requests: 0, retries: 0, absorbed: 0, finalFailures: 0, startedAt: new Date().toISOString(), lastEventAt: null, v3: {} };
 
 function log(msg) {
   console.log(`[poolguard ${new Date().toISOString()}] ${msg}`);
@@ -166,7 +223,12 @@ function upstreamRequest(req, body, cb) {
       port: UPSTREAM_PORT,
       method: req.method,
       path: req.url,
-      headers: { ...req.headers, host: `${UPSTREAM_HOST}:${UPSTREAM_PORT}` },
+      // v3 fix (2026-10-24): the body may have been REWRITTEN between buffering and
+      // forwarding (lexi class routing, billing guards) — Content-Length must describe
+      // the buffer actually written or the pool reads truncated JSON and 400s every
+      // rewritten fire. Latent bug since the 10-21 guards; first caught by v3 smoke.
+      headers: { ...req.headers, host: `${UPSTREAM_HOST}:${UPSTREAM_PORT}`,
+        ...(body ? { "content-length": String(body.length) } : {}) },
     },
     cb,
   );
@@ -191,7 +253,23 @@ const server = http.createServer((req, res) => {
   req.on("error", () => res.destroy());
   req.on("end", () => {
     let body = Buffer.concat(chunks);
-    const noRetry = req.headers["x-poolguard-no-retry"] === "1";
+    // v3: per-fire task classification + rewrite of the Lexi umbrella — BEFORE the
+    // billing guards so they see the final model string (lexi lane is guard-exempt)
+    let lexiCls = null;
+    if (isChatCompletion(req)) {
+      const r3 = applyLexiRouting(body);
+      if (r3.model) {
+        body = r3.body;
+        lexiCls = r3.cls;
+        state.v3[lexiCls] = (state.v3[lexiCls] || 0) + 1;
+        appendEvent({ at: new Date().toISOString(), kind: "v3-fire", class: lexiCls, model: r3.model });
+        log(`V3-FIRE ${r3.model}`);
+      }
+    }
+    // Q4 (2026-10-24): the lexi lane is single-shot — each lexi profile holds exactly
+    // 2 members x 1 key (models.key_id is singular), so one pool send = max 2 upstream
+    // attempts; the pool's exhaustion error passes through VISIBLY, never re-sent here.
+    const noRetry = req.headers["x-poolguard-no-retry"] === "1" || lexiCls !== null;
     const wantsRetry = isChatCompletion(req) && !noRetry;
     state.requests++;
 
@@ -217,7 +295,9 @@ const server = http.createServer((req, res) => {
           return settle(n, 503, Buffer.from(JSON.stringify({ error: { message: `poolguard upstream failure: ${uerr.message}` } })), true, null);
         }
         if (ures.statusCode < 400 || !wantsRetry) {
-          res.writeHead(ures.statusCode, ures.headers);
+          const h = { ...ures.headers };
+          if (lexiCls) h["x-poolguard-class"] = lexiCls;
+          res.writeHead(ures.statusCode, h);
           ures.pipe(res);
           // QA D1 (2026-09-19): upstream socket death mid-streamed 200 must close the
           // caller too — otherwise the client hangs until its own timeout.
@@ -236,15 +316,27 @@ const server = http.createServer((req, res) => {
     function settle(n, status, bodyBuf, connectFailed, headers) {
       const text = bodyBuf.toString("utf8");
       // free-tier wall flags: a 402 (OR credits) or gemini quota 429 trips the day flag
-      if (status === 402 && /openrouter|credits/i.test(text)) {
+      if ((status === 402 || /openrouter[.]ai\/settings\/credits|billing or credits exhausted/i.test(text)) && /openrouter|credits/i.test(text)) {
         const c = loadCounters(); c.or402 = true; saveCounters(c);
         log("WALL-FLAG openrouter 402 credits — OR traffic reroutes for the rest of the day");
       }
       if (status === 429 && /gemini|google/i.test(text)) {
         const c = loadCounters(); c.google429 = true; saveCounters(c);
         log("WALL-FLAG google/gemini 429 quota — google traffic reroutes for the rest of the day");
+      } else if (/Token Plan usage limit/i.test(text)) {
+        // 2026-10-24 (Eddie): spent subscription plan - flag this MODEL for the
+        // day so the selector routes around it until the plan resets.
+        const mm2 = /"model"\s*:\s*"([^"]+)"/.exec(body.toString("utf8"));
+        if (mm2) {
+          const c = loadCounters();
+          if (!Array.isArray(c.spentModels)) c.spentModels = [];
+          if (!c.spentModels.includes(mm2[1])) c.spentModels.push(mm2[1]);
+          saveCounters(c);
+          log(`SPENT-MODEL flagged: ${mm2[1]} (plan limit) - rerouting to ${SAFE_MODEL} until reset`);
+        }
       }
       if (guardNote && headers) headers = { ...headers, "x-poolguard-rerouted": guardNote.slice(0, 60) };
+      if (lexiCls && headers) headers = { ...headers, "x-poolguard-class": lexiCls };
       const exhausted = /all models exhausted/i.test(text);
       const retryable = connectFailed || [429, 500, 502, 503, 504].includes(status) || exhausted;
       // Retry ONLY chat-completion traffic (GATE 3 finding): a replayed non-idempotent admin
@@ -291,4 +383,4 @@ if (isMain) {
   server.listen(LISTEN_PORT, LISTEN_HOST, () => log(`listening on ${LISTEN_HOST ?? "*"}:${LISTEN_PORT} -> ${UPSTREAM_HOST}:${UPSTREAM_PORT} (retry-max ${RETRY_MAX}, wait ${WAIT_MIN_MS}-${WAIT_CAP_MS}ms)`));
 }
 
-export { parseResetEta, retryableExhaustion, isChatCompletion };
+export { parseResetEta, retryableExhaustion, isChatCompletion, classifyTask, applyLexiRouting, applyFreeTierGuards };

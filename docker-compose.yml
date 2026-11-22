@@ -49,8 +49,12 @@ services:
       WAIT_CAP_MS: "45000"
       EVENTS_FILE: /data/poolguard-events.jsonl
       # Free-tier billing guard (2026-10-21, fleet-wide with LexiLava)
-      SAFE_MODEL: "gpt-oss-120b"
-      OR_INPUT_MAX: "16000"
+      SAFE_MODEL: "MiniMax-M3"
+      # Fallback chain when SAFE_MODEL itself is rate-limited (added 2026-10-22).
+      # The guard funnels every oversized request into SAFE_MODEL, so one exhausted
+      # model stalls every large turn on 429. qwen-3.8-27b verified 200 OK.
+      SAFE_FALLBACKS: "qwen-3.8-27b,glm-5.3-flash"
+      OR_INPUT_MAX: "3000"
       OR_RPD: "50"
       GOOGLE_RPD: "250"
       COUNTERS_FILE: /data/poolguard-platform-counters.json
