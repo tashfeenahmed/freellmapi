@@ -15,7 +15,7 @@
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · 全カタログを閲覧: 736 のモデルファミリー、1,313 の無料エンドポイント
 
-[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · **日本語**
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · **日本語** · [Tiếng Việt](README.vi.md)
 
 この翻訳は英語版より遅れることがあります。最新の内容は英語の README を参照してください。
 
