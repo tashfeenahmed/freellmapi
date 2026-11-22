@@ -52,6 +52,39 @@ export function parseBudget(s: string): number {
   return perDay ? tokens * 30 : tokens;
 }
 
+// Effective per-key monthly token budget in tokens. Prefers a parsed
+// `monthly_token_budget` label when present; falls back to `tpd_limit * 30`
+// when a concrete daily token cap is configured (e.g. custom models or local
+// overrides). Returns 0 when neither yields a positive token budget.
+export function effectiveMonthlyBudget(m: {
+  monthly_token_budget?: string | null;
+  tpd_limit?: number | null;
+}): number {
+  const fromLabel = parseBudget(m.monthly_token_budget ?? '');
+  if (fromLabel > 0) return fromLabel;
+  if (m.tpd_limit != null && m.tpd_limit > 0) return m.tpd_limit * 30;
+  return 0;
+}
+
+// A monthly token budget typed by the operator (custom endpoint / custom model
+// forms, #2030). parseBudget needs a K/M unit, so a plain "30000000" would be
+// stored as-is and silently read as "no budget". Plain digit counts are
+// rewritten to the unit form; anything else must already parse to a positive
+// token count. Returns '' for blank input and null when the text is not a
+// token budget (e.g. "40 RPM"), so the route can reject it with a 400.
+export function normalizeBudgetInput(raw: string | undefined | null): string | null {
+  const s = (raw ?? '').trim();
+  if (!s) return '';
+  if (/^\d[\d,_ ]*$/.test(s)) {
+    const n = Number(s.replace(/[,_ ]/g, ''));
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const short = (x: number) => String(parseFloat(x.toFixed(3)));
+    return n >= 1_000_000 ? `${short(n / 1_000_000)}M` : `${short(n / 1_000)}K`;
+  }
+  return parseBudget(s) > 0 ? s : null;
+}
+
+export const BUDGET_INPUT_ERROR = 'monthlyTokenBudget must be a token count such as 30M, 500K/day or 30000000';
 // Sort score for the "budget" preset on the fallback/profiles dashboards.
 // Shares parseBudget so rate-limit labels can't masquerade as budgets: the
 // per-route copies this replaced multiplied the bare number in

@@ -436,6 +436,7 @@
     "familyHaiku": "thơ haiku",
     "selectPlatform": "Chọn nhà cung cấp",
     "addKey": "Thêm khóa",
+    "addAnotherKey": "Thêm khóa API khác",
     "keyAdded": "Đã thêm khóa",
     "endpointKeysShareModels": "Các khóa của cùng một endpoint dùng chung các mô hình của nó.",
     "export": "Xuất khẩu",

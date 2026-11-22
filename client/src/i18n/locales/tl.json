@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Pumili ng provider",
     "addKey": "Add key",
+    "addAnotherKey": "Magdagdag ng isa pang API key",
     "keyAdded": "Idinagdag ang susi",
     "endpointKeysShareModels": "Ang mga susi ng parehong endpoint ay nagbabahagi ng mga modelo nito.",
     "export": "Pag-export",

@@ -460,6 +460,7 @@
     "revoke": "Revoke",
     "selectPlatform": "Select a provider",
     "addKey": "Add key",
+    "addAnotherKey": "Add another API key",
     "keyAdded": "Key added",
     "endpointKeysShareModels": "Keys for the same endpoint share its models.",
     "export": "Export",

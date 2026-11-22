@@ -11,6 +11,7 @@ import { getSyncState } from '../services/catalog-sync.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
+import { budgetInputSchema } from '../lib/budget-input.js';
 import { verifyCredentials, recordReauthFailure, clearReauthFailures } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
@@ -928,6 +929,8 @@ const modelEntrySchema = z.union([
     displayName: z.string().optional(),
     supportsTools: z.boolean().optional(),
     supportsVision: z.boolean().optional(),
+    monthlyTokenBudget: budgetInputSchema.optional(),
+    tpdLimit: z.number().int().positive().nullable().optional(),
     // #1506: a kind forwarded from discovery metadata (the endpoint's own
     // `type`/metadata) so an id with no media keyword still routes to the
     // table that can serve it. Absent, the handler falls back to the
@@ -951,6 +954,8 @@ const customProviderSchema = z.object({
   // (object form) overrides them for that one model.
   supportsTools: z.boolean().optional(),
   supportsVision: z.boolean().optional(),
+  monthlyTokenBudget: budgetInputSchema.optional(),
+  tpdLimit: z.number().int().positive().nullable().optional(),
   // Endpoint group (#1176). Absent keeps the endpoint's current group; '' moves
   // it back to the single "Custom" group.
   groupLabel: z.string().trim().max(80).optional(),
@@ -1417,9 +1422,11 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
   // whatever name it already has on re-registration (see the upsert below).
   const topTools = parsed.data.supportsTools;
   const topVision = parsed.data.supportsVision;
-  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean; kind?: DiscoveredModelKind }[] = [];
+  const topMonthlyTokenBudget = parsed.data.monthlyTokenBudget?.trim() || undefined;
+  const topTpdLimit = parsed.data.tpdLimit;
+  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean; monthlyTokenBudget?: string; tpdLimit?: number | null; kind?: DiscoveredModelKind }[] = [];
   const seen = new Set<string>();
-  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean, kind?: DiscoveredModelKind) => {
+  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean, kind?: DiscoveredModelKind, monthlyTokenBudget?: string, tpdLimit?: number | null) => {
     const modelId = rawId.trim();
     if (!modelId || seen.has(modelId)) return;
     seen.add(modelId);
@@ -1428,13 +1435,15 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
       displayName: rawDisplay?.trim() || null,
       supportsTools: tools ?? topTools,
       supportsVision: vision ?? topVision,
+      monthlyTokenBudget: monthlyTokenBudget?.trim() || topMonthlyTokenBudget,
+      tpdLimit: tpdLimit !== undefined ? tpdLimit : topTpdLimit,
       kind,
     });
   };
   if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
   for (const m of parsed.data.models ?? []) {
     if (typeof m === 'string') addEntry(m);
-    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision, m.kind);
+    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision, m.kind, m.monthlyTokenBudget, m.tpdLimit);
   }
   // A lone model submitted through the plural `models` also carries its name in
   // the top-level `displayName` — that is exactly what the dashboard's custom

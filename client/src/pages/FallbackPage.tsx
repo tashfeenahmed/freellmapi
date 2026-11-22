@@ -149,6 +149,9 @@ export default function FallbackPage() {
   const { data: tokenUsage } = useQuery<TokenUsageData>({
     queryKey: ['fallback', 'token-usage'],
     queryFn: () => apiFetch('/api/fallback/token-usage'),
+    // Proxy traffic moves the used figures without any dashboard mutation to
+    // invalidate this query, so poll it like the routing table (#2030).
+    refetchInterval: 30_000,
   })
 
   const { data: routing } = useQuery<RoutingData>({

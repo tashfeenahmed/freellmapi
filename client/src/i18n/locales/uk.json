@@ -436,6 +436,7 @@
     "familyHaiku": "Хайку",
     "selectPlatform": "Виберіть провайдера",
     "addKey": "Додати ключ",
+    "addAnotherKey": "Додати ще один API-ключ",
     "keyAdded": "Ключ додано",
     "endpointKeysShareModels": "Ключі однієї кінцевої точки спільно використовують її моделі.",
     "export": "Експорт",

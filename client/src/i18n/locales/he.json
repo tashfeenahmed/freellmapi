@@ -436,6 +436,7 @@
     "familyHaiku": "הייקו",
     "selectPlatform": "בחר ספק",
     "addKey": "הוספת מפתח",
+    "addAnotherKey": "הוסף מפתח API נוסף",
     "keyAdded": "מפתח נוסף",
     "endpointKeysShareModels": "מפתחות של אותה נקודת קצה משתפים את המודלים שלה.",
     "export": "יצוא",

@@ -436,6 +436,7 @@
     "familyHaiku": "هایکو",
     "selectPlatform": "ارائه دهنده ای را انتخاب کنید",
     "addKey": "کلید اضافه کنید",
+    "addAnotherKey": "افزودن کلید API دیگر",
     "keyAdded": "کلید اضافه شد",
     "endpointKeysShareModels": "کلیدهای یک نقطه پایانی، مدل‌های آن را به اشتراک می‌گذارند.",
     "export": "صادرات",

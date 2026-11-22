@@ -436,6 +436,7 @@
     "familyHaiku": "हाइकु",
     "selectPlatform": "एक प्रदाता चुनें",
     "addKey": "कुंजी जोड़ें",
+    "addAnotherKey": "एक और API कुंजी जोड़ें",
     "keyAdded": "कुंजी जोड़ी गई",
     "endpointKeysShareModels": "एक ही एंडपॉइंट की कुंजियाँ उसके मॉडल साझा करती हैं।",
     "export": "निर्यात करें",

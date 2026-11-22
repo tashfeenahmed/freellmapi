@@ -436,6 +436,7 @@
     "familyHaiku": "Хайку",
     "selectPlatform": "Изберете доставчик",
     "addKey": "Добави ключ",
+    "addAnotherKey": "Добави друг API ключ",
     "keyAdded": "Добавен ключ",
     "endpointKeysShareModels": "Ключовете за една и съща крайна точка споделят нейните модели.",
     "export": "Износ",

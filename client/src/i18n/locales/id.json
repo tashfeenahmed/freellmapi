@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Pilih penyedia",
     "addKey": "Tambahkan kunci",
+    "addAnotherKey": "Tambahkan kunci API lain",
     "keyAdded": "Kunci ditambahkan",
     "endpointKeysShareModels": "Kunci untuk endpoint yang sama berbagi model-modelnya.",
     "export": "Ekspor",

@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Alege un furnizor",
     "addKey": "Tonul de adăugare",
+    "addAnotherKey": "Adaugă o altă cheie API",
     "keyAdded": "Cheia adăugată",
     "endpointKeysShareModels": "Cheile aceluiași endpoint partajează modelele acestuia.",
     "export": "Export",

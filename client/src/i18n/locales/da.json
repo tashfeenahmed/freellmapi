@@ -436,6 +436,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Vælg en udbyder",
     "addKey": "Tilføj nøgle",
+    "addAnotherKey": "Tilføj en anden API-nøgle",
     "keyAdded": "Nøgle tilføjet",
     "endpointKeysShareModels": "Nøgler til det samme endpoint deler dets modeller.",
     "export": "Eksport",

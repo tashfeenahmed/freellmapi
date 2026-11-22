@@ -9,6 +9,7 @@ import { Tooltip } from '@/components/tooltip'
 import {
   cleanQuotaLabel,
   formatContext,
+  formatTokens,
   groupMaxContext,
   groupQuotaBadge,
   isGroupDepleted,
@@ -240,7 +241,11 @@ export function RowContent({
               as if it were fact. */}
           {[
             (row.monthlyTokenBudgetTokens ?? 0) > 0
-              ? t('models.tokPerMonth', { count: row.monthlyTokenBudget }) + (row.keyCount > 1 ? ` × ${row.keyCount}` : '')
+              ? t('models.tokPerMonth', {
+                  count: row.monthlyTokenBudgetDerived
+                    ? formatTokens((row.monthlyTokenBudgetTokens ?? 0) / Math.max(1, row.keyCount))
+                    : row.monthlyTokenBudget,
+                }) + (row.keyCount > 1 ? ` × ${row.keyCount}` : '')
               : null,
             row.rpmLimit ? t('models.rpmLimit', { count: row.rpmLimit }) : null,
             row.rpdLimit ? t('models.rpdLimit', { count: row.rpdLimit }) : null,

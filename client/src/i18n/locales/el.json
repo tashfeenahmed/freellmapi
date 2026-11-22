@@ -436,6 +436,7 @@
     "familyHaiku": "Χαϊκού",
     "selectPlatform": "Επιλέξτε έναν πάροχο",
     "addKey": "Προσθήκη κλειδιού",
+    "addAnotherKey": "Προσθήκη άλλου κλειδιού API",
     "keyAdded": "Προστέθηκε κλειδί",
     "endpointKeysShareModels": "Τα κλειδιά του ίδιου endpoint μοιράζονται τα μοντέλα του.",
     "export": "Εξαγωγή",

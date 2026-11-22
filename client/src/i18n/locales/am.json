@@ -436,6 +436,7 @@
     "familyHaiku": "ሃይኩ",
     "selectPlatform": "አቅራቢ ይምረጡ",
     "addKey": "ቁልፍ አክል",
+    "addAnotherKey": "ሌላ የAPI ቁልፍ ያክሉ",
     "keyAdded": "ቁልፍ ታክሏል",
     "endpointKeysShareModels": "የአንድ መዳረሻ ቁልፎች ተመሳሳይ ሞዴሎችን ይጋራሉ።",
     "export": "ወደ ውጪ መላክ",

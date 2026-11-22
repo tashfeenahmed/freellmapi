@@ -436,6 +436,7 @@
     "familyHaiku": "ไฮกุ",
     "selectPlatform": "เลือกผู้ให้บริการ",
     "addKey": "เพิ่มรหัส",
+    "addAnotherKey": "เพิ่มคีย์ API อื่น",
     "keyAdded": "เพิ่มคีย์แล้ว",
     "endpointKeysShareModels": "คีย์ของเอนด์พอยต์เดียวกันใช้โมเดลร่วมกัน",
     "export": "ส่งออก",
