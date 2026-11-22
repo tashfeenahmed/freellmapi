@@ -2094,9 +2094,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // heuristic above (text-only) can't see.
   const hasImage = messageHasImage(messages);
   if (hasImage && !hasEnabledVisionModel()) {
-    // Structured log event for RCA of 429/history reinjected (issue #2061)
+    // Structured log event for RCA of 429/history reinjected (issue #2062)
     // Records that a historical chat with images was blocked due to no vision model
-    // Headers help operator distinguish 429 cause: quota vs lack of vision model
+    // when the session history was reinjected. Helps operator distinguish:
+    // - Quota exhaustion (429 with details)
+    // - No vision model available (422 with headers)
+    // Headers added for operator RCA visibility (also covers #2061)
     res.status(422).json({
       error: {
         message: 'This request includes an image, but no vision-capable model is enabled. Enable a vision model (e.g. Gemini 2.5 Flash, Llama 4 Scout) in the Fallback Chain.',
