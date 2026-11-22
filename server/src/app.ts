@@ -352,7 +352,11 @@ export function createApp(config?: Config) {
       }
       // Same no-cache policy as the statically-served index.html: SPA deep
       // links must revalidate so a redeploy propagates new asset URLs.
-      res.sendFile(path.join(clientDist, 'index.html'), {
+      // Path MUST be root-relative: send 1.x flags any absolute path that has
+      // a dot-segment (e.g. clientDist under /root/.hermes/…) as a dotfile
+      // and 404s it, silently breaking the SPA fallback.
+      res.sendFile('index.html', {
+        root: clientDist,
         headers: { 'Cache-Control': 'no-cache' },
       });
     });
