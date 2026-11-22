@@ -25,6 +25,7 @@ beforeEach(() => {
   vi.stubEnv('XDG_DATA_HOME', '');
   vi.stubEnv('MIMOCODE_HOME', '');
   vi.stubEnv('DSH_HOME', '');
+  vi.stubEnv('GOOSE_PATH_ROOT', '');
   vi.stubEnv('OPENCLAW_HOME', '');
   vi.stubEnv('OPENCLAW_STATE_DIR', '');
   vi.stubEnv('OPENCLAW_CONFIG_PATH', '');
@@ -33,7 +34,10 @@ beforeEach(() => {
   vi.stubEnv('REASONIX_HOME', '');
   // Reasonix keeps its home under %APPDATA% on Windows instead of ~/.reasonix;
   // pin it so asPosix can map that home back to the POSIX golden (#1392).
-  if (process.platform === 'win32') vi.stubEnv('APPDATA', WIN_APPDATA);
+  if (process.platform === 'win32') {
+    vi.stubEnv('APPDATA', WIN_APPDATA);
+    vi.stubEnv('LOCALAPPDATA', 'C:\\Users\\tester\\AppData\\Local');
+  }
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -70,7 +74,10 @@ const context: GenerateContext = {
 const WIN_APPDATA = 'C:\\Users\\tester\\AppData\\Roaming';
 function asPosix(p: string): string {
   if (process.platform !== 'win32') return p;
-  return p.replaceAll('\\', '/').replace('C:/Users/tester/AppData/Roaming/reasonix', '/home/tester/.reasonix');
+  return p.replaceAll('\\', '/')
+    .replace('C:/Users/tester/AppData/Local/hermes', '/home/tester/.hermes')
+    .replace('C:/Users/tester/AppData/Roaming/Block/goose/config', '/home/tester/.config/goose')
+    .replace('C:/Users/tester/AppData/Roaming/reasonix', '/home/tester/.reasonix');
 }
 
 // Snapshots embed the generated file paths verbatim; normalize them so the
@@ -396,7 +403,10 @@ describe('tool generators', () => {
   it('declares a complete DeepSeek Harness route and claims the default model', () => {
     const dsh = tools.find(tool => tool.id === 'dsh')!;
     const generation = dsh.generate(context);
-    const [settings, env] = generation.files;
+    const [settings, env, patch] = generation.files;
+    expect(asPosix(patch.path)).toBe('/home/tester/.dsh/cordis.patch.yml');
+    expect(patch.format).toBe('yaml-entries');
+    expect(patch.value).toEqual(settings.value);
     expect(asPosix(settings.path)).toBe('/home/tester/.dsh/settings.yaml');
     expect(settings.format).toBe('yaml');
     const value = settings.value as {

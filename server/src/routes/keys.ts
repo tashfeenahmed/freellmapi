@@ -1,3 +1,4 @@
+import { speechFlowCredentials } from '../providers/speechflow.js';
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
@@ -10,6 +11,7 @@ import { getSyncState } from '../services/catalog-sync.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
+import { budgetInputSchema } from '../lib/budget-input.js';
 import { verifyCredentials, recordReauthFailure, clearReauthFailures } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
@@ -36,6 +38,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import { parseModelScope } from '../lib/model-scope.js';
 import { KEY_PROXY_URL_ERROR, KEY_PROXY_URL_MAX, decryptProxyUrl, encryptProxyUrl, isValidKeyProxyUrl, maskProxyUrl } from '../lib/key-proxy.js';
 import { isLoopbackRequest } from '../lib/loopback.js';
+import { availableKeylessProviders, dismissAvailableKeylessProviders, enableAvailableKeylessProviders } from '../services/keyless-defaults.js';
 
 export const keysRouter = Router();
 
@@ -47,7 +50,9 @@ export const keysRouter = Router();
 // cannot create a key (#1565, #1768). The API still serves existing keys.
 // Waterfall: users report being unable to create new keys (#1768). A working
 // public site/models endpoint does not establish that key creation works.
-const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall']);
+// AINative Studio: no free tier — its pricing page lists paid plans only
+// (#2019). Existing keys keep working.
+const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall', 'ainative']);
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
@@ -73,6 +78,8 @@ const PLATFORMS = [
   'zro',
   'novai',
   'varosity',
+  'speechflow',
+  'meldport',
   'rime',
   'typecast',
   'cartesia',
@@ -93,7 +100,7 @@ const PLATFORMS = [
   'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare', 'bai', 'radeon', 'nvidia', 'mistral',
   'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
-  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'powertokens', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
+  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'powertokens', 'cheapllm', 'puter', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
   'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'custom',
 ] as const;
 
@@ -781,6 +788,20 @@ keysRouter.post('/:id/reveal', (req: Request, res: Response) => {
   }
 });
 
+// #1870: no-key providers this install's catalog offers but it has not added.
+keysRouter.get('/keyless-available', (_req: Request, res: Response) => {
+  res.json({ providers: availableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/enable', (_req: Request, res: Response) => {
+  res.json({ enabled: enableAvailableKeylessProviders() });
+});
+
+keysRouter.post('/keyless-available/dismiss', (_req: Request, res: Response) => {
+  dismissAvailableKeylessProviders();
+  res.json({ ok: true });
+});
+
 // Add a key
 keysRouter.post('/', (req: Request, res: Response) => {
   const parsed = addKeySchema.safeParse(req.body);
@@ -794,6 +815,10 @@ keysRouter.post('/', (req: Request, res: Response) => {
   const isKeyless = resolveProvider(platform)?.keyless === true;
   const rawKey = parsed.data.key?.trim() ?? '';
 
+  if (platform === 'speechflow' && !speechFlowCredentials(rawKey)) {
+    res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+    return;
+  }
   if (!isKeyless && !rawKey) {
     res.status(400).json({ error: { message: 'key is required' } });
     return;
@@ -904,6 +929,8 @@ const modelEntrySchema = z.union([
     displayName: z.string().optional(),
     supportsTools: z.boolean().optional(),
     supportsVision: z.boolean().optional(),
+    monthlyTokenBudget: budgetInputSchema.optional(),
+    tpdLimit: z.number().int().positive().nullable().optional(),
     // #1506: a kind forwarded from discovery metadata (the endpoint's own
     // `type`/metadata) so an id with no media keyword still routes to the
     // table that can serve it. Absent, the handler falls back to the
@@ -927,6 +954,8 @@ const customProviderSchema = z.object({
   // (object form) overrides them for that one model.
   supportsTools: z.boolean().optional(),
   supportsVision: z.boolean().optional(),
+  monthlyTokenBudget: budgetInputSchema.optional(),
+  tpdLimit: z.number().int().positive().nullable().optional(),
   // Endpoint group (#1176). Absent keeps the endpoint's current group; '' moves
   // it back to the single "Custom" group.
   groupLabel: z.string().trim().max(80).optional(),
@@ -1393,9 +1422,11 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
   // whatever name it already has on re-registration (see the upsert below).
   const topTools = parsed.data.supportsTools;
   const topVision = parsed.data.supportsVision;
-  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean; kind?: DiscoveredModelKind }[] = [];
+  const topMonthlyTokenBudget = parsed.data.monthlyTokenBudget?.trim() || undefined;
+  const topTpdLimit = parsed.data.tpdLimit;
+  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean; monthlyTokenBudget?: string; tpdLimit?: number | null; kind?: DiscoveredModelKind }[] = [];
   const seen = new Set<string>();
-  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean, kind?: DiscoveredModelKind) => {
+  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean, kind?: DiscoveredModelKind, monthlyTokenBudget?: string, tpdLimit?: number | null) => {
     const modelId = rawId.trim();
     if (!modelId || seen.has(modelId)) return;
     seen.add(modelId);
@@ -1404,13 +1435,15 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
       displayName: rawDisplay?.trim() || null,
       supportsTools: tools ?? topTools,
       supportsVision: vision ?? topVision,
+      monthlyTokenBudget: monthlyTokenBudget?.trim() || topMonthlyTokenBudget,
+      tpdLimit: tpdLimit !== undefined ? tpdLimit : topTpdLimit,
       kind,
     });
   };
   if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
   for (const m of parsed.data.models ?? []) {
     if (typeof m === 'string') addEntry(m);
-    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision, m.kind);
+    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision, m.kind, m.monthlyTokenBudget, m.tpdLimit);
   }
   // A lone model submitted through the plural `models` also carries its name in
   // the top-level `displayName` — that is exactly what the dashboard's custom
@@ -1944,6 +1977,10 @@ keysRouter.patch('/:id', (req: Request, res: Response) => {
     // Key-optional platforms (Kilo, OVH, AI Horde) accept a real key here like
     // any other provider: it replaces the anonymous sentinel (#1331).
 
+    if (stored.platform === 'speechflow' && !speechFlowCredentials(key)) {
+      res.status(400).json({ error: { message: 'SpeechFlow requires keyId:keySecret' } });
+      return;
+    }
     if (stored.platform === 'cloudflare') {
       const separator = key.indexOf(':');
       if (separator < 1 || !key.slice(0, separator).trim() || !key.slice(separator + 1).trim()) {

@@ -20,6 +20,8 @@ export interface CustomModelEntry {
   displayName: string | null;
   supportsTools?: boolean;
   supportsVision?: boolean;
+  monthlyTokenBudget?: string;
+  tpdLimit?: number | null;
 }
 
 export interface RegisteredCustomModel {
@@ -92,7 +94,7 @@ export function registerCustomChatModels(
   const seed = customModelSeed(db);
 
   const registered: RegisteredCustomModel[] = [];
-  for (const { modelId, displayName, supportsTools, supportsVision } of entries) {
+  for (const { modelId, displayName, supportsTools, supportsVision, monthlyTokenBudget, tpdLimit } of entries) {
     // #926: this is an EXPLICIT registration (POST /custom, bulk importer or
     // the dashboard's "Fetch models" submit), so it overrides a previous
     // deletion. The scheduled sync never reaches this loop for a tombstoned
@@ -106,6 +108,8 @@ export function registerCustomChatModels(
     const bindKeyId = bound?.key_id != null && endpointKeyIds.has(bound.key_id) ? bound.key_id : keyId;
     const toolsParam = supportsTools === undefined ? null : (supportsTools ? 1 : 0);
     const visionParam = supportsVision === undefined ? null : (supportsVision ? 1 : 0);
+    const budgetParam = monthlyTokenBudget?.trim() ? monthlyTokenBudget.trim() : null;
+    const tpdParam = tpdLimit != null && tpdLimit > 0 ? tpdLimit : null;
     // The seed applies on INSERT only: DO UPDATE deliberately leaves the rank
     // columns alone so re-registering a model (or bulk-adding alongside it)
     // never rewrites ranks the operator has since tuned by hand.
@@ -115,17 +119,20 @@ export function registerCustomChatModels(
          rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window, enabled, key_id,
          supports_tools, supports_vision, source, endpoint_scope)
       VALUES ('custom', @modelId, COALESCE(@displayName, @modelId), @intelligenceRank, @speedRank, @sizeLabel,
-         NULL, NULL, NULL, NULL, '', NULL, 1, @keyId,
+         NULL, NULL, NULL, @tpdLimit, COALESCE(@monthlyTokenBudget, ''), NULL, 1, @keyId,
          COALESCE(@tools, 1), COALESCE(@vision, 0), 'user', @endpointScope)
       ON CONFLICT(platform, model_id, endpoint_scope)
       DO UPDATE SET
         display_name = COALESCE(@displayName, display_name),
         key_id = excluded.key_id,
         enabled = 1,
+        tpd_limit = COALESCE(@tpdLimit, tpd_limit),
+        monthly_token_budget = COALESCE(@monthlyTokenBudget, monthly_token_budget),
         supports_tools = COALESCE(@tools, supports_tools),
         supports_vision = COALESCE(@vision, supports_vision)
     `).run({
       modelId, displayName, keyId: bindKeyId, tools: toolsParam, vision: visionParam,
+      monthlyTokenBudget: budgetParam, tpdLimit: tpdParam,
       intelligenceRank: seed.intelligenceRank, speedRank: seed.speedRank, sizeLabel: seed.sizeLabel,
       endpointScope,
     });

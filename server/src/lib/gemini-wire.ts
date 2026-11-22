@@ -97,7 +97,7 @@ const UNSUPPORTED_SCHEMA_KEYS = new Set([
   'additionalProperties',
   'examples', 'const', 'readOnly', 'writeOnly',
   'uniqueItems',
-  'not', 'allOf', 'oneOf',
+  'not',
   'prefixItems',
   'contains', 'minContains', 'maxContains',
   'propertyNames',
@@ -162,6 +162,7 @@ function sanitizeSchema(schema: unknown, insidePropertiesMap: boolean, ctx: Sani
   const out: Record<string, unknown> = {};
   let nullable = false;
   let inlined: Record<string, unknown> | undefined;
+  let allOfBranches: Record<string, unknown>[] = [];
   const hasItems = 'items' in schema || 'prefixItems' in schema;
   for (const [key, value] of Object.entries(schema as Record<string, unknown>)) {
     if (insidePropertiesMap) {
@@ -178,6 +179,22 @@ function sanitizeSchema(schema: unknown, insidePropertiesMap: boolean, ctx: Sani
       }
       continue;
     }
+    // Gemini has no oneOf/allOf (#1874). oneOf becomes anyOf, which Gemini
+    // takes: "exactly one" loosens to "at least one", but the branch shapes
+    // reach the model instead of an empty schema. allOf means every branch
+    // applies at once, so its branches merge into this schema below.
+    if (key === 'oneOf' || key === 'allOf') {
+      const branches = Array.isArray(value)
+        ? value.filter(isSchemaObject).map(branch => sanitizeSchema(branch, false, ctx) as Record<string, unknown>)
+        : [];
+      if (key === 'oneOf') {
+        const kept = branches.filter(branch => Object.keys(branch).length > 0);
+        if (kept.length > 0 && kept.length === branches.length && !('anyOf' in schema)) out.anyOf = kept;
+      } else {
+        allOfBranches = branches;
+      }
+      continue;
+    }
     if (key === 'type' && Array.isArray(value)) {
       const collapsed = collapseTypeUnion(value, hasItems);
       if (collapsed.type !== undefined) out.type = collapsed.type;
@@ -191,7 +208,8 @@ function sanitizeSchema(schema: unknown, insidePropertiesMap: boolean, ctx: Sani
   if (nullable) out.nullable = true;
   // Keywords written alongside a `$ref` (description, overrides) win over the
   // definition they point at.
-  const merged = inlined ? { ...inlined, ...out } : out;
+  let merged = inlined ? { ...inlined, ...out } : out;
+  if (allOfBranches.length > 0) merged = mergeAllOf(allOfBranches, merged);
   // A `properties` map is keyed by parameter names, not keywords; a tool
   // param literally named `items` or `type` must not be read as a schema.
   if (insidePropertiesMap) return merged;
@@ -239,6 +257,29 @@ function normalizeArrayItems(
     else delete merged.items;
   }
   return merged;
+}
+
+// Merge allOf branches (already sanitized) under the schema that holds them.
+// Properties and required lists combine; for any other keyword the holding
+// schema wins, then the earlier branch.
+function mergeAllOf(branches: Record<string, unknown>[], own: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  const properties: Record<string, unknown> = {};
+  const required: string[] = [];
+  for (const source of [...branches, own]) {
+    for (const [key, value] of Object.entries(source)) {
+      if (key === 'properties' && isSchemaObject(value)) Object.assign(properties, value);
+      else if (key === 'required' && Array.isArray(value)) {
+        for (const name of value) if (typeof name === 'string' && !required.includes(name)) required.push(name);
+      } else if (source === own || !(key in result)) result[key] = value;
+    }
+  }
+  if (Object.keys(properties).length > 0) {
+    result.properties = properties;
+    if (result.type === undefined) result.type = 'object';
+  }
+  if (required.length > 0) result.required = required;
+  return result;
 }
 
 function isSchemaObject(value: unknown): value is Record<string, unknown> {

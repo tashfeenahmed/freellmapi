@@ -387,6 +387,14 @@ export function claudeLaunchEnv(
     ANTHROPIC_DEFAULT_HAIKU_MODEL: selected,
     CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: '1',
   });
+  // #2011: auto mode's server-side review cannot run behind this gateway (the
+  // routed models are not Anthropic's). Anthropic documents
+  // CLAUDE_CODE_AUTO_MODE_SERVER=0 for that case: Claude Code checks actions
+  // with its own classifier requests through the gateway and does not show
+  // the "isn't eligible" notice. An explicit value in the caller's shell wins.
+  if (env.CLAUDE_CODE_AUTO_MODE_SERVER === undefined || env.CLAUDE_CODE_AUTO_MODE_SERVER === '') {
+    env.CLAUDE_CODE_AUTO_MODE_SERVER = '0';
+  }
   // Only pin the compaction window when the catalog actually published one.
   // The old `?? 128_000` invented a number for every model with no stated
   // window, and a wrong window is worse than none: too high and Claude Code

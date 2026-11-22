@@ -165,8 +165,9 @@ interface AnthropicMessageResponse {
   stop_reason: AnthropicStopReason;
   stop_sequence: string | null;
   usage: { input_tokens: number; output_tokens: number };
-  // Upstream-supplied classifier results (#1589). Present only when the
-  // routed provider actually returned them; never synthesized here.
+  // Classifier results (#1589, #2011): the routed provider's own results,
+  // unchanged, or the "unsupported" status when the client asked for the
+  // review and no provider answered. See safeguardResultsFor. Never a verdict.
   safeguard_results?: unknown;
 }
 
@@ -190,6 +191,46 @@ export function extractAnthropicCompat(
   const value = Array.isArray(beta) ? beta.join(', ') : beta;
   if (typeof value === 'string' && value.length > 0) out.anthropicBeta = value;
   return out;
+}
+
+// Claude Code's auto mode asks the server to review tool calls with a
+// `safeguards` entry of this type (#2011). The reply carries a
+// `safeguard_results` entry of the same type.
+export const AUTO_MODE_SAFEGUARD_TYPE = 'dangerous_tool_use';
+
+/** True when the request asks the server to run auto mode's tool-call review. */
+export function requestsAutoModeReview(compat: AnthropicCompatMetadata | undefined): boolean {
+  const safeguards = compat?.safeguards;
+  return Array.isArray(safeguards) && safeguards.some(
+    (entry) => typeof entry === 'object' && entry !== null
+      && (entry as { type?: unknown }).type === AUTO_MODE_SAFEGUARD_TYPE,
+  );
+}
+
+/**
+ * The `safeguard_results` value to send back, or undefined to omit it (#2011).
+ *
+ * Upstream results, when a provider sends any, go back unchanged (#1589).
+ * Otherwise, when Claude Code asked for the review, the answer is the
+ * protocol's own "this server does not run the review" status:
+ * `{type: 'dangerous_tool_use', status: {type: 'unsupported'}}`. That is a
+ * true statement about this gateway: the routed models are not Anthropic's
+ * and no Anthropic review runs here. It is not a verdict. Claude Code reads it
+ * as "the API answered unsupported" and checks the session's actions with its
+ * own classifier requests, which also come through this gateway. It never
+ * marks an action as reviewed.
+ */
+export function safeguardResultsFor(
+  compat: AnthropicCompatMetadata | undefined,
+  upstream: unknown,
+): unknown {
+  if (upstream !== undefined) return upstream;
+  if (!requestsAutoModeReview(compat)) return undefined;
+  return [{ type: AUTO_MODE_SAFEGUARD_TYPE, status: { type: 'unsupported' } }];
+}
+
+function withSafeguardResults(value: unknown): { safeguard_results?: unknown } {
+  return value === undefined ? {} : { safeguard_results: value };
 }
 
 function sendError(res: Response, status: number, errorType: string, message: string): void {
@@ -719,14 +760,15 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
-  const hedgeAbort = new AbortController();
+  // `let`: abortInFlight aborts only the in-flight attempt and replaces the
+  // controller, so a silent-window failover gets a fresh signal (#1960).
+  let hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
       clientAbort.abort(newClientAbortError());
     }
   });
-  const dispatchOptions = { ...completionOptions, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) };
 
   // Decision routing (#1354): with the 'decision' strategy on, a decision
   // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
@@ -741,7 +783,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
     attemptLog,
     logIdentity: { surface: 'anthropic messages', requestedModel },
     clientGone: () => clientGone,
-    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
+    abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
+    streaming: stream === true,
     route: () => {
       // Task-type routing (#1127): same header/derivation as /chat/completions.
       const taskType = resolveTaskType(req, tools, messages);
@@ -753,7 +796,8 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
     },
     dispatch: async (route, attempt, dispatchCtx) => {
       const contextBudget = routeOutputBudget(route, estimatedInputTokens);
-      const routeOptions = { ...dispatchOptions, contextBudget };
+      // Signal composed per attempt: hedgeAbort is replaced after each abort.
+      const routeOptions = { ...completionOptions, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]), contextBudget };
       if (stream) {
         try {
           await streamCompletion(res, route, messages, routeOptions, {
@@ -850,10 +894,10 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
         stop_reason: mapStopReason(result.choices?.[0]?.finish_reason ?? null, respToolCalls.length > 0),
         stop_sequence: null,
         usage: { input_tokens: promptTokens, output_tokens: completionTokens },
-        // #1589: return upstream-supplied classifier results verbatim. Absent
-        // when the routed provider sent none — never fabricated. Preserving
-        // metadata alone does not establish server-side classifier eligibility.
-        ...(result.safeguard_results !== undefined ? { safeguard_results: result.safeguard_results } : {}),
+        // #1589/#2011: upstream classifier results unchanged; else, when the
+        // client asked for the review, the protocol's "unsupported" status.
+        // Never a verdict.
+        ...withSafeguardResults(safeguardResultsFor(anthropicCompat, result.safeguard_results)),
       };
 
       res.setHeader('X-Routed-Via', routedViaValue(route.platform, route.modelId));
@@ -931,7 +975,7 @@ async function streamCompletion(
   let upstreamFinish: string | null = null;
   let upstreamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
   // #1589: classifier results arriving on a stream chunk, carried to
-  // message_delta verbatim. Absent unless the upstream sent them.
+  // message_delta.delta verbatim (#2011 moved them into `delta`).
   let upstreamSafeguardResults: unknown;
   let sawSafeguardResults = false;
   const toolAcc = new Map<number, { id?: string; name: string; args: string; thought_signature?: string }>();
@@ -1213,11 +1257,19 @@ async function streamCompletion(
       : { output_tokens: outputTokens };
     writeSse(res, 'message_delta', {
       type: 'message_delta',
-      delta: { stop_reason: stopReason, stop_sequence: null },
+      // #1589/#2011: classifier results go INSIDE `delta`, where the
+      // Anthropic stream puts them and where Claude Code reads them
+      // (`message_delta.delta.safeguard_results`). Upstream results are
+      // unchanged; else the "unsupported" status when the client asked.
+      delta: {
+        stop_reason: stopReason,
+        stop_sequence: null,
+        ...withSafeguardResults(safeguardResultsFor(
+          options?.anthropicCompat as AnthropicCompatMetadata | undefined,
+          sawSafeguardResults ? upstreamSafeguardResults : undefined,
+        )),
+      },
       usage: deltaUsage,
-      // #1589: upstream-supplied classifier results, verbatim; omitted when
-      // the upstream sent none — never fabricated.
-      ...(sawSafeguardResults ? { safeguard_results: upstreamSafeguardResults } : {}),
     });
     writeSse(res, 'message_stop', { type: 'message_stop' });
     res.end();

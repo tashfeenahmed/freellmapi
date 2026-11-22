@@ -1,3 +1,4 @@
+import { listSpecialists, serveSpecialist } from '../services/specialist-text.js';
 import crypto from 'crypto';
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -288,6 +289,16 @@ function getSessionKey(messages: ChatMessage[], sessionIdHeader?: string, strate
   if (!text) return '';
   const payload = strategyKey ? `${text}::${strategyKey}` : text;
   return crypto.createHash('sha1').update(payload).digest('hex');
+}
+
+// #1890: the reasoning memory (#797) and the context-handoff store replay what
+// one request left behind into a later one. Their key comes from the session
+// header or the first user message, which two callers can share, so prefix it
+// with the caller's credential: a client-profile key must never read state that
+// another profile's (or the unified key's) traffic wrote.
+function callerScopedSessionKey(auth: ResolvedAuth, sessionKey: string): string {
+  if (!sessionKey) return '';
+  return auth.kind === 'profile' ? `profile:${auth.profileId}:${sessionKey}` : `unified:${sessionKey}`;
 }
 
 export function getStickyModel(messages: ChatMessage[], sessionIdHeader?: string, strategyKey?: string): number | undefined {
@@ -1062,6 +1073,18 @@ async function handleDecision(req: Request, res: Response): Promise<void> {
   }
 }
 
+proxyRouter.get('/text/models', (req, res) => {
+  if (requireInferenceAuth(req, res)) res.json({object:'list', data:listSpecialists()});
+});
+for (const [path, task] of [['translate','translation'], ['summarize','summarization']] as const) {
+  proxyRouter.post('/text/'+path, async (req, res) => {
+    const auth = requireInferenceAuth(req, res);
+    if (!auth) return;
+    if (auth.systemPrompt) { res.status(403).json({error:{message:'A profile requiring a system prompt cannot use a fixed-task specialist.'}}); return; }
+    await serveSpecialist(task, req, res);
+  });
+}
+
 proxyRouter.post('/decisions', handleDecision);
 proxyRouter.post('/systemone', handleDecision);
 
@@ -1546,7 +1569,9 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
-  const hedgeAbort = new AbortController();
+  // `let`: abortInFlight aborts only the in-flight attempt and replaces the
+  // controller, so a silent-window failover gets a fresh signal (#1960).
+  let hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
@@ -1563,7 +1588,8 @@ proxyRouter.post('/completions', async (req: Request, res: Response) => {
     attemptLog,
     logIdentity: { surface: 'legacy completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
-    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
+    abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
+    streaming: stream === true,
     route: () => {
       // #507: see inbound-chat.ts — inflate the routing estimate from any
       // provider-reported REQUESTED size latched onto state so the existing
@@ -2406,7 +2432,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // be semantically wrong.
   const isAutoRouted = !requestedModel || isAutoModel(requestedModel);
   const handoffMode = isAutoRouted ? getContextHandoffMode() : ('off' as const);
-  const sessionKey = handoffMode !== 'off' ? getSessionKey(sessionMessages, sessionIdHeader, strategyKey) : '';
+  const rawSessionKey = handoffMode !== 'off' ? getSessionKey(sessionMessages, sessionIdHeader, strategyKey) : '';
+  const sessionKey = callerScopedSessionKey(auth, rawSessionKey);
   if (handoffMode !== 'off' && sessionKey) {
     recordIncomingMessages(sessionKey, messages);
   }
@@ -2420,10 +2447,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Header-less clients are covered: without x-session-id, getSessionKey hashes
   // the FIRST user message, which does not change as the conversation grows —
   // the same stability sticky sessions already rely on. Its known weakness is
-  // shared here: two conversations opening with identical text share a key, so
+  // shared here, within one calling key (#1890 keeps keys apart): two
+  // conversations opening with identical text share a key, so
   // the same-model + field-actually-missing gates below are what keep a
   // mis-keyed restore from reaching a payload it does not belong in.
-  const reasoningSessionKey = getSessionKey(sessionMessages, sessionIdHeader, strategyKey);
+  const reasoningSessionKey = callerScopedSessionKey(auth, getSessionKey(sessionMessages, sessionIdHeader, strategyKey));
   // A handoff can only fire when a prior model is on record for this session.
   // Check after recordIncomingMessages, which clears the prior model on a
   // fresh conversation. Stable across the retry loop (the prior model only
@@ -2538,7 +2566,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
-  const hedgeAbort = new AbortController();
+  // `let`: abortInFlight aborts only the in-flight attempt and replaces the
+  // controller, so a silent-window failover gets a fresh signal (#1960).
+  let hedgeAbort = new AbortController();
 
   // Decision routing (#1354): with the 'decision' strategy on, a decision
   // model picks which preset (Smartest / Fastest / Balanced / Most reliable)
@@ -2553,7 +2583,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     attemptLog,
     logIdentity: { surface: 'chat completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
-    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
+    abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
+    streaming: stream === true,
     route: () => {
       // When a handoff could fire this turn, pad the token estimate so the router's
       // context-window and TPM checks account for the extra system message overhead.
@@ -2591,7 +2622,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     let injectedHandoffTokens = 0;
     if (handoffMode !== 'off' && sessionKey) {
       const handoff = maybeInjectContextHandoff({ mode: handoffMode, sessionKey, messages, selectedModelKey: modelKey });
-      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${sessionKey.slice(0, 8)}…, model switch detected)`);
+      if (handoff.injected) console.log(`[Proxy] Context handoff injected (session ${rawSessionKey.slice(0, 8)}…, model switch detected)`);
       outboundMessages = handoff.messages;
       injectedHandoffTokens = handoff.injectedTokens;
     }

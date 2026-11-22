@@ -1,3 +1,4 @@
+import { specialistTask } from './specialist-text.js';
 import type { Db } from '../db/types.js';
 import type { Scheduler } from '../lib/scheduler.js';
 import type { Platform } from '@freellmapi/shared/types.js';
@@ -238,13 +239,13 @@ function patternMatches(pattern: string, id: string): boolean {
  *  - an upstream that prices a model and says it is not free is skipped;
  *  - CUSTOM_MODEL_SYNC_FREE_PATTERNS, when set, applies here too (#746).
  */
-export function autoRegistrable(models: DiscoveredModel[]): { accepted: DiscoveredModel[]; nonChat: number; paid: number } {
+export function autoRegistrable(models: DiscoveredModel[], platform?: string): { accepted: DiscoveredModel[]; nonChat: number; paid: number } {
   const freePatterns = customModelSyncFreePatterns();
   const accepted: DiscoveredModel[] = [];
   let nonChat = 0;
   let paid = 0;
   for (const model of models) {
-    if (model.kind !== undefined) { nonChat += 1; continue; }
+    if (model.kind !== undefined || specialistTask(model.id, platform)) { nonChat += 1; continue; }
     if (model.priceNote !== undefined && model.isFree !== true) { paid += 1; continue; }
     if (freePatterns.length > 0 && !freePatterns.some(p => patternMatches(p, model.id))) { paid += 1; continue; }
     accepted.push(model);
@@ -294,7 +295,7 @@ export async function runBuiltinModelDiscovery(db: Db, only?: string): Promise<B
       // Re-check after the network round-trip: a catalog sync may have landed
       // in between, and the catalog always wins.
       if (!isBuiltinDiscoveryEligible(db, platform)) continue;
-      const { accepted, nonChat, paid } = autoRegistrable(discovered);
+      const { accepted, nonChat, paid } = autoRegistrable(discovered, platform);
       result.nonChatSkipped += nonChat;
       result.paidSkipped += paid;
       const registered = registerDiscoveredModels(

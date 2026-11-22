@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import dns from 'node:dns';
-import { OpenAICompatProvider, inBandCreditsError } from '../../providers/openai-compat.js';
+import { OpenAICompatProvider, inBandCreditsError, inBandErrorEnvelope } from '../../providers/openai-compat.js';
 import { stubPublicDns } from '../helpers/dns.js';
 
 // Fake relay hosts must resolve for the URL guard (#1875).
@@ -304,6 +304,27 @@ describe('OpenAICompatProvider', () => {
     await expect(
       provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model')
     ).rejects.toThrow(/Too many requests/);
+  });
+
+  it('treats a 200 carrying only an error envelope as a 503, not an empty answer (cheapllm.shop busy queue)', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: () => Promise.resolve({ error: { message: 'The kitchen is packed right now', type: 'server_overloaded', code: 'overloaded' } }),
+    } as any);
+
+    const err = await provider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'model').catch(e => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.status).toBe(503);
+    expect(err.message).toMatch(/API error 503: The kitchen is packed/);
+  });
+
+  it('maps in-body error envelopes by code and leaves real answers alone', () => {
+    expect(inBandErrorEnvelope({ error: { message: 'slow down', code: 'rate_limit_exceeded' } })?.status).toBe(429);
+    expect(inBandErrorEnvelope({ error: { message: 'boom' } })?.status).toBe(502);
+    expect(inBandErrorEnvelope({ choices: [{ message: { content: 'hi' } }], error: { message: 'ignored' } })).toBeNull();
+    expect(inBandErrorEnvelope({ choices: [] })).toBeNull();
   });
 
   it('explains a non-JSON 200 body instead of surfacing the raw parse error (#189)', async () => {
