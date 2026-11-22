@@ -1185,6 +1185,20 @@ describe('OpenAICompatProvider in-band out-of-credits notice (#pollinations-inba
   });
 });
 
+/** Answer each request with the next response and record every request body.
+ *  Fails closed on any unexpected extra request instead of falling through to
+ *  real fetch. */
+function upstream(...responses: Array<() => any>) {
+  const bodies: any[] = [];
+  vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => {
+    bodies.push(JSON.parse((init as any).body));
+    const next = responses[bodies.length - 1];
+    if (!next) throw new Error(`unexpected request #${bodies.length}`);
+    return next();
+  });
+  return bodies;
+}
+
 describe('pinned tool_choice retry on custom endpoints (#1548)', () => {
   const custom = () => new OpenAICompatProvider({ platform: 'custom', name: 'Custom', baseUrl: 'http://127.0.0.1:1234/v1' });
   const moveNote = { type: 'function' as const, function: { name: 'move_note', description: 'Move a note', parameters: { type: 'object', properties: { folder: { type: 'string' } }, required: ['folder'] } } };
@@ -1215,18 +1229,6 @@ describe('pinned tool_choice retry on custom endpoints (#1548)', () => {
     });
     return { ok: true, status: 200, body, headers: new Headers() } as any;
   };
-
-  /** Answer each request with the next response and record every request body. */
-  function upstream(...responses: Array<() => any>) {
-    const bodies: any[] = [];
-    vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => {
-      bodies.push(JSON.parse((init as any).body));
-      const next = responses[bodies.length - 1];
-      if (!next) throw new Error(`unexpected request #${bodies.length}`);
-      return next();
-    });
-    return bodies;
-  }
 
   let log: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
@@ -1467,30 +1469,22 @@ describe('custom endpoint reasoning output-budget serialization (#2056)', () => 
     const custom = resolveProvider('custom', 'https://gateway.example.com/v1')!;
 
     for (const modelId of reasoningModels) {
-      let rawChat = '';
-      let rawStream = '';
-      vi.spyOn(global, 'fetch')
-        .mockImplementationOnce(async (_url, init) => {
-          rawChat = String((init as RequestInit).body);
-          return okJson(modelId);
-        })
-        .mockImplementationOnce(async (_url, init) => {
-          rawStream = String((init as RequestInit).body);
-          return okSse(modelId);
-        });
+      const bodies = upstream(() => okJson(modelId), () => okSse(modelId));
 
       await custom.chatCompletion('test-token', messages, modelId, { max_tokens: 1024 });
-      const chatBody = JSON.parse(rawChat);
-      expect(chatBody.max_completion_tokens, `chat ${modelId}`).toBe(1024);
-      expect(chatBody, `chat ${modelId}`).not.toHaveProperty('max_tokens');
-      expect(rawChat).not.toContain('"max_tokens"');
+      expect(bodies[0].max_completion_tokens, `chat ${modelId}`).toBe(1024);
+      expect(bodies[0], `chat ${modelId}`).not.toHaveProperty('max_tokens');
 
       await drainStream(custom.streamChatCompletion('test-token', messages, modelId, { max_tokens: 2048 }));
-      const streamBody = JSON.parse(rawStream);
-      expect(streamBody.max_completion_tokens, `stream ${modelId}`).toBe(2048);
-      expect(streamBody, `stream ${modelId}`).not.toHaveProperty('max_tokens');
-      expect(rawStream).not.toContain('"max_tokens"');
+      expect(bodies[1].max_completion_tokens, `stream ${modelId}`).toBe(2048);
+      expect(bodies[1], `stream ${modelId}`).not.toHaveProperty('max_tokens');
     }
+
+    const guarded = upstream(() => okJson('gpt-5'));
+    await custom.chatCompletion('test-token', messages, 'gpt-5', { max_tokens: 64 });
+    await expect(custom.chatCompletion('test-token', messages, 'gpt-5', { max_tokens: 64 }))
+      .rejects.toThrow('unexpected request #2');
+    expect(guarded).toHaveLength(2);
   });
 
   it('clamps custom reasoning budgets through resolveMaxTokens before emitting max_completion_tokens', async () => {
@@ -1499,16 +1493,7 @@ describe('custom endpoint reasoning output-budget serialization (#2056)', () => 
       name: 'Custom (OpenAI-compatible)',
       baseUrl: 'https://gateway.example.com/v1',
     });
-    const bodies: Array<Record<string, unknown>> = [];
-    vi.spyOn(global, 'fetch')
-      .mockImplementationOnce(async (_url, init) => {
-        bodies.push(JSON.parse(String((init as RequestInit).body)));
-        return okJson('gpt-5');
-      })
-      .mockImplementationOnce(async (_url, init) => {
-        bodies.push(JSON.parse(String((init as RequestInit).body)));
-        return okSse('o4-mini');
-      });
+    const bodies = upstream(() => okJson('gpt-5'), () => okSse('o4-mini'));
 
     await custom.chatCompletion('test-token', messages, 'gpt-5', { max_tokens: 4096, contextBudget: 320 });
     await drainStream(custom.streamChatCompletion('test-token', messages, 'o4-mini', { max_tokens: 4096, contextBudget: 256 }));
@@ -1530,29 +1515,29 @@ describe('custom endpoint reasoning output-budget serialization (#2056)', () => 
       type: 'function' as const,
       function: { name: 'lookup', description: 'Lookup item', parameters: { type: 'object', properties: {} } },
     };
-    const bodies: Array<Record<string, unknown>> = [];
-    vi.spyOn(global, 'fetch')
-      .mockImplementationOnce(async (_url, init) => {
-        bodies.push(JSON.parse(String((init as RequestInit).body)));
-        return { ok: false, status: 400, statusText: 'Bad Request', json: () => Promise.resolve({}) } as any;
-      })
-      .mockImplementationOnce(async (_url, init) => {
-        bodies.push(JSON.parse(String((init as RequestInit).body)));
-        return okJson('gpt-5');
-      });
+    const badRequest = () => ({ ok: false, status: 400, statusText: 'Bad Request', json: () => Promise.resolve({}) }) as any;
+    const bodies = upstream(badRequest, () => okJson('gpt-5'), badRequest, () => okSse('o3-mini'));
 
     await custom.chatCompletion('test-token', messages, 'gpt-5', {
       tools: [lookupTool],
       tool_choice: { type: 'function', function: { name: 'lookup' } },
       max_tokens: 512,
     });
+    await drainStream(custom.streamChatCompletion('test-token', messages, 'o3-mini', {
+      tools: [lookupTool],
+      tool_choice: { type: 'function', function: { name: 'lookup' } },
+      max_tokens: 768,
+    }));
 
-    expect(bodies).toHaveLength(2);
+    expect(bodies).toHaveLength(4);
     expect(bodies[0].max_completion_tokens).toBe(512);
     expect(bodies[0]).not.toHaveProperty('max_tokens');
-    expect(bodies[1].tool_choice).toBe('required');
-    expect(bodies[1].max_completion_tokens).toBe(512);
+    expect(bodies[1]).toMatchObject({ tool_choice: 'required', max_completion_tokens: 512, stream: false });
     expect(bodies[1]).not.toHaveProperty('max_tokens');
+    expect(bodies[2].max_completion_tokens).toBe(768);
+    expect(bodies[2]).not.toHaveProperty('max_tokens');
+    expect(bodies[3]).toMatchObject({ tool_choice: 'required', max_completion_tokens: 768, stream: true });
+    expect(bodies[3]).not.toHaveProperty('max_tokens');
   });
 
   it('keeps max_tokens for ordinary and look-alike models on custom endpoints (chat + stream)', async () => {
@@ -1576,25 +1561,15 @@ describe('custom endpoint reasoning output-budget serialization (#2056)', () => 
     const custom = resolveProvider('custom', 'https://gateway.example.com/v1')!;
 
     for (const modelId of ordinaryModels) {
-      let chatBody: Record<string, unknown> = {};
-      let streamBody: Record<string, unknown> = {};
-      vi.spyOn(global, 'fetch')
-        .mockImplementationOnce(async (_url, init) => {
-          chatBody = JSON.parse(String((init as RequestInit).body));
-          return okJson(modelId);
-        })
-        .mockImplementationOnce(async (_url, init) => {
-          streamBody = JSON.parse(String((init as RequestInit).body));
-          return okSse(modelId);
-        });
+      const bodies = upstream(() => okJson(modelId), () => okSse(modelId));
 
       await custom.chatCompletion('test-token', messages, modelId, { max_tokens: 512 });
-      expect(chatBody.max_tokens, `chat ${modelId}`).toBe(512);
-      expect(chatBody, `chat ${modelId}`).not.toHaveProperty('max_completion_tokens');
+      expect(bodies[0].max_tokens, `chat ${modelId}`).toBe(512);
+      expect(bodies[0], `chat ${modelId}`).not.toHaveProperty('max_completion_tokens');
 
       await drainStream(custom.streamChatCompletion('test-token', messages, modelId, { max_tokens: 768 }));
-      expect(streamBody.max_tokens, `stream ${modelId}`).toBe(768);
-      expect(streamBody, `stream ${modelId}`).not.toHaveProperty('max_completion_tokens');
+      expect(bodies[1].max_tokens, `stream ${modelId}`).toBe(768);
+      expect(bodies[1], `stream ${modelId}`).not.toHaveProperty('max_completion_tokens');
     }
   });
 
@@ -1602,31 +1577,15 @@ describe('custom endpoint reasoning output-budget serialization (#2056)', () => 
     const custom = resolveProvider('custom', 'https://gateway.example.com/v1')!;
 
     for (const modelId of ['gpt-5', 'o3-mini', 'gpt-4o']) {
-      let rawChat = '';
-      let rawStream = '';
-      vi.spyOn(global, 'fetch')
-        .mockImplementationOnce(async (_url, init) => {
-          rawChat = String((init as RequestInit).body);
-          return okJson(modelId);
-        })
-        .mockImplementationOnce(async (_url, init) => {
-          rawStream = String((init as RequestInit).body);
-          return okSse(modelId);
-        });
+      const bodies = upstream(() => okJson(modelId), () => okSse(modelId));
 
       await custom.chatCompletion('test-token', messages, modelId, { temperature: 0.2 });
-      const chatBody = JSON.parse(rawChat);
-      expect(chatBody, `chat ${modelId}`).not.toHaveProperty('max_tokens');
-      expect(chatBody, `chat ${modelId}`).not.toHaveProperty('max_completion_tokens');
-      expect(rawChat).not.toContain('max_tokens');
-      expect(rawChat).not.toContain('max_completion_tokens');
+      expect(bodies[0], `chat ${modelId}`).not.toHaveProperty('max_tokens');
+      expect(bodies[0], `chat ${modelId}`).not.toHaveProperty('max_completion_tokens');
 
       await drainStream(custom.streamChatCompletion('test-token', messages, modelId));
-      const streamBody = JSON.parse(rawStream);
-      expect(streamBody, `stream ${modelId}`).not.toHaveProperty('max_tokens');
-      expect(streamBody, `stream ${modelId}`).not.toHaveProperty('max_completion_tokens');
-      expect(rawStream).not.toContain('max_tokens');
-      expect(rawStream).not.toContain('max_completion_tokens');
+      expect(bodies[1], `stream ${modelId}`).not.toHaveProperty('max_tokens');
+      expect(bodies[1], `stream ${modelId}`).not.toHaveProperty('max_completion_tokens');
     }
   });
 
@@ -1640,25 +1599,15 @@ describe('custom endpoint reasoning output-budget serialization (#2056)', () => 
 
     for (const cfg of builtins) {
       const provider = new OpenAICompatProvider(cfg);
-      let chatBody: Record<string, unknown> = {};
-      let streamBody: Record<string, unknown> = {};
-      vi.spyOn(global, 'fetch')
-        .mockImplementationOnce(async (_url, init) => {
-          chatBody = JSON.parse(String((init as RequestInit).body));
-          return okJson(cfg.modelId);
-        })
-        .mockImplementationOnce(async (_url, init) => {
-          streamBody = JSON.parse(String((init as RequestInit).body));
-          return okSse(cfg.modelId);
-        });
+      const bodies = upstream(() => okJson(cfg.modelId), () => okSse(cfg.modelId));
 
       await provider.chatCompletion('test-token', messages, cfg.modelId, { max_tokens: 512 });
-      expect(chatBody.max_tokens, `chat ${cfg.platform}`).toBe(512);
-      expect(chatBody, `chat ${cfg.platform}`).not.toHaveProperty('max_completion_tokens');
+      expect(bodies[0].max_tokens, `chat ${cfg.platform}`).toBe(512);
+      expect(bodies[0], `chat ${cfg.platform}`).not.toHaveProperty('max_completion_tokens');
 
       await drainStream(provider.streamChatCompletion('test-token', messages, cfg.modelId, { max_tokens: 512 }));
-      expect(streamBody.max_tokens, `stream ${cfg.platform}`).toBe(512);
-      expect(streamBody, `stream ${cfg.platform}`).not.toHaveProperty('max_completion_tokens');
+      expect(bodies[1].max_tokens, `stream ${cfg.platform}`).toBe(512);
+      expect(bodies[1], `stream ${cfg.platform}`).not.toHaveProperty('max_completion_tokens');
     }
   });
 
