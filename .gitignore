@@ -24,3 +24,16 @@ update-hermes.sh
 
 # Monetization planning — private, never committed
 monetization/
+
+# Local ops artifacts — backups, scratch notes, archives (2026-11-22)
+*.bak-*
+*.orig-*
+*.db-*
+*.db.backup-*
+alibaba-removal-*/
+data-poolguard/
+allowed-ips.txt
+gitchk.txt
+inv.txt
+r.txt
+src.txt
