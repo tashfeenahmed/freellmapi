@@ -10,6 +10,7 @@ import type { QuotaObservationContext } from '../services/provider-quota.js';
 import type { ExtendedSamplingOptions } from '../lib/sampling-params.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { providerTimeoutMs, streamStallTimeoutMs } from '../lib/provider-timeout.js';
+import { currentUpstreamWatch } from '../lib/upstream-watch.js';
 import { extractThinkTagsFromStream } from '../lib/think-tags.js';
 
 /** A provider HTTP error carrying the upstream status and, when the provider
@@ -530,6 +531,10 @@ export abstract class BaseProvider {
     let buffer = '';
     let sawFinishReason = false;
     let awaitingFirstByte = true;
+    // Fallback silent-window cap (#1960): report the open stream with this
+    // call's declared first-byte patience, then every body read as activity.
+    const watch = currentUpstreamWatch();
+    watch?.opened(chatTimeoutMs);
 
     try {
       while (true) {
@@ -538,6 +543,7 @@ export abstract class BaseProvider {
           : await this.readWithStallTimeout(() => reader.read(), inactivityTimeoutMs);
         awaitingFirstByte = false;
         if (done) break;
+        if (value && value.byteLength > 0) watch?.activity();
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
