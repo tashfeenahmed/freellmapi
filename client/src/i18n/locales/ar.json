@@ -111,6 +111,8 @@
     "generalDescription": "لغة لوحة التحكم هذه ومظهرها.",
     "startAtLogin": "بدء التشغيل مع النظام",
     "startAtLoginHelp": "شغّل FreeLLMAPI تلقائيًا عند تسجيل الدخول إلى جهاز الكمبيوتر.",
+    "readyOnlyModels": "اعرض النماذج الجاهزة فقط في /v1/models",
+    "readyOnlyModelsHelp": "يجعل ?execution_status=ready هو الافتراضي للعملاء الذين لا يستطيعون إرسال عامل التصفية بأنفسهم، مثل منتقي النماذج في Open WebUI.",
     "advancedDescription": "الحدود ومفاتيح الأمان الخاصة بمسار الضغط.",
     "compressionTitle": "ضغط الموجه",
     "compressionDescription": "تقليل حجم الطلب قبل التوجيه مع الحفاظ على الكود والأخطاء والمسارات والأرقام وتعريفات الأدوات.",

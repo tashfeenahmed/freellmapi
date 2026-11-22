@@ -111,6 +111,8 @@
     "generalDescription": "이 대시보드의 언어와 모양입니다.",
     "startAtLogin": "시스템 시작 시 실행",
     "startAtLoginHelp": "컴퓨터에 로그인하면 FreeLLMAPI를 자동으로 실행합니다.",
+    "readyOnlyModels": "/v1/models에서 준비된 모델만 표시",
+    "readyOnlyModelsHelp": "필터를 직접 보낼 수 없는 클라이언트(예: Open WebUI의 모델 선택기)에서 ?execution_status=ready를 기본값으로 사용합니다.",
     "advancedDescription": "압축 파이프라인의 임계값과 안전 스위치입니다.",
     "compressionTitle": "프롬프트 압축",
     "compressionDescription": "코드, 오류, 경로, 숫자, 도구 정의를 유지하면서 라우팅 전에 요청 크기를 줄입니다.",

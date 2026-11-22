@@ -111,6 +111,8 @@
     "generalDescription": "Ede ati irisi dasibodu yii.",
     "startAtLogin": "Bẹrẹ ni ibẹrẹ eto",
     "startAtLoginHelp": "Mu FreeLLMAPI ṣiṣẹ laifọwọyi nigbati o wọle si kọnputa rẹ.",
+    "readyOnlyModels": "Ṣe àkójọ àwọn awoṣe tí ó ṣetán nínú /v1/models",
+    "readyOnlyModelsHelp": "Fi ?execution_status=ready ṣe àkọ́kọ́ fún àwọn oníbàárà tí kò lè fi àlẹ̀mọ́ ránṣẹ́ fúnra wọn, bíi olùyàn awoṣe Open WebUI.",
     "advancedDescription": "Awọn ààlà ati awọn àmúyẹ ààbò fun ìlànà ifunpọ.",
     "compressionTitle": "Ifunpọ ilana",
     "compressionDescription": "Din iwọn ibeere ku ṣaaju ipa ọna lakoko ti o n tọju koodu, awọn aṣiṣe, awọn ipa ọna, awọn nọmba, ati awọn itumọ irinṣẹ.",

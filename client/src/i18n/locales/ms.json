@@ -111,6 +111,8 @@
     "generalDescription": "Bahasa dan penampilan papan pemuka ini.",
     "startAtLogin": "Mula semasa permulaan sistem",
     "startAtLoginHelp": "Lancarkan FreeLLMAPI secara automatik apabila anda log masuk ke komputer anda.",
+    "readyOnlyModels": "Senaraikan hanya model sedia dalam /v1/models",
+    "readyOnlyModelsHelp": "Menjadikan ?execution_status=ready sebagai lalai untuk klien yang tidak boleh menghantar penapis sendiri, seperti pemilih model Open WebUI.",
     "advancedDescription": "Ambang dan suis keselamatan untuk saluran pemampatan.",
     "compressionTitle": "Pemampatan prompt",
     "compressionDescription": "Kurangkan saiz permintaan sebelum penghalaan sambil mengekalkan kod, ralat, laluan, nombor, dan definisi alat.",

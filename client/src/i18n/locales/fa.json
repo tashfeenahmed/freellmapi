@@ -111,6 +111,8 @@
     "generalDescription": "زبان و ظاهر این داشبورد.",
     "startAtLogin": "شروع با شروع سیستم",
     "startAtLoginHelp": "با ورود به رایانه، FreeLLMAPI را به‌طور خودکار راه‌اندازی کنید.",
+    "readyOnlyModels": "فقط مدل‌های آماده را در /v1/models فهرست کن",
+    "readyOnlyModelsHelp": "برای کارخواهانی که نمی‌توانند خودشان صافی را بفرستند، مانند انتخابگر مدل Open WebUI، ?execution_status=ready را پیش‌فرض می‌کند.",
     "advancedDescription": "آستانه‌ها و کلیدهای ایمنی خط فشرده‌سازی.",
     "compressionTitle": "فشرده‌سازی پرامپت",
     "compressionDescription": "حجم درخواست را قبل از مسیریابی کاهش دهید و در عین حال کد، خطاها، مسیرها، اعداد و تعاریف ابزار حفظ شوند.",

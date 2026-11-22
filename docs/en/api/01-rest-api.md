@@ -104,7 +104,9 @@ Each catalog entry also carries `execution_status`, a live answer to "would a re
 - `needsKey` — the model is disabled, or no enabled key matches it at all.
 - `exhausted` — keys match the model but every one of them is blocked at this moment, so a request would fail immediately. This is the state a burst of 429s produces, and it clears on its own when the cooldowns expire.
 
-`?execution_status=ready` (also `needsKey`, `exhausted`; matched case-insensitively) narrows the catalog rows to one status, so an agent can ask for models it can call without reading the whole list. An unrecognised value filters nothing. Like `?available=`, the filter applies only to catalog rows: `auto`, `fusion` and the `auto:<profile>` chains are router entries rather than models with keys of their own, and are always listed.
+`?execution_status=ready` (also `needsKey`, `exhausted`; matched case-insensitively) narrows the catalog rows to one status, so an agent can ask for models it can call without reading the whole list. An unrecognised value filters nothing. Like `?available=`, the filter applies only to catalog rows: `auto`, `fusion` and the `auto:<profile>` chains are router entries rather than models with keys of their own, and are always listed when the filter comes from the request.
+
+Some clients, such as Open WebUI's model picker, fetch `/v1/models` with no query parameters at all and cannot ask for `ready` themselves. Turn on **Settings → General → List only ready models in /v1/models** to make `ready` the default for those bare requests. When that default is on and nothing can serve a request, `auto`, `fusion` and the `auto:<profile>` chains are omitted as well, so the list never advertises a route with no model behind it. An explicit `?execution_status=` or `?available=` still overrides the default. New installations keep the full catalog as the default.
 
 ```bash
 curl "http://localhost:3001/v1/models?execution_status=ready" \

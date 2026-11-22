@@ -111,6 +111,8 @@
     "generalDescription": "Wika at hitsura ng dashboard na ito.",
     "startAtLogin": "Magsimula sa pagsisimula ng system",
     "startAtLoginHelp": "Ilunsad ang FreeLLMAPI nang awtomatiko kapag nag-sign in ka sa iyong computer.",
+    "readyOnlyModels": "Ilista lamang ang mga ready na modelo sa /v1/models",
+    "readyOnlyModelsHelp": "Ginagawang default ang ?execution_status=ready para sa mga client na hindi makapagpadala ng filter mismo, tulad ng model picker ng Open WebUI.",
     "advancedDescription": "Mga threshold at safety switch para sa compression pipeline.",
     "compressionTitle": "Compression ng prompt",
     "compressionDescription": "Bawasan ang laki ng request bago ang routing habang pinapanatili ang code, mga error, path, numero, at tool definition.",

@@ -111,6 +111,8 @@
     "generalDescription": "Bu panelin dili və görünüşü.",
     "startAtLogin": "Sistem açılışında başlat",
     "startAtLoginHelp": "Kompüterə daxil olanda FreeLLMAPI avtomatik başlasın.",
+    "readyOnlyModels": "/v1/models-də yalnız hazır modelləri göstər",
+    "readyOnlyModelsHelp": "Filtri özü göndərə bilməyən müştərilər üçün, məsələn, Open WebUI model seçicisi üçün ?execution_status=ready dəyərini standart edir.",
     "advancedDescription": "Sıxılma prosesi üçün hədlər və təhlükəsizlik açarları.",
     "compressionTitle": "Prompt sıxılması",
     "compressionDescription": "Kodu, səhvləri, yolları, rəqəmləri və alət təriflərini qoruyaraq marşrutlaşdırmadan əvvəl sorğu ölçüsünü azaldın.",

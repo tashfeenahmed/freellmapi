@@ -9,6 +9,7 @@ import { getSavedFusionConfig, setSavedFusionConfig, savedFusionConfigSchema, ge
 import { isUnifyEnabled, setUnifyEnabled, getUnifyOverrides, setUnifyOverrides, unifyOverridesSchema } from '../services/model-groups.js';
 import { getClaudeModelMap, setClaudeModelMap } from '../services/anthropic-map.js';
 import { getGeminiModelMap, setGeminiModelMap } from '../services/gemini-map.js';
+import { isModelsReadyOnlyDefault, MODELS_READY_ONLY_SETTING } from '../services/model-listing.js';
 import { getOllamaEmulationMode } from './ollama.js';
 import { MIN_CONTEXT_WINDOW_SETTING, MIN_CONTEXT_WINDOW_PRESETS } from '../lib/min-context-window.js';
 import { UPDATE_CHECK_SETTING, isAutoUpdateCheckEnabled } from './update.js';
@@ -68,6 +69,31 @@ settingsRouter.put('/update-check', (req: Request, res: Response) => {
   }
   setSetting(UPDATE_CHECK_SETTING, parsed.data.enabled ? '1' : '0');
   res.json({ enabled: isAutoUpdateCheckEnabled() });
+});
+
+// #2051: make `?execution_status=ready` the answer to a bare GET /v1/models.
+// Clients that cannot send a query parameter (Open WebUI's model picker is the
+// reported case) then stop offering models whose keys are all on cooldown. Off
+// by default, so the full catalog remains the default for new installations.
+const modelsReadyOnlySchema = z.object({ readyOnly: z.boolean() }).strict();
+
+settingsRouter.get('/models-ready-only', (_req: Request, res: Response) => {
+  res.json({ readyOnly: isModelsReadyOnlyDefault() });
+});
+
+settingsRouter.put('/models-ready-only', (req: Request, res: Response) => {
+  const parsed = modelsReadyOnlySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: {
+        message: `Invalid ready-only setting: ${parsed.error.issues.map(error => error.message).join(', ')}`,
+        type: 'invalid_request_error',
+      },
+    });
+    return;
+  }
+  setSetting(MODELS_READY_ONLY_SETTING, parsed.data.readyOnly ? '1' : '0');
+  res.json({ readyOnly: isModelsReadyOnlyDefault() });
 });
 
 settingsRouter.get('/compression', (_req: Request, res: Response) => {

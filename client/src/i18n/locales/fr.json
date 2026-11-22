@@ -111,6 +111,8 @@
     "generalDescription": "Langue et apparence de ce tableau de bord.",
     "startAtLogin": "Démarrer au démarrage du système",
     "startAtLoginHelp": "Lancez FreeLLMAPI automatiquement à l'ouverture de session sur votre ordinateur.",
+    "readyOnlyModels": "N’afficher que les modèles prêts dans /v1/models",
+    "readyOnlyModelsHelp": "Fait de ?execution_status=ready la valeur par défaut pour les clients qui ne peuvent pas envoyer le filtre, comme le sélecteur de modèles d’Open WebUI.",
     "advancedDescription": "Seuils et interrupteurs de sécurité du pipeline de compression.",
     "compressionTitle": "Compression des prompts",
     "compressionDescription": "Réduisez la taille des requêtes avant le routage tout en préservant le code, les erreurs, les chemins, les nombres et les définitions d'outils.",

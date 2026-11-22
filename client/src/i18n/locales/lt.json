@@ -111,6 +111,8 @@
     "generalDescription": "Šio skydelio kalba ir išvaizda.",
     "startAtLogin": "Pradėti paleidžiant sistemą",
     "startAtLoginHelp": "Automatiškai paleiskite FreeLLMAPI prisijungę prie kompiuterio.",
+    "readyOnlyModels": "Rodyti /v1/models tik paruoštus modelius",
+    "readyOnlyModelsHelp": "Nustato ?execution_status=ready kaip numatytąją klientams, kurie negali patys siųsti filtro, pavyzdžiui, Open WebUI modelių parinkikliui.",
     "advancedDescription": "Suspaudimo grandinės slenksčiai ir apsaugos jungikliai.",
     "compressionTitle": "Raginimų (prompt) suspaudimas",
     "compressionDescription": "Sumažinkite užklausos dydį prieš maršrutizavimą, išsaugant kodą, klaidas, kelius, skaičius ir įrankių apibrėžimus.",

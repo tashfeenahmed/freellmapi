@@ -111,6 +111,8 @@
     "generalDescription": "Harshe da kamanni na wannan dashboard.",
     "startAtLogin": "Fara a farawar tsarin",
     "startAtLoginHelp": "ƙaddamar da FreeLLMAPI ta atomatik lokacin shiga kwamfutarka.",
+    "readyOnlyModels": "Jera samfuran da suka shirya kawai a /v1/models",
+    "readyOnlyModelsHelp": "Yana sa ?execution_status=ready ya zama tsoho ga abokan ciniki da ba za su iya aika tacewa da kansu ba, kamar mai zaɓin samfura na Open WebUI.",
     "advancedDescription": "Iyaka da maɓallan tsaro na tsarin matsawa.",
     "compressionTitle": "Matsawar prompt",
     "compressionDescription": "Rage girman buƙata kafin turawa yayin da ake kiyaye kod, kurakurai, hanyoyi, lambobi da ma'anonin kayan aiki.",

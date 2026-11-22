@@ -111,6 +111,8 @@
     "generalDescription": "Asụsụ na ọdịdị nke dashboard a.",
     "startAtLogin": "Malite na mbido sistemụ",
     "startAtLoginHelp": "Mịlọ FreeLLMAPI ozugbo mgbe ị banyere na kọmputa gị.",
+    "readyOnlyModels": "Depụta naanị ụdị ndị dị njikere na /v1/models",
+    "readyOnlyModelsHelp": "Na-eme ?execution_status=ready ka ndabara maka ndị ahịa na-enweghị ike izipu nzacha n'onwe ha, dị ka onye na-ahọrọ ụdị Open WebUI.",
     "advancedDescription": "Oke na mgbanwe nchekwa maka usoro mpịkọta.",
     "compressionTitle": "Mpịkọta prompt",
     "compressionDescription": "Belata nha arịrịọ tupu ntụzịaka ma na-echekwa koodu, njehie, ụzọ, ọnụọgụgụ, na nkọwa ngwaọrụ.",

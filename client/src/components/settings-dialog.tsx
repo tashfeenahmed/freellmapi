@@ -546,6 +546,56 @@ function PreviewSection({ state }: { state: CompressionState }) {
   )
 }
 
+function ModelsReadyOnlyRow() {
+  const { t } = useI18n()
+  const [readyOnly, setReadyOnly] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    apiFetch<{ readyOnly: boolean }>('/api/settings/models-ready-only')
+      .then(data => { if (!cancelled) setReadyOnly(data.readyOnly) })
+      // A failed read leaves the row hidden: showing an off switch we could not
+      // confirm would invite the operator to save a value they never chose.
+      .catch(() => { if (!cancelled) setReadyOnly(null) })
+    return () => { cancelled = true }
+  }, [])
+
+  async function toggle(next: boolean) {
+    setBusy(true)
+    try {
+      // The response is the stored value, not the one we asked for, so the
+      // switch always shows what the server will actually answer with.
+      const data = await apiFetch<{ readyOnly: boolean }>('/api/settings/models-ready-only', {
+        method: 'PUT',
+        body: JSON.stringify({ readyOnly: next }),
+      })
+      setReadyOnly(data.readyOnly)
+    } catch {
+      // Keep the previous position on failure; the next open re-reads it.
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (readyOnly === null) return null
+
+  return (
+    <Row
+      label={t('settings.readyOnlyModels')}
+      hint={t('settings.readyOnlyModelsHelp')}
+      control={(
+        <Switch
+          aria-label={t('settings.readyOnlyModels')}
+          checked={readyOnly}
+          disabled={busy}
+          onCheckedChange={checked => void toggle(checked)}
+        />
+      )}
+    />
+  )
+}
+
 function GeneralSection() {
   const { t } = useI18n()
   const { theme, setTheme } = useTheme()
@@ -587,6 +637,7 @@ function GeneralSection() {
           )}
         />
       )}
+      <ModelsReadyOnlyRow />
     </>
   )
 }
