@@ -47,6 +47,15 @@ export function isMoonshotEndpoint(baseUrl: string): boolean {
 
 /** Hosts that ARE OpenCode's Zen gateway (opencode.ai and subdomains — the Go
  * tier serves `https://opencode.ai/zen/go/v1`). */
+
+/**
+ * Reasoning models (OpenAI o-series, GPT-5) require `max_completion_tokens`
+ * instead of `max_tokens` in the request body. Other models accept `max_tokens`.
+ */
+function isReasoningModel(modelId: string): boolean {
+  const reasoningModelPrefixes: string[] = ["gpt-5", "o1", "o3", "o4"];
+  return reasoningModelPrefixes.some((prefix) => modelId.startsWith(prefix));
+}
 const OPENCODE_HOST_SUFFIXES = ['opencode.ai'];
 
 /**
@@ -370,6 +379,8 @@ export class OpenAICompatProvider extends BaseProvider {
     quotaContext?: QuotaObservationContext,
   ): Promise<ChatCompletionResponse> {
     const sampling = this.samplingForModel(modelId, options);
+    const maxTokens = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
+  const bodyMaxTokens = isReasoningModel(modelId) ? undefined : maxTokens;
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -382,7 +393,8 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        max_completion_tokens: isReasoningModel(modelId) ? maxTokens : undefined,
+        max_tokens: bodyMaxTokens,
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
@@ -515,6 +527,8 @@ export class OpenAICompatProvider extends BaseProvider {
     quotaContext?: QuotaObservationContext,
   ): AsyncGenerator<ChatCompletionChunk> {
     const sampling = this.samplingForModel(modelId, options);
+    const maxTokens = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
+  const bodyMaxTokens = isReasoningModel(modelId) ? undefined : maxTokens;
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -527,7 +541,8 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        max_completion_tokens: isReasoningModel(modelId) ? maxTokens : undefined,
+        max_tokens: bodyMaxTokens,
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
