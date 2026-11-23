@@ -103,6 +103,18 @@ function isTrustworthyOrigin(req: express.Request): boolean {
   return isHttpsRequest(req) || LOOPBACK_HOST_RE.test(req.hostname ?? '');
 }
 
+const NON_COMPRESSIBLE_API_PREFIXES = ['/api/chat', '/api/generate'];
+
+/** Compression filter for /api: never touch streaming responses. */
+export function apiCompressionFilter(req: express.Request, res: express.Response): boolean {
+  const url = req.originalUrl || req.url;
+  if (url.startsWith('/v1')) return false;
+  if (NON_COMPRESSIBLE_API_PREFIXES.some(p => url === p || url.startsWith(`${p}/`) || url.startsWith(`${p}?`))) return false;
+  const type = String(res.getHeader('Content-Type') ?? '').toLowerCase();
+  if (type.includes('text/event-stream') || type.includes('application/x-ndjson')) return false;
+  return compression.filter(req, res);
+}
+
 export function createApp(config?: Config) {
   const cfg = config ?? loadConfig();
   const app = express();
@@ -252,6 +264,11 @@ export function createApp(config?: Config) {
   // for the limiter as the one /api path it did not cover. It still sits below
   // the Ollama /api/* mount above, which carries its own proxy limiter.
   const adminRateLimiter = createAdminRateLimiter();
+  // Gzip admin API JSON (/api only). Mounted before the /api routers so their
+  // responses pass through it. Streaming is never compressed or buffered: no
+  // /v1 (or other proxy surface), no text/event-stream, no Ollama NDJSON
+  // streams (/api/chat, /api/generate); all else defers to the default filter.
+  app.use('/api', compression({ filter: apiCompressionFilter }));
   app.use('/api', adminRateLimiter);
 
   // Dashboard auth (#35): /api/auth/{status,setup,login} bootstrap without a
@@ -378,7 +395,11 @@ export function createApp(config?: Config) {
     // end their responses upstream and never fall through to this middleware,
     // so nothing (crucially the /v1/chat/completions SSE streams) gets buffered
     // or re-encoded by compression.
-    app.use(compression());
+    // /api responses that fall through to here were already offered to the
+    // /api-scoped compression above; skip them so a body is never wrapped twice.
+    app.use(compression({
+      filter: (req, res) => (req.originalUrl.startsWith('/api') ? false : compression.filter(req, res)),
+    }));
     app.use(express.static(clientDist, {
       // Vite emits content-hashed build assets under assets/ (index-<hash>.js,
       // chunk-<hash>.js, *.css, fonts…). The URL changes whenever the bytes do,
