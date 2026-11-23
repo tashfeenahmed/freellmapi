@@ -185,6 +185,8 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   // cheapllm.shop counts its hourly free tier per account, across requests.
   if (platform === 'puter') return 'puter::account';
   if (platform === 'cheapllm') return 'cheapllm::account';
+  // LLM.kiwi: one 20-requests/minute window per account across `auto` and `hrllm`.
+  if (platform === 'llmkiwi') return 'llmkiwi::account';
   // ModelScope: one 2000-requests/day quota across the whole account.
   if (platform === 'modelscope') return 'modelscope::account';
   return normalizedModelId ? `${platform}::${normalizedModelId}` : `${platform}::account`;
@@ -204,7 +206,7 @@ function isSharedPool(platform: Platform): boolean {
   if (platform === 'plugsky') return true;
   if (platform === 'inferbase' || platform === 'simplellm') return true;
   if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'].includes(platform)) return true;
-  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'powertokens', 'cheapllm', 'puter', 'modelscope', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'powertokens', 'cheapllm', 'llmkiwi', 'puter', 'modelscope', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };
@@ -227,6 +229,10 @@ const HEADER_SPECS: Partial<Record<Platform, HeaderSpec[]>> = {
     { metric: 'credits', limit: 'x-credits-limit', remaining: 'x-credits-remaining', reset: 'x-credits-reset', strategy: 'provider_reported' },
   ],
   septor: [
+    { metric: 'requests', limit: 'x-ratelimit-limit', remaining: 'x-ratelimit-remaining', reset: 'x-ratelimit-reset', strategy: 'provider_reported' },
+  ],
+  // Live 2026-11-23: x-ratelimit-limit 20 with a reset on the next minute.
+  llmkiwi: [
     { metric: 'requests', limit: 'x-ratelimit-limit', remaining: 'x-ratelimit-remaining', reset: 'x-ratelimit-reset', strategy: 'provider_reported' },
   ],
   // Live-observed account-wide rolling-minute headers; no invented limits or

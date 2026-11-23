@@ -158,6 +158,15 @@ export type Platform =
   // tier of at least 5,000 input + 1,000 output tokens per hour per account.
   // Email sign-up, no card. Hosted catalog only (no migration seed).
   | 'cheapllm'
+  // LLM.kiwi - OpenAI-compatible. Ongoing free plan, no card: `auto` and
+  // `hrllm` only (other models answer 403 pro_model_access_denied). 20
+  // requests/minute per account from its x-ratelimit headers, 2026-11-23.
+  // Hosted catalog only.
+  | 'llmkiwi'
+  // TokenReply - OpenAI-compatible relay. A changing set of free models next to
+  // paid ones in one roster; only live-verified free ids go in the hosted
+  // catalog. Some free ids need a linked Discord account. 2026-11-23.
+  | 'tokenreply'
   | 'puter'
   // AMD Radeon Cloud TokenFactory — OpenAI-compatible shared inference. Its
   // rotating public-model roster is free without consuming instance credits,
@@ -183,6 +192,7 @@ export type Platform =
   | 'aisense'
   | 'brave'
   | 'outcrawl'
+  | 'tinyfish'
   | 'cloudflare'
   | 'zhipu'
   | 'ollama'
@@ -312,7 +322,7 @@ export type Platform =
  *  web_search tools), never chat. Search engine rows arrive through the
  *  catalog's `searchEngines` registry. The server keeps its own runtime copy in
  *  server/src/lib/search-platforms.ts (shared is type-only on the server). */
-export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave', 'outcrawl'] as const;
+export const SEARCH_PLATFORMS = ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'serpsearch', 'keenable', 'brave', 'outcrawl', 'tinyfish'] as const;
 export type SearchPlatform = (typeof SEARCH_PLATFORMS)[number];
 
 export function isSearchPlatform(platform: string): platform is SearchPlatform {
