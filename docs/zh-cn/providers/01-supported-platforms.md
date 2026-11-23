@@ -23,6 +23,8 @@
 | `powertokens` | PowerTokens | 带密钥 | OpenAI 兼容 | 免费模型 `glm-4.7-flash`（Models 详情：$0 / 1M 输入+输出，0 Credits）；2026-11-10 复测 chat 与流式均 200（约 3 秒）。上游高负载时返回 429（代码 `1305`），由常规冷却处理。限定了其他模型的密钥会返回 403 `token_model_forbidden`。模型行仅托管目录（RPM/RPD 未公布）：付费版即时获得，免费版 30 天后获得。 |
 | `puter` | Puter | Keyed | Native /drivers/call | 请使用独立免费 Puter 账户的令牌；它是账户凭据，不是仅限 AI 的密钥。原生驱动固定模型 ID、不启用替代模型，所有路由共享每月额度。模型仅通过目录发布。 |
 | `cheapllm` | cheapllm.shop | 带密钥 | OpenAI 兼容 | 仅一个模型 `deepseek-v4.1-flash-1017`。公测期间免费且不限速，之后每个账户保留永久免费额度：每小时至少 5,000 输入 + 1,000 输出词元；无需信用卡（[来源](https://cheapllm.shop/docs#free-tier)，2026-11-10）。繁忙时排队而不返回 429；超时 180s。模型行仅托管目录。 |
+| `llmkiwi` | LLM.kiwi | 带密钥 | OpenAI 兼容（`LlmKiwiProvider`） | 免费套餐无需信用卡，提供 `auto`（路由，不公开具体模型）和 `hrllm`（克罗地亚语方向）；其他模型仅限 Pro（返回 403）。每个账户每分钟 20 次请求，来自其 `x-ratelimit-*` 响应头（[价格](https://llm.kiwi/pricing)，2026-11-23 实测）。`/v1/models` 公开，因此密钥检查为空的聊天请求（有效密钥 400，无效密钥 401），每个密钥只发送一次。模型行仅托管目录。 |
+| `tokenreply` | TokenReply | 带密钥 | OpenAI 兼容 | 中转服务，同一模型列表混有免费、试用和付费模型；只有实测确认免费的模型 ID 才进入目录（[免费模型](https://www.tokenreply.com/guides/free-ai-api)，2026-11-23 实测）。部分免费模型需要绑定 Discord 账户（否则返回 403）。未公布限速，也没有限速响应头。推理模型超时 60s。模型行仅托管目录。 |
 | `nvidia` | NVIDIA NIM | 带密钥 | OpenAI 兼容 | `parallel_tool_calls` 固定为 false（#255）；180s 超时兼任流式首字节宽限（#584）。 |
 | `mistral` | Mistral | 带密钥 | OpenAI 兼容 | `api.mistral.ai/v1`。 |
 | `sambanova` | SambaNova | 已退役（V23） | 未注册 | 免费额度永久消失；因历史密钥行而保留在类型联合中。 |

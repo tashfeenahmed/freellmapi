@@ -187,6 +187,51 @@ describe('Empty-completion failover', () => {
     expect(headers.get('x-request-id')).toMatch(/\S+/);
   });
 
+  const QUOTA_NOTICE = 'Sorry, to prevent abuse of free resources, accounts that have not been recharged can only try 10 times.';
+  const QUOTA_RESULT = {
+    choices: [{ message: { role: 'assistant', content: QUOTA_NOTICE } }],
+    usage: { prompt_tokens: 10, completion_tokens: 0, total_tokens: 10 },
+  };
+
+  it('/v1/chat/completions (non-stream): an in-band relay quota notice fails over', async () => {
+    chatCompletion
+      .mockResolvedValueOnce(QUOTA_RESULT)
+      .mockResolvedValueOnce(GOOD_RESULT);
+
+    const { status, body } = await post(app, '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'hi' }],
+    }, key);
+
+    expect(status).toBe(200);
+    expect(body.choices[0].message.content).toBe('a real answer');
+    expect(chatCompletion).toHaveBeenCalledTimes(2);
+  });
+
+  it('/v1/responses (non-stream): an in-band relay quota notice fails over', async () => {
+    chatCompletion
+      .mockResolvedValueOnce(QUOTA_RESULT)
+      .mockResolvedValueOnce(GOOD_RESULT);
+
+    const { status, body } = await post(app, '/v1/responses', { input: 'hi' }, key);
+
+    expect(status).toBe(200);
+    expect(body.output_text).toBe('a real answer');
+    expect(chatCompletion).toHaveBeenCalledTimes(2);
+  });
+
+  it('/v1/responses (non-stream): an ordinary "Sorry, ..." answer is NOT treated as a notice', async () => {
+    chatCompletion.mockResolvedValueOnce({
+      choices: [{ message: { role: 'assistant', content: 'Sorry, I cannot help with that.' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 8, total_tokens: 18 },
+    });
+
+    const { status, body } = await post(app, '/v1/responses', { input: 'hi' }, key);
+
+    expect(status).toBe(200);
+    expect(body.output_text).toBe('Sorry, I cannot help with that.');
+    expect(chatCompletion).toHaveBeenCalledTimes(1);
+  });
+
   it('a tool-calls-only completion (no text) is NOT treated as empty', async () => {
     chatCompletion.mockResolvedValueOnce({
       choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'f', arguments: '{}' } }] } }],
