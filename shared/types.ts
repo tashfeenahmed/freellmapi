@@ -254,7 +254,7 @@ export type Platform =
   // free after the 30-day model-age gate).
   | 'unorouter'
   // CrowLLM (crowllm.com) — OpenAI-compatible gateway. Free key from
-  // crowllm.com/sign-up (email only, no card); 39 model ids carry a `:free`
+  // crowllm.com/sign-up (email only, no card); Free-account ids carry a `:free`
   // suffix and 31 of them bill at zero. Live-probed 2026-11-23: /v1/models
   // answers 200 without a key but 401s `Invalid token` on a wrong Bearer, and
   // /v1/chat/completions 401s without a key, so default key validation works.
