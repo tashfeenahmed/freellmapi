@@ -599,10 +599,10 @@ register(new OpenAICompatProvider({
 }));
 
 // CrowLLM (crowllm.com) — OpenAI-compatible gateway (new-api fork). Free key
-// from crowllm.com/sign-up (email only, no card). 39 ids carry a `:free`
-// suffix; 31 of those are zero-priced in the public /api/pricing feed and the
-// rest bill a small per-token rate, so a 429 on the shelf is not the only
-// limit to respect. Live-probed 2026-11-23: GET /v1/models is public (200 with
+// from crowllm.com/sign-up (email only, no card). Free-account ids carry a `:free`
+// suffix; the public /api/pricing feed marks which of them bill at zero (31 of 38
+// today) and the rest carry a small per-token rate, so the shelf rotates and a 429
+// is not the only limit to respect. Live-probed 2026-11-23: GET /v1/models is public (200 with
 // no Authorization) but answers 401 "Invalid token" to a wrong Bearer, and
 // chat/completions 401s without a key — the default /v1/models key validation
 // sends the key, so it is a real check; no validateUrl override needed.
