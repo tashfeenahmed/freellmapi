@@ -4,6 +4,14 @@ import { BaseProvider, providerHttpError, type CompletionOptions } from './base.
 
 // Wire IDs only. No route is discovered or enabled without the signed catalog.
 const pinned: Record<string,string> = {
+  "qwen4-max": "alibaba:qwen/qwen4-max",
+  "qwen3.7-flash": "alibaba:qwen/qwen3.7-flash",
+  "qwen3.6-flash": "alibaba:qwen/qwen3.6-flash",
+  "qwen3.6-plus": "alibaba:qwen/qwen3.6-plus",
+  "qwen3.5-plus": "alibaba:qwen/qwen3.5-plus",
+  "qwen3.5-122b-a10b": "alibaba:qwen/qwen3.5-122b-a10b",
+  "qwen3.5-397b-a17b": "alibaba:qwen/qwen3.5-397b-a17b",
+  "qwen-flash": "alibaba:qwen/qwen-flash",
   "gemini-3.7-flash": "google:google/gemini-3.7-flash",
   "gpt-4o-mini": "openai:openai/gpt-4o-mini",
   "qwen3.5-flash": "alibaba:qwen/qwen3.5-flash",
