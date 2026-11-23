@@ -6,6 +6,7 @@ import { LinkupProvider } from '../../providers/linkup.js';
 import { ParallelProvider } from '../../providers/parallel.js';
 import { KeenableProvider } from '../../providers/keenable.js';
 import { OutcrawlProvider } from '../../providers/outcrawl.js';
+import { TinyFishProvider } from '../../providers/tinyfish.js';
 import { getProvider } from '../../providers/index.js';
 
 // Search platforms (#1174) validate keys without spending search credits and
@@ -31,6 +32,7 @@ const cases = [
   { provider: new ParallelProvider(), url: 'https://api.parallel.ai/v1/search', method: 'POST' },
   { provider: new KeenableProvider(), url: 'https://api.keenable.ai/v1/search', method: 'POST' },
   { provider: new OutcrawlProvider(), url: 'https://api.outcrawl.ai/v1/credits', method: 'GET' },
+  { provider: new TinyFishProvider(), url: 'https://api.fetch.tinyfish.ai/', method: 'POST' },
 ];
 
 describe.each(cases)('$provider.name key validation', ({ provider, url, method }) => {
@@ -124,6 +126,6 @@ describe('Keenable keyless validation', () => {
 
 describe('registry', () => {
   it('registers every search platform', () => {
-    for (const p of ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'outcrawl'] as const) expect(getProvider(p)?.platform).toBe(p);
+    for (const p of ['tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'outcrawl', 'tinyfish'] as const) expect(getProvider(p)?.platform).toBe(p);
   });
 });

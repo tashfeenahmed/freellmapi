@@ -120,6 +120,10 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   // Free during the beta with no rate limit, then 5K in + 1K out tokens/hour, 2026-11-10.
   { value: 'puter', label: 'Puter (use a dedicated free account token)', url: 'https://puter.com/dashboard' },
   { value: 'cheapllm', label: 'cheapllm.shop (free: DeepSeek V4.1 Flash)', url: 'https://cheapllm.shop/signup' },
+  // Free plan, no card: `auto` and `hrllm`, 20 requests/minute, 2026-11-23.
+  { value: 'llmkiwi', label: 'LLM.kiwi (free: auto router)', url: 'https://llm.kiwi/dashboard' },
+  // Free models in a mixed free/paid relay; some need a linked Discord, 2026-11-23.
+  { value: 'tokenreply', label: 'TokenReply (free models)', url: 'https://www.tokenreply.com/console/token' },
   { value: 'modelscope', label: 'ModelScope (free key, needs Aliyun cn binding)', url: 'https://modelscope.cn/my/myaccesstoken' },
   { value: 'aihorde', label: 'AI Horde (no key needed, slow)', url: 'https://aihorde.net/register', keyless: true },
   // Chinese domestic providers. All four gate API access behind real-name
