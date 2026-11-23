@@ -27,6 +27,7 @@ import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandof
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { logRequest } from '../lib/request-log.js';
+import { providerLog } from '../lib/server-logs.js';
 import { observeServedModel } from '../lib/served-model.js';
 import { parseCacheDirective, cacheActive, isCacheableTemperature, computeCacheKey, getCachedResponse, storeCachedResponse, getCachedStreamResponse, storeCachedStreamResponse, STREAM_CACHE_MAX_BYTES } from '../services/cache.js';
 import { normalizeIdempotencyKey, hashIdempotencyKey, computeIdempotencyFingerprint, lookupIdempotencyReplay, storeIdempotencyResult } from '../services/idempotency.js';
@@ -2111,7 +2112,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       'X-Vision-Model-Available': 'false',
       execution_id: requestGroupId,
     });
-    // TODO: add structured log event to monitoring system when available
+    // Structured log event for RCA analysis
+    providerLog('warn', '[Proxy] 422 blocked: history reinjected without vision model', {
+      event: 'history_reinject_blocked',
+      provider: 'proxy',
+      requestId: requestGroupId,
+    });
     return;
   }
   const IMAGE_TOKEN_ESTIMATE = 1000;
