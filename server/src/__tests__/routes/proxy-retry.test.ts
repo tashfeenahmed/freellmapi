@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError } from '../../routes/proxy.js';
 import { isProviderBadRequestError } from '../../lib/error-classify.js';
-import { cooldownDecisionForError } from '../../lib/fallback-loop.js';
+import { classifyAttemptError, cooldownDecisionForError } from '../../lib/fallback-loop.js';
 import { MODEL_FORBIDDEN_COOLDOWN_MS } from '../../services/ratelimit.js';
 
 describe('isModelAccessForbiddenError (403 model-not-on-tier, drives whole-model skip — issue #256)', () => {
@@ -235,6 +235,16 @@ describe('isRetryableError', () => {
       expect(isPaymentRequiredError(new Error('Pollinations API error 402: insufficient credit'))).toBe(true);
       expect(isPaymentRequiredError(new Error('provider API error 429: insufficient balance (1008)'))).toBe(true);
       expect(isPaymentRequiredError(new Error('openai API error 429: insufficient_quota'))).toBe(true);
+    });
+
+    it('isPaymentRequiredError catches an empty wallet sent under 429 or 403', () => {
+      const zhipu = Object.assign(new Error('Zhipu API error 429: 余额不足或无可用资源包,请充值。'), { status: 429 });
+      const agnes = Object.assign(new Error('Agnes AI API error 403: Insufficient user quota, remaining: $0.000000'), { status: 403 });
+      expect(isPaymentRequiredError(zhipu)).toBe(true);
+      expect(isPaymentRequiredError(agnes)).toBe(true);
+      // The credit bench must win over the rate-limit and model-gate readings.
+      expect(classifyAttemptError(zhipu)).toBe('out_of_credits');
+      expect(classifyAttemptError(agnes)).toBe('out_of_credits');
     });
   });
 

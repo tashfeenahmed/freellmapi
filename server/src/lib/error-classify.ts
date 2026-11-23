@@ -568,7 +568,11 @@ export function isPaymentRequiredError(err: any): boolean {
   const msg = String(err?.message ?? '').toLowerCase();
   if (msg.includes('payment required')
     || msg.includes('insufficient_quota') || msg.includes('insufficient credit')
-    || msg.includes('insufficient balance')) return true;
+    || msg.includes('insufficient balance')
+    // Zhipu code 1113 arrives as a 429 ("余额不足或无可用资源包,请充值。"), and
+    // new-api relays (Agnes) as a 403; the status alone reads as a rate limit
+    // or a model gate, so the 90s bench retried an empty wallet all day.
+    || msg.includes('insufficient user quota') || msg.includes('余额不足')) return true;
 
   const stated = msg.match(STATED_STATUS);
   const status = typeof err?.status === 'number' ? err.status : Number(stated?.[1] ?? stated?.[2]);
