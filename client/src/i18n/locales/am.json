@@ -410,6 +410,8 @@
     "hideKey": "መደበቅ",
     "copyKey": "ቅዳ",
     "copyFullKey": "ሙሉ ቁልፍ ቅዳ",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "ተቀድዟል",
     "baseUrl": "የመሠረት URL",
     "endpointChat": "ተወያይ",

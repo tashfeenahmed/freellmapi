@@ -410,6 +410,8 @@
     "hideKey": "itago",
     "copyKey": "Kopyahin",
     "copyFullKey": "Kopyahin ang buong susi",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "kinopya",
     "baseUrl": "Base URL",
     "endpointChat": "Chat",

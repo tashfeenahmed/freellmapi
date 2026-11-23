@@ -410,6 +410,8 @@
     "hideKey": "Nascondi",
     "copyKey": "Copia",
     "copyFullKey": "Copia chiave completa",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Copiato",
     "baseUrl": "URL di base",
     "endpointChat": "Chat",

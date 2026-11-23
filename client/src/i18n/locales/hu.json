@@ -410,6 +410,8 @@
     "hideKey": "Bújj el",
     "copyKey": "Értettem",
     "copyFullKey": "Teljes kulcs másolása",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Másolva",
     "baseUrl": "Alap URL",
     "endpointChat": "Chat",

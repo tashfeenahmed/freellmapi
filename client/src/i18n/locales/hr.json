@@ -410,6 +410,8 @@
     "hideKey": "Sakrij se",
     "copyKey": "Primljeno",
     "copyFullKey": "Kopiraj cijeli ključ",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Kopirano",
     "baseUrl": "Baza URL",
     "endpointChat": "Chat",

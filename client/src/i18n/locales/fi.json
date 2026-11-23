@@ -410,6 +410,8 @@
     "hideKey": "Piiloudu",
     "copyKey": "Selvä",
     "copyFullKey": "Kopioi koko avain",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Kopioitu",
     "baseUrl": "Perus URL",
     "endpointChat": "Chat",

@@ -410,6 +410,8 @@
     "hideKey": "Ascunde-te",
     "copyKey": "Recepționat",
     "copyFullKey": "Copiați cheia completă",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Copiat",
     "baseUrl": "Baza URL",
     "endpointChat": "Chat",

@@ -410,6 +410,8 @@
     "hideKey": "മറയ്ക്കുക",
     "copyKey": "പകർത്തുക",
     "copyFullKey": "പൂർണ്ണ കീ പകർത്തുക",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "പകർത്തി",
     "baseUrl": "അടിസ്ഥാന URL",
     "endpointChat": "ചാറ്റ്",

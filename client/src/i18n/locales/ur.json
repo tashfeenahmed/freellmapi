@@ -410,6 +410,8 @@
     "hideKey": "چھپائیں",
     "copyKey": "کاپی",
     "copyFullKey": "مکمل کلید کاپی کریں",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "کاپی",
     "baseUrl": "بیس URL",
     "endpointChat": "گپ شپ",

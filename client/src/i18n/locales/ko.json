@@ -410,6 +410,8 @@
     "hideKey": "숨기기",
     "copyKey": "복사",
     "copyFullKey": "전체 키 복사",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "복사됨",
     "baseUrl": "베이스 URL",
     "endpointChat": "채팅",

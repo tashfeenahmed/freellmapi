@@ -410,6 +410,8 @@
     "hideKey": "ဖုံးကွယ်ပါ",
     "copyKey": "မိတ္တူယူပါ",
     "copyFullKey": "သော့အပြည့် ကူးယူရန်",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "မိတ္တူယူပြီး",
     "baseUrl": "အခြေခံ URL",
     "endpointChat": "Chat",

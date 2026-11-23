@@ -410,6 +410,8 @@
     "hideKey": "దాచు",
     "copyKey": "కాపీ చేయండి",
     "copyFullKey": "పూర్తి కీని కాపీ చేయండి",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "కాపీ చేయబడింది",
     "baseUrl": "బేస్ URL",
     "endpointChat": "చాట్ చేయండి",

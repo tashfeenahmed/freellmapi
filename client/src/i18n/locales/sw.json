@@ -410,6 +410,8 @@
     "hideKey": "Ficha",
     "copyKey": "Nakili",
     "copyFullKey": "Nakili ufunguo kamili",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Imenakiliwa",
     "baseUrl": "Msingi wa URL",
     "endpointChat": "Soga",

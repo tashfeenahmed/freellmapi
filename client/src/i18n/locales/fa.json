@@ -410,6 +410,8 @@
     "hideKey": "پنهان کردن",
     "copyKey": "کپی کنید",
     "copyFullKey": "کپی کلید کامل",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "کپی شده است",
     "baseUrl": "پایه URL",
     "endpointChat": "چت کنید",

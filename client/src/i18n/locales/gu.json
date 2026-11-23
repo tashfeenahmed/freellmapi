@@ -410,6 +410,8 @@
     "hideKey": "છુપાવો",
     "copyKey": "નકલ કરો",
     "copyFullKey": "સંપૂર્ણ કી કૉપિ કરો",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "નકલ કરી",
     "baseUrl": "આધાર URL",
     "endpointChat": "ચેટ",

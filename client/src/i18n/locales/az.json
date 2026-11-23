@@ -410,6 +410,8 @@
     "hideKey": "Gizlən",
     "copyKey": "Alındı",
     "copyFullKey": "Tam açarı kopyala",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Kopyalandı",
     "baseUrl": "Baza URL",
     "endpointChat": "Söhbət",

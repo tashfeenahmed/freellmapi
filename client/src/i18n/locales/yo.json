@@ -410,6 +410,8 @@
     "hideKey": "Tọju",
     "copyKey": "Daakọ",
     "copyFullKey": "Da bọtini kíkún kọ",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Ti daakọ",
     "baseUrl": "Mimọ URL",
     "endpointChat": "Wiregbe",

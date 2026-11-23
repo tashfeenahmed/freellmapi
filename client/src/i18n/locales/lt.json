@@ -410,6 +410,8 @@
     "hideKey": "Slėpkis",
     "copyKey": "Supratau",
     "copyFullKey": "Kopijuoti visą raktą",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Nukopijuota",
     "baseUrl": "Bazės URL",
     "endpointChat": "Pokalbis",

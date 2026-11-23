@@ -410,6 +410,8 @@
     "hideKey": "Ẩn",
     "copyKey": "Sao chép",
     "copyFullKey": "Sao chép toàn bộ khóa",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Đã sao chép",
     "baseUrl": "Căn cứ URL",
     "endpointChat": "Trò chuyện",

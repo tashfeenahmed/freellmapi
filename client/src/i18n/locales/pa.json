@@ -410,6 +410,8 @@
     "hideKey": "ਓਹਲੇ",
     "copyKey": "ਕਾਪੀ ਕਰੋ",
     "copyFullKey": "ਪੂਰੀ ਕੁੰਜੀ ਕਾਪੀ ਕਰੋ",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "ਕਾਪੀ ਕੀਤਾ",
     "baseUrl": "ਬੇਸ URL",
     "endpointChat": "ਚੈਟ",

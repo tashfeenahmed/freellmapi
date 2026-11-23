@@ -410,6 +410,8 @@
     "hideKey": "Schovej se",
     "copyKey": "Rozumím",
     "copyFullKey": "Kopírovat celý klíč",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Zkopírováno",
     "baseUrl": "Základní URL",
     "endpointChat": "Chat",

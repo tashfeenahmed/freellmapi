@@ -410,6 +410,8 @@
     "hideKey": "Boye",
     "copyKey": "Kwafi",
     "copyFullKey": "Kwafi cikakken maɓalli",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Kwafi",
     "baseUrl": "Tushen URL",
     "endpointChat": "Taɗi",

@@ -410,6 +410,8 @@
     "hideKey": "සඟවන්න",
     "copyKey": "පිටපත් කරන්න",
     "copyFullKey": "සම්පූර්ණ යතුර පිටපත් කරන්න",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "පිටපත් කර ඇත",
     "baseUrl": "පදනම URL",
     "endpointChat": "කතාබස් කරන්න",

@@ -411,6 +411,8 @@
     "hideKey": "Hide",
     "copyKey": "Copy",
     "copyFullKey": "Copy full key",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Copied",
     "baseUrl": "OpenAI base URL",
     "endpointChat": "Chat",

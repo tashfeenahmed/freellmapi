@@ -410,6 +410,8 @@
     "hideKey": "Сховати",
     "copyKey": "Копія",
     "copyFullKey": "Скопіювати ключ повністю",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Скопійовано",
     "baseUrl": "Основа URL",
     "endpointChat": "Чат",

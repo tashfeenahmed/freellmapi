@@ -410,6 +410,8 @@
     "hideKey": "Yashirish",
     "copyKey": "Nusxalash",
     "copyFullKey": "To'liq kalitni nusxalash",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Ko‘chirildi",
     "baseUrl": "Baza URL",
     "endpointChat": "Chat",

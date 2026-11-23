@@ -410,6 +410,8 @@
     "hideKey": "הסתתר",
     "copyKey": "העתק",
     "copyFullKey": "העתקת המפתח המלא",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "הועתק",
     "baseUrl": "בסיס URL",
     "endpointChat": "שיחה",

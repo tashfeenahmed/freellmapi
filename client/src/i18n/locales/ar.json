@@ -410,6 +410,8 @@
     "hideKey": "إخفاء",
     "copyKey": "نسخ",
     "copyFullKey": "نسخ المفتاح الكامل",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "منقول",
     "baseUrl": "قاعدة URL",
     "endpointChat": "الدردشة",

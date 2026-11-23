@@ -410,6 +410,8 @@
     "hideKey": "Gjem deg",
     "copyKey": "Kopiert",
     "copyFullKey": "Kopier hele nøkkelen",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Kopiert",
     "baseUrl": "Base URL",
     "endpointChat": "Chat",

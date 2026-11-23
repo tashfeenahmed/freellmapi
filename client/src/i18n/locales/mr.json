@@ -410,6 +410,8 @@
     "hideKey": "लपवा",
     "copyKey": "कॉपी करा",
     "copyFullKey": "पूर्ण की कॉपी करा",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "कॉपी केले",
     "baseUrl": "बेस URL",
     "endpointChat": "गप्पा",

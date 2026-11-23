@@ -410,6 +410,8 @@
     "hideKey": "隱藏",
     "copyKey": "複製",
     "copyFullKey": "複製完整金鑰",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "已複製",
     "baseUrl": "基礎 URL",
     "endpointChat": "對話",

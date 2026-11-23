@@ -410,6 +410,8 @@
     "hideKey": "Ocultar",
     "copyKey": "Copiar",
     "copyFullKey": "Copiar clave completa",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Copiado",
     "baseUrl": "URL base",
     "endpointChat": "Chat",

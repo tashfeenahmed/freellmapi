@@ -410,6 +410,8 @@
     "hideKey": "छिपाओ",
     "copyKey": "प्रतिलिपि",
     "copyFullKey": "पूरी कुंजी कॉपी करें",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "नकल की गई",
     "baseUrl": "आधार URL",
     "endpointChat": "बातचीत",

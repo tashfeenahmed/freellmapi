@@ -410,6 +410,8 @@
     "hideKey": "sembunyikan",
     "copyKey": "Salin",
     "copyFullKey": "Salin kunci penuh",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "disalin",
     "baseUrl": "URL asas",
     "endpointChat": "Sembang",

@@ -410,6 +410,8 @@
     "hideKey": "隠す",
     "copyKey": "コピー",
     "copyFullKey": "キー全体をコピー",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "コピーされました",
     "baseUrl": "ベース URL",
     "endpointChat": "チャット",

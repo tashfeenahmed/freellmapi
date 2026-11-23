@@ -823,6 +823,25 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                                   </Button>
                                 </Tooltip>
                               )}
+                              {!k.keyless && k.baseUrl && (
+                                <Tooltip text={t('keys.copyApiUrl')}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={async () => {
+                                      const apiUrl = `${k.baseUrl}/chat/completions`
+                                      if (!await copyText(apiUrl)) {
+                                        toast.error(t('common.copyFailed'))
+                                        return
+                                      }
+                                      toast.success(t('keys.copiedApiUrl'))
+                                    }}
+                                    aria-label={t('keys.copyApiUrl')}
+                                  >
+                                    <ExternalLink className="size-3" />
+                                  </Button>
+                                </Tooltip>
+                              )}
                               {k.platform !== 'custom' && k.modelDiscovery && (
                                 <Tooltip text={t('keys.discoverModels')}>
                                   <Button

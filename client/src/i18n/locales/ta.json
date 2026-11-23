@@ -410,6 +410,8 @@
     "hideKey": "மறை",
     "copyKey": "நகலெடுக்கவும்",
     "copyFullKey": "முழு விசையை நகலெடு",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "நகலெடுக்கப்பட்டது",
     "baseUrl": "அடிப்படை URL",
     "endpointChat": "அரட்டை",

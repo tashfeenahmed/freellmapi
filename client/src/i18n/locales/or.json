@@ -410,6 +410,8 @@
     "hideKey": "ଲୁଚାନ୍ତୁ",
     "copyKey": "କପି",
     "copyFullKey": "ସମ୍ପୂର୍ଣ୍ଣ କୀ କପି କରନ୍ତୁ",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "କପି ହୋଇଛି",
     "baseUrl": "ବେସ୍ URL",
     "endpointChat": "ଚାଟ୍",

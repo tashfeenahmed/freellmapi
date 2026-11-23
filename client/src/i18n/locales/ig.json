@@ -410,6 +410,8 @@
     "hideKey": "Zoo",
     "copyKey": "Detuo",
     "copyFullKey": "Detuo igodo zuru ezu",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Eṅomiri",
     "baseUrl": "Ntọala URL",
     "endpointChat": "Kpaa nkata",

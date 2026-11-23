@@ -410,6 +410,8 @@
     "hideKey": "Απόκρυψη",
     "copyKey": "Αντιγραφή",
     "copyFullKey": "Αντιγραφή πλήρους κλειδιού",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Αντιγράφηκε",
     "baseUrl": "Βάση URL",
     "endpointChat": "Κουβέντα",

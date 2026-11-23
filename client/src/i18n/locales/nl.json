@@ -410,6 +410,8 @@
     "hideKey": "Verstop",
     "copyKey": "Begrepen",
     "copyFullKey": "Volledige sleutel kopiëren",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "Gekopieerd",
     "baseUrl": "Basis URL",
     "endpointChat": "Chat",

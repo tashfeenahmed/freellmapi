@@ -410,6 +410,8 @@
     "hideKey": "លាក់ខ្លួន",
     "copyKey": "ចម្លង",
     "copyFullKey": "ចម្លងកូនសោពេញ",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "បានចម្លង",
     "baseUrl": "Base URL",
     "endpointChat": "ជជែក",

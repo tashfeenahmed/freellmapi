@@ -410,6 +410,8 @@
     "hideKey": "დამალვა",
     "copyKey": "კოპირება",
     "copyFullKey": "სრული გასაღების კოპირება",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "კოპირებულია",
     "baseUrl": "ბაზა URL",
     "endpointChat": "ჩატი",

@@ -410,6 +410,8 @@
     "hideKey": "ซ่อน",
     "copyKey": "คัดลอก",
     "copyFullKey": "คัดลอกคีย์ทั้งหมด",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "คัดลอกแล้ว",
     "baseUrl": "ฐาน URL",
     "endpointChat": "แชท",

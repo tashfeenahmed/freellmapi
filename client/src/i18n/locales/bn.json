@@ -410,6 +410,8 @@
     "hideKey": "লুকান",
     "copyKey": "কপি",
     "copyFullKey": "সম্পূর্ণ কী কপি করুন",
+    "copyApiUrl": "Copy API request URL",
+    "copiedApiUrl": "Copied API request URL",
     "copiedKey": "কপি করা হয়েছে",
     "baseUrl": "বেস URL",
     "endpointChat": "চ্যাট",
