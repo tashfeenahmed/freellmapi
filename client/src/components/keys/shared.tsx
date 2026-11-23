@@ -130,7 +130,8 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'volcengine', label: 'Volcengine Ark (free daily, needs cn real-name)', url: 'https://console.volcengine.com/ark' },
   { value: 'longcat', label: 'LongCat (free daily, email signup ok)', url: 'https://longcat.chat/platform' },
   { value: 'xfyun', label: 'iFlytek Spark (free Lite, needs cn real-name)', url: 'https://console.xfyun.cn' },
-]
+  { value: 'grok', label: 'Grok (xAI, 60 messages/day, 2M tokens/day)', url: 'https://grok.com/settings/api-keys' },
+  { value: 'xai', label: 'xAI (100 messages/day, 250 RPM)', url: 'https://x.ai/api-key' },]
 
 /** Providers a new user can pick (`hidden` ones only stay for existing keys). */
 export const LISTED_PLATFORMS = PLATFORMS.filter(p => !p.hidden)

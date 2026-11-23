@@ -157,6 +157,13 @@ export type Platform =
   // glm-4.7-flash ($0 / 1M in+out, 0 Credits). RPM/RPD unpublished. Hosted
   // catalog only (no migration seed), same as the anyapi/bai gateways.
   | 'powertokens'
+
+  // Grok — xAI's OpenAI-compatible gateway (grok.com).
+  // Free tier: 60 messages/day, 2M tokens/day, 10 RPM. Key from grok.com/settings/api-keys.
+  | 'grok'
+  // xAI — OpenAI-compatible gateway (x.ai). Free tier: 100 messages/day, 250 RPM.
+  // Key from x.ai/api-key (requires verified account).
+  | 'xai'
   // cheapllm.shop - OpenAI-compatible host for one model, DeepSeek V4.1 Flash
   // 1017. Free with no rate limit during its beta; afterwards a permanent free
   // tier of at least 5,000 input + 1,000 output tokens per hour per account.
