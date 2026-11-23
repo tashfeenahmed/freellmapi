@@ -30,6 +30,25 @@ describe('parseMaxTokensCeiling', () => {
     expect(parseMaxTokensCeiling('custom endpoint 422: max_output_tokens: 100000 is at most 16384')).toBe(16384);
   });
 
+  it('reads the space-spelled "max tokens" and "max_output" wordings (Septor, Cohere)', () => {
+    // Live rejections the gateway failed to learn from (2026-11-14).
+    expect(parseMaxTokensCeiling('custom API error 400: Requested max tokens (104394) exceeds model max_output (8192)')).toBe(8192);
+    expect(parseMaxTokensCeiling('Requested max tokens (32000) exceeds model max_output (16384)')).toBe(16384);
+    expect(parseMaxTokensCeiling('Cohere API error 400: max tokens must be less than or equal to 4096')).toBe(4096);
+    expect(parseMaxTokensCeiling('Cohere API error 400: invalid request: max tokens must be less than or equal to 4096, received 103643')).toBe(4096);
+    // The 65536 readings (Groq / Ollama) are unchanged by the wider pattern.
+    expect(parseMaxTokensCeiling(GROQ)).toBe(65536);
+    expect(parseMaxTokensCeiling(OLLAMA)).toBe(65536);
+    expect(parseMaxTokensCeiling('max tokens (128000) exceeds model\'s maximum output tokens (65536)')).toBe(65536);
+  });
+
+  it('keeps the wider spellings from reading unrelated numbers', () => {
+    expect(parseMaxTokensCeiling('max tokens: requested 16000, the number of input tokens exceeds 200 tokens')).toBeNull();
+    expect(parseMaxTokensCeiling('Request exceeds 30000 TPM limit; max tokens=4096')).toBeNull();
+    expect(parseMaxTokensCeiling('max tokens must be a positive integer')).toBeNull();
+    expect(parseMaxTokensCeiling('model max_output is not configured; input tokens exceeds 200000')).toBeNull();
+  });
+
   it('ignores context-window and unrelated errors', () => {
     expect(parseMaxTokensCeiling('Cloudflare API error 413: AiError: Ai: The estimated number of input and maximum output tokens (24092) exceeded this model context window limit (24000).')).toBeNull();
     expect(parseMaxTokensCeiling('Groq API error 413: Request too large for model `x` on tokens per minute (TPM): Limit 8000, Requested 17679')).toBeNull();

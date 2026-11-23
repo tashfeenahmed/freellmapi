@@ -38,7 +38,7 @@ import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
-import { isClientAbortError, newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
+import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { maybeServeResponsesWebSearch, webSearchCallToText } from '../lib/responses-web-search.js';
@@ -1450,6 +1450,16 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           // Resolve the dialect hold window now that the full text is known.
           // Held text was never emitted, so a dead dialect turn can still fail
           // over on the same SSE stream (nothing has been committed yet).
+          // #809 / quota notices: a turn whose whole (still-held, never
+          // emitted) text is an upstream classification word or a relay quota
+          // notice is a dead turn — fail over like an empty completion.
+          if (heldText.length > 0 && toolAcc.size === 0 && msgItemId === null
+            && isUpstreamClassificationOutput(heldText, route.platform)) {
+            throw Object.assign(
+              new Error(`empty completion from ${route.displayName} (upstream notice)`),
+              upstreamFinish === 'length' ? { skipBench: true } : {},
+            );
+          }
           if (heldText.length > 0) {
             const rescue = (wantsTools && (dialectMode === 'dialect' || containsDialectMarker(heldText)))
               ? rescueInlineToolCalls(heldText, new Set((tools ?? []).map(t => t.function.name)))
@@ -1662,6 +1672,14 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       if (!text && toolCalls.length === 0) {
         throw Object.assign(
           new Error(`empty completion from ${route.displayName}`),
+          result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
+        );
+      }
+      // #809 / quota notices: an upstream classification word or a relay
+      // quota notice in place of the reply is a dead turn — fail over.
+      if (toolCalls.length === 0 && isUpstreamClassificationOutput(text, route.platform)) {
+        throw Object.assign(
+          new Error(`empty completion from ${route.displayName} (upstream notice)`),
           result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
         );
       }
