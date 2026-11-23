@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import dns from 'node:dns';
-import { OpenAICompatProvider, inBandCreditsError, inBandErrorEnvelope } from '../../providers/openai-compat.js';
+import { OpenAICompatProvider, inBandCreditsError, inBandErrorEnvelope, isOpenAIReasoningModel } from '../../providers/openai-compat.js';
 import { stubPublicDns } from '../helpers/dns.js';
 
 // Fake relay hosts must resolve for the URL guard (#1875).
@@ -1382,5 +1382,100 @@ describe('OpenCode session header (#1639)', () => {
     if ((global as any).__lastHeaders) {
       expect((global as any).__lastHeaders['x-opencode-session']).toBeUndefined();
     }
+  });
+
+  describe('OpenAI reasoning model max_completion_tokens remap (#2056)', () => {
+    it('accurately classifies OpenAI reasoning models and excludes non-reasoning models', () => {
+      expect(isOpenAIReasoningModel('o1')).toBe(true);
+      expect(isOpenAIReasoningModel('o1-mini')).toBe(true);
+      expect(isOpenAIReasoningModel('o1-preview')).toBe(true);
+      expect(isOpenAIReasoningModel('o1-2024-12-17')).toBe(true);
+      expect(isOpenAIReasoningModel('o3')).toBe(true);
+      expect(isOpenAIReasoningModel('o3-mini')).toBe(true);
+      expect(isOpenAIReasoningModel('o3-mini-2025-01-31')).toBe(true);
+      expect(isOpenAIReasoningModel('o4-mini')).toBe(true);
+      expect(isOpenAIReasoningModel('gpt-5')).toBe(true);
+      expect(isOpenAIReasoningModel('gpt-5-mini')).toBe(true);
+      expect(isOpenAIReasoningModel('gpt-5-turbo')).toBe(true);
+      expect(isOpenAIReasoningModel('gpt-5.1')).toBe(true);
+      expect(isOpenAIReasoningModel('gpt-5.2-codex')).toBe(true);
+      expect(isOpenAIReasoningModel('openai/gpt-5')).toBe(true);
+      expect(isOpenAIReasoningModel('azure/o3-mini')).toBe(true);
+      expect(isOpenAIReasoningModel('custom/o1-mini')).toBe(true);
+
+      expect(isOpenAIReasoningModel('gpt-4o')).toBe(false);
+      expect(isOpenAIReasoningModel('gpt-4o-mini')).toBe(false);
+      expect(isOpenAIReasoningModel('gpt-4.1')).toBe(false);
+      expect(isOpenAIReasoningModel('gpt-4')).toBe(false);
+      expect(isOpenAIReasoningModel('gpt-3.5-turbo')).toBe(false);
+      expect(isOpenAIReasoningModel('deepseek-r1')).toBe(false);
+      expect(isOpenAIReasoningModel('claude-3-7-sonnet')).toBe(false);
+      expect(isOpenAIReasoningModel('llama-3.3-70b')).toBe(false);
+      expect(isOpenAIReasoningModel('olmo-7b')).toBe(false);
+      expect(isOpenAIReasoningModel('')).toBe(false);
+    });
+
+    it('chatCompletion: emits max_completion_tokens and omits max_tokens for reasoning models', async () => {
+      let capturedBody: any = null;
+      vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+        capturedBody = JSON.parse((init as any).body);
+        return {
+          ok: true,
+          json: () => Promise.resolve({
+            id: 'test-id',
+            object: 'chat.completion',
+            created: 123,
+            model: 'gpt-5',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'test' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          }),
+        } as any;
+      });
+
+      const customProvider = new OpenAICompatProvider({
+        platform: 'custom',
+        name: 'CustomGateway',
+        baseUrl: 'https://gateway.example.com/v1',
+      });
+
+      await customProvider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'gpt-5', { max_tokens: 4096 });
+      expect(capturedBody.max_completion_tokens).toBe(4096);
+      expect(capturedBody.max_tokens).toBeUndefined();
+
+      await customProvider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'o1-mini', { max_tokens: 8192 });
+      expect(capturedBody.max_completion_tokens).toBe(8192);
+      expect(capturedBody.max_tokens).toBeUndefined();
+
+      await customProvider.chatCompletion('key', [{ role: 'user', content: 'hi' }], 'gpt-4o', { max_tokens: 2048 });
+      expect(capturedBody.max_tokens).toBe(2048);
+      expect(capturedBody.max_completion_tokens).toBeUndefined();
+    });
+
+    it('streamChatCompletion: emits max_completion_tokens and omits max_tokens for reasoning models', async () => {
+      let capturedBody: any = null;
+      const frames = ['data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"gpt-5","choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\n', 'data: [DONE]\n\n'];
+      const encoder = new TextEncoder();
+      vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+        capturedBody = JSON.parse((init as any).body);
+        const stream = new ReadableStream<Uint8Array>({
+          start(c) { for (const f of frames) c.enqueue(encoder.encode(f)); c.close(); },
+        });
+        return { ok: true, body: stream, headers: new Headers() } as any;
+      });
+
+      const customProvider = new OpenAICompatProvider({
+        platform: 'custom',
+        name: 'CustomGateway',
+        baseUrl: 'https://gateway.example.com/v1',
+      });
+
+      for await (const _ of customProvider.streamChatCompletion('key', [{ role: 'user', content: 'hi' }], 'gpt-5', { max_tokens: 5000 })) { /* drain */ }
+      expect(capturedBody.max_completion_tokens).toBe(5000);
+      expect(capturedBody.max_tokens).toBeUndefined();
+
+      for await (const _ of customProvider.streamChatCompletion('key', [{ role: 'user', content: 'hi' }], 'gpt-4o', { max_tokens: 3000 })) { /* drain */ }
+      expect(capturedBody.max_tokens).toBe(3000);
+      expect(capturedBody.max_completion_tokens).toBeUndefined();
+    });
   });
 });

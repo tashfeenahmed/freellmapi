@@ -116,6 +116,18 @@ function pinnedToolChoiceRetry(options?: CompletionOptions): CompletionOptions |
 }
 
 /**
+ * Whether a model ID represents an OpenAI reasoning model (e.g. gpt-5*, o1*,
+ * o3*, o4*). OpenAI reasoning models reject `max_tokens` with HTTP 400 and
+ * require `max_completion_tokens` instead (#2056). Strip any prefix (e.g.
+ * `openai/`, `custom/`, `azure/`) so namespaced routes match correctly.
+ */
+export function isOpenAIReasoningModel(modelId: string): boolean {
+  if (!modelId) return false;
+  const basename = (modelId.split('/').pop() ?? modelId).trim().toLowerCase();
+  return /^(o[134]|gpt-5)([-.]|$)/i.test(basename);
+}
+
+/**
  * Generic provider for platforms that use an OpenAI-compatible API.
  * Covers: Groq, Cerebras, NVIDIA NIM, Mistral, OpenRouter,
  * GitHub Models, Fireworks AI.
@@ -382,7 +394,9 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        ...(isOpenAIReasoningModel(modelId)
+          ? { max_completion_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget) }
+          : { max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget) }),
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
@@ -527,7 +541,9 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        ...(isOpenAIReasoningModel(modelId)
+          ? { max_completion_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget) }
+          : { max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget) }),
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
