@@ -186,6 +186,9 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   // 429 on every model for several minutes — so one pool, and a 429 on any
   // model backs off the platform as a whole.
   if (platform === 'unorouter') return 'unorouter::free';
+  // CrowLLM: per-account request limits (unpublished numbers); a 429 on any
+  // model is an account-level signal, so one pool.
+  if (platform === 'crowllm') return 'crowllm::account';
   // xkiro: one account-level allowance shared across its free models (the
   // free tier is a per-account grant, not per-model), so one pool.
   if (platform === 'xkiro') return 'xkiro::free';
@@ -215,7 +218,7 @@ function isSharedPool(platform: Platform): boolean {
   if (platform === 'plugsky') return true;
   if (platform === 'inferbase' || platform === 'simplellm') return true;
   if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'].includes(platform)) return true;
-  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'anyapi', 'powertokens', 'cheapllm', 'puter', 'modelscope', 'aihorde'].includes(platform);
+  return ['openrouter', 'google', 'groq', 'cerebras', 'sail', 'bai', 'radeon', 'sambanova', 'nvidia', 'mistral', 'cohere', 'cloudflare', 'zhipu', 'ollama', 'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'routeway', 'bazaarlink', 'ainative', 'aion', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'crowllm', 'xkiro', 'anyapi', 'powertokens', 'cheapllm', 'puter', 'modelscope', 'aihorde'].includes(platform);
 }
 
 type HeaderSpec = { metric: QuotaMetric; limit: string; remaining?: string; reset?: string; strategy?: QuotaResetStrategy };

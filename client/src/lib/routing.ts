@@ -486,6 +486,7 @@ export const platformColors: Record<string, string> = {
   sealion:     '#0ea5e9',
   orcarouter:  '#f97316',
   unorouter:   '#ec4899',
+  crowllm:     '#f59e0b',
   xkiro:       '#a855f7',
   anyapi:      '#0891b2',
   powertokens: '#7c3aed',
