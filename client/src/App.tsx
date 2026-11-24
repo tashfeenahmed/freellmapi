@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, NavLink, Link, useLocation, useNavigate } from 'react-router-dom'
-import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { ChevronDown, KeyRound, LogOut, Menu, MoreHorizontal, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import {
@@ -14,7 +14,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { AuthGate, ChangeCredentialsModal } from '@/components/auth-gate'
+import { AuthGate, ChangeCredentialsModal, type AuthStatus } from '@/components/auth-gate'
 import { CommandPalette } from '@/components/command-palette'
 import { openCommandPalette } from '@/components/command-palette-state'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -26,7 +26,7 @@ import { UpdateReminder } from '@/components/update-reminder'
 import { NewBuildPrompt } from '@/components/new-build-prompt'
 import { usePremium } from '@/hooks/use-premium'
 import { I18nProvider, useI18n } from '@/i18n'
-import { logout } from '@/lib/api'
+import { apiFetch, logout } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { ThemeProvider } from '@/theme'
 
@@ -177,6 +177,7 @@ if (isDesktopApp) {
 
 function AccountMenuItems({
   showUpgrade,
+  showLocalCredentials,
   upgradeLabel,
   settingsLabel,
   updatesLabel,
@@ -190,6 +191,7 @@ function AccountMenuItems({
   onChangePassword,
 }: {
   showUpgrade: boolean
+  showLocalCredentials: boolean
   upgradeLabel: string
   settingsLabel: string
   updatesLabel: string
@@ -223,14 +225,18 @@ function AccountMenuItems({
       {!isDesktopApp && (
         <>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onChangeEmail}>
-            <span className="flex size-4 items-center justify-center font-serif text-xs font-bold">@</span>
-            {changeEmailLabel}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onChangePassword}>
-            <KeyRound />
-            {changePasswordLabel}
-          </DropdownMenuItem>
+          {showLocalCredentials && (
+            <>
+              <DropdownMenuItem onClick={onChangeEmail}>
+                <span className="flex size-4 items-center justify-center font-serif text-xs font-bold">@</span>
+                {changeEmailLabel}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onChangePassword}>
+                <KeyRound />
+                {changePasswordLabel}
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuItem onClick={() => logout()}>
             <LogOut />
             {signOutLabel}
@@ -254,6 +260,12 @@ function Navbar() {
     return () => window.removeEventListener(OPEN_UPDATES_EVENT, open)
   }, [])
   const [credentialsMode, setCredentialsMode] = useState<'password' | 'email' | null>(null)
+  const { data: authStatus } = useQuery<AuthStatus>({
+    queryKey: ['auth-status'],
+    queryFn: () => apiFetch('/api/auth/status'),
+    staleTime: 30_000,
+  })
+  const showLocalCredentials = authStatus?.hasLocalPassword !== false
   const { data: premium, licensed, isLoading: premiumLoading, isError: premiumError } = usePremium()
   const showUpgrade = Boolean(premium) && !licensed && !premiumLoading && !premiumError
 
@@ -330,6 +342,7 @@ function Navbar() {
               <DropdownMenuContent align="end" className="w-48">
                 <AccountMenuItems
                   showUpgrade={showUpgrade}
+                  showLocalCredentials={showLocalCredentials}
                   upgradeLabel={t('nav.upgrade')}
                   settingsLabel={t('nav.settings')}
                   updatesLabel={t('settings.checkForUpdates')}
@@ -386,6 +399,7 @@ function Navbar() {
                 <DropdownMenuSeparator />
                 <AccountMenuItems
                   showUpgrade={showUpgrade}
+                  showLocalCredentials={showLocalCredentials}
                   upgradeLabel={t('nav.upgrade')}
                   settingsLabel={t('nav.settings')}
                   updatesLabel={t('settings.checkForUpdates')}

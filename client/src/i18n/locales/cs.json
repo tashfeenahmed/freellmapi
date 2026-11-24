@@ -60,7 +60,16 @@
     "emailChanged": "E-mail byl změněn.",
     "passwordReset": "Heslo bylo resetováno. Přihlaste se.",
     "resetCodeDockerHint": "Používáte Docker? Kód je v logu kontejneru: docker logs <container>.",
-    "desktopSessionFailed": "Řídicí panel se nedokázal přihlásit k místnímu serveru. Ukončete FreeLLMAPI a spusťte jej znovu."
+    "desktopSessionFailed": "Řídicí panel se nedokázal přihlásit k místnímu serveru. Ukončete FreeLLMAPI a spusťte jej znovu.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Uložit",

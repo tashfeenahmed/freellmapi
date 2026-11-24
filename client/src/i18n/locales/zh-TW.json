@@ -60,7 +60,16 @@
     "emailChanged": "電子郵件已成功變更。",
     "passwordReset": "密碼已重設，請重新登入。",
     "resetCodeDockerHint": "在 Docker 中執行？重設碼在容器日誌中：docker logs <container>",
-    "desktopSessionFailed": "儀表板無法登入本機伺服器。請結束 FreeLLMAPI 並重新開啟。"
+    "desktopSessionFailed": "儀表板無法登入本機伺服器。請結束 FreeLLMAPI 並重新開啟。",
+    "signInWithSso": "使用 {provider} 登入",
+    "orContinueWithPassword": "或使用電子郵件密碼登入",
+    "reverifyWithSso": "使用 {provider} 重新驗證",
+    "oidcReauthHint": "請透過 {provider} 確認身分以存取明文金鑰。",
+    "oidcReauthSuccess": "身分已驗證，有效時間 5 分鐘。",
+    "oidcErrorNotAllowed": "你的帳號未被允許登入此儀表板。",
+    "oidcErrorUnverifiedEmail": "登入前，身分提供者必須先驗證你的電子郵件地址。",
+    "oidcErrorNoAccount": "沒有相符的帳號，且自動建立帳號已停用。",
+    "oidcErrorFailed": "單一登入失敗，請再試一次。"
   },
   "common": {
     "save": "儲存",

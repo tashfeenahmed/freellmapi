@@ -60,7 +60,16 @@
     "emailChanged": "E-mailadres gewijzigd.",
     "passwordReset": "Wachtwoord gereset. Log opnieuw in.",
     "resetCodeDockerHint": "Draait het in Docker? De code staat in de containerlog: docker logs <container>.",
-    "desktopSessionFailed": "Het dashboard kon niet inloggen op de lokale server. Sluit FreeLLMAPI af en open het opnieuw."
+    "desktopSessionFailed": "Het dashboard kon niet inloggen op de lokale server. Sluit FreeLLMAPI af en open het opnieuw.",
+    "signInWithSso": "Inloggen met {provider}",
+    "orContinueWithPassword": "of ga verder met e-mail",
+    "reverifyWithSso": "Opnieuw verifiëren met {provider}",
+    "oidcReauthHint": "Bevestig je identiteit met {provider} om platte-tekstsleutels te bekijken.",
+    "oidcReauthSuccess": "Identiteit geverifieerd voor de komende 5 minuten.",
+    "oidcErrorNotAllowed": "Je account mag niet inloggen op dit dashboard.",
+    "oidcErrorUnverifiedEmail": "Je identiteitsprovider moet je e-mailadres verifiëren voordat je inlogt.",
+    "oidcErrorNoAccount": "Er bestaat geen overeenkomstig account en automatisch aanmaken is uitgeschakeld.",
+    "oidcErrorFailed": "Single sign-on mislukt. Probeer het opnieuw."
   },
   "common": {
     "save": "Sla op",

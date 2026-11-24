@@ -60,7 +60,16 @@
     "emailChanged": "تم تغيير البريد الإلكتروني بنجاح.",
     "passwordReset": "تمت إعادة تعيين كلمة المرور. يرجى تسجيل الدخول.",
     "resetCodeDockerHint": "هل تعمل داخل Docker؟ الرمز موجود في سجل الحاوية: docker logs <container>.",
-    "desktopSessionFailed": "تعذّر على لوحة التحكم تسجيل الدخول إلى الخادم المحلي. أغلق FreeLLMAPI ثم افتحه من جديد."
+    "desktopSessionFailed": "تعذّر على لوحة التحكم تسجيل الدخول إلى الخادم المحلي. أغلق FreeLLMAPI ثم افتحه من جديد.",
+    "signInWithSso": "تسجيل الدخول باستخدام {provider}",
+    "orContinueWithPassword": "أو المتابعة بالبريد الإلكتروني",
+    "reverifyWithSso": "إعادة التحقق باستخدام {provider}",
+    "oidcReauthHint": "أكّد هويتك عبر {provider} للوصول إلى المفاتيح النصية.",
+    "oidcReauthSuccess": "تم التحقق من الهوية لمدة 5 دقائق قادمة.",
+    "oidcErrorNotAllowed": "حسابك غير مصرح له بتسجيل الدخول إلى لوحة التحكم هذه.",
+    "oidcErrorUnverifiedEmail": "يجب أن يتحقق موفر الهوية من بريدك الإلكتروني قبل تسجيل الدخول.",
+    "oidcErrorNoAccount": "لا يوجد حساب مطابق والإنشاء التلقائي للحسابات معطّل.",
+    "oidcErrorFailed": "فشل تسجيل الدخول الموحد. يرجى المحاولة مرة أخرى."
   },
   "common": {
     "save": "حفظ",

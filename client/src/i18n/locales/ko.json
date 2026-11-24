@@ -60,7 +60,16 @@
     "emailChanged": "이메일이 변경되었습니다.",
     "passwordReset": "비밀번호가 재설정되었습니다. 로그인해 주세요.",
     "resetCodeDockerHint": "Docker에서 실행 중인가요? 코드는 컨테이너 로그에 있습니다: docker logs <container>",
-    "desktopSessionFailed": "대시보드가 로컬 서버에 로그인하지 못했습니다. FreeLLMAPI를 종료한 뒤 다시 여세요."
+    "desktopSessionFailed": "대시보드가 로컬 서버에 로그인하지 못했습니다. FreeLLMAPI를 종료한 뒤 다시 여세요.",
+    "signInWithSso": "{provider}(으)로 로그인",
+    "orContinueWithPassword": "또는 이메일로 계속",
+    "reverifyWithSso": "{provider}(으)로 다시 인증",
+    "oidcReauthHint": "평문 키에 접근하려면 {provider}에서 본인 확인을 완료하세요.",
+    "oidcReauthSuccess": "향후 5분 동안 본인 확인이 유지됩니다.",
+    "oidcErrorNotAllowed": "이 계정은 대시보드 로그인 권한이 없습니다.",
+    "oidcErrorUnverifiedEmail": "로그인하기 전에 ID 공급자에서 이메일 주소가 인증되어야 합니다.",
+    "oidcErrorNoAccount": "일치하는 계정이 없으며 자동 계정 생성이 비활성화되어 있습니다.",
+    "oidcErrorFailed": "SSO 로그인에 실패했습니다. 다시 시도하세요."
   },
   "common": {
     "save": "저장",

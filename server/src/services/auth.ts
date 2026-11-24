@@ -7,14 +7,35 @@ import { hashPassword, verifyPassword } from '../lib/password.js';
 // for apps — this gates the /api/* admin surface for the human operator (#35).
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+export const OIDC_REAUTH_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+export type AuthSource = 'password' | 'oidc' | 'desktop';
 
 export interface SessionUser {
   userId: number;
   email: string;
+  authSource: AuthSource;
+  hasLocalPassword: boolean;
+  reauthenticatedAtMs: number | null;
+}
+
+export function hashSessionToken(s: string): string {
+  return crypto.createHash('sha256').update(s).digest('hex');
 }
 
 function sha256(s: string): string {
-  return crypto.createHash('sha256').update(s).digest('hex');
+  return hashSessionToken(s);
+}
+
+export function isSessionRecentlyReauthenticated(session: SessionUser, now = Date.now()): boolean {
+  return session.authSource === 'oidc'
+    && session.reauthenticatedAtMs != null
+    && now - session.reauthenticatedAtMs <= OIDC_REAUTH_WINDOW_MS;
+}
+
+export function sessionReauthenticatedUntilMs(session: SessionUser, now = Date.now()): number | null {
+  if (!isSessionRecentlyReauthenticated(session, now)) return null;
+  return session.reauthenticatedAtMs! + OIDC_REAUTH_WINDOW_MS;
 }
 
 /** The one spelling of an address the DB is keyed on. Exported so callers that
@@ -40,19 +61,55 @@ export function createUser(email: string, password: string): SessionUser {
     err.code = 'email_taken';
     throw err;
   }
-  const result = db.prepare('INSERT INTO users (email, password_hash) VALUES (?, ?)')
+  const result = db.prepare('INSERT INTO users (email, password_hash, has_local_password) VALUES (?, ?, 1)')
     .run(normalized, hashPassword(password));
-  return { userId: Number(result.lastInsertRowid), email: normalized };
+  return {
+    userId: Number(result.lastInsertRowid),
+    email: normalized,
+    authSource: 'password',
+    hasLocalPassword: true,
+    reauthenticatedAtMs: null,
+  };
+}
+
+/** Create a passwordless user provisioned via OIDC (#2008). Stores a random
+ *  unusable password hash so NOT NULL holds while has_local_password=0 blocks
+ *  password sign-in and password-change endpoints. */
+export function createPasswordlessUser(email: string): SessionUser {
+  const db = getDb();
+  const normalized = normalizeEmail(email);
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalized);
+  if (existing) {
+    const err = new Error('An account with that email already exists') as any;
+    err.code = 'email_taken';
+    throw err;
+  }
+  const randomSecret = crypto.randomBytes(32).toString('hex');
+  const result = db.prepare('INSERT INTO users (email, password_hash, has_local_password) VALUES (?, ?, 0)')
+    .run(normalized, hashPassword(randomSecret));
+  return {
+    userId: Number(result.lastInsertRowid),
+    email: normalized,
+    authSource: 'oidc',
+    hasLocalPassword: false,
+    reauthenticatedAtMs: null,
+  };
 }
 
 /** Verify credentials. Returns the user on success, null on failure. */
 export function verifyCredentials(email: string, password: string): SessionUser | null {
   const db = getDb();
-  const row = db.prepare('SELECT id, email, password_hash FROM users WHERE email = ?')
-    .get(normalizeEmail(email)) as { id: number; email: string; password_hash: string } | undefined;
-  if (!row) return null;
+  const row = db.prepare('SELECT id, email, password_hash, has_local_password FROM users WHERE email = ?')
+    .get(normalizeEmail(email)) as { id: number; email: string; password_hash: string; has_local_password: number } | undefined;
+  if (!row || row.has_local_password === 0) return null;
   if (!verifyPassword(password, row.password_hash)) return null;
-  return { userId: row.id, email: row.email };
+  return {
+    userId: row.id,
+    email: row.email,
+    authSource: 'password',
+    hasLocalPassword: true,
+    reauthenticatedAtMs: null,
+  };
 }
 
 /** Desktop app only: a session for the install's account, creating the hidden
@@ -64,15 +121,26 @@ export function desktopSessionToken(): string {
     createUser('desktop@localhost', crypto.randomBytes(24).toString('hex'));
   }
   const first = getDb().prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get() as { id: number };
-  return createSession(first.id);
+  return createSession(first.id, 'desktop');
 }
 
 /** Mint a session and return the raw token (only the hash is persisted). */
-export function createSession(userId: number): string {
+export function createSession(userId: number, authSource: AuthSource = 'password'): string {
   const token = crypto.randomBytes(32).toString('hex');
-  getDb().prepare('INSERT INTO sessions (token_hash, user_id, expires_at_ms) VALUES (?, ?, ?)')
-    .run(sha256(token), userId, Date.now() + SESSION_TTL_MS);
+  getDb().prepare('INSERT INTO sessions (token_hash, user_id, expires_at_ms, auth_source) VALUES (?, ?, ?, ?)')
+    .run(sha256(token), userId, Date.now() + SESSION_TTL_MS, authSource);
   return token;
+}
+
+/** Mark an active session as freshly re-authenticated via OIDC step-up (#2008). */
+export function stampSessionReauthenticated(tokenHash: string, now = Date.now()): boolean {
+  const result = getDb().prepare(`
+    UPDATE sessions
+       SET reauthenticated_at_ms = ?
+     WHERE token_hash = ?
+       AND expires_at_ms > ?
+  `).run(now, tokenHash, now);
+  return result.changes > 0;
 }
 
 /** Resolve a session token to its user, or null if missing/expired. */
@@ -80,16 +148,32 @@ export function validateSession(token: string | undefined | null): SessionUser |
   if (!token) return null;
   const db = getDb();
   const row = db.prepare(`
-    SELECT s.user_id, s.expires_at_ms, u.email
+    SELECT s.user_id, s.expires_at_ms, s.auth_source, s.reauthenticated_at_ms, u.email, u.has_local_password
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ?
-  `).get(sha256(token)) as { user_id: number; expires_at_ms: number; email: string } | undefined;
+  `).get(sha256(token)) as {
+    user_id: number;
+    expires_at_ms: number;
+    auth_source: string;
+    reauthenticated_at_ms: number | null;
+    email: string;
+    has_local_password: number;
+  } | undefined;
   if (!row) return null;
   if (row.expires_at_ms < Date.now()) {
     db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
     return null;
   }
-  return { userId: row.user_id, email: row.email };
+  const authSource: AuthSource = row.auth_source === 'oidc' || row.auth_source === 'desktop'
+    ? row.auth_source
+    : 'password';
+  return {
+    userId: row.user_id,
+    email: row.email,
+    authSource,
+    hasLocalPassword: row.has_local_password !== 0,
+    reauthenticatedAtMs: row.reauthenticated_at_ms ?? null,
+  };
 }
 
 export function deleteSession(token: string | undefined | null): void {
@@ -131,9 +215,9 @@ export function resetReauthFailures(): void {
 /** Update the email of the authenticated user after verifying the current password. Throws { code: 'email_taken' } on conflict. */
 export function updateEmail(userId: number, currentPassword: string, newEmail: string): boolean {
   const db = getDb();
-  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?')
-    .get(userId) as { password_hash: string } | undefined;
-  if (!row) return false;
+  const row = db.prepare('SELECT password_hash, has_local_password FROM users WHERE id = ?')
+    .get(userId) as { password_hash: string; has_local_password: number } | undefined;
+  if (!row || row.has_local_password === 0) return false;
   if (!verifyPassword(currentPassword, row.password_hash)) return false;
 
   const normalized = normalizeEmail(newEmail);
@@ -151,9 +235,9 @@ export function updateEmail(userId: number, currentPassword: string, newEmail: s
 /** Update the password of the authenticated user after verifying the current one. Invalidates all sessions on success. */
 export function updatePassword(userId: number, currentPassword: string, newPassword: string): boolean {
   const db = getDb();
-  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?')
-    .get(userId) as { password_hash: string } | undefined;
-  if (!row) return false;
+  const row = db.prepare('SELECT password_hash, has_local_password FROM users WHERE id = ?')
+    .get(userId) as { password_hash: string; has_local_password: number } | undefined;
+  if (!row || row.has_local_password === 0) return false;
   if (!verifyPassword(currentPassword, row.password_hash)) return false;
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), userId);
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
@@ -168,14 +252,22 @@ export function accountEmail(): string | null {
 
 /**
  * Reset the password for the single existing user and invalidate all
- * sessions.
+ * sessions. Also restores has_local_password = 1 so the server-logged reset
+ * code remains a reliable emergency recovery hatch for OIDC-only installs.
  * Returns the user, or null if no user exists.
  */
 export function resetUserPassword(newPassword: string): SessionUser | null {
   const db = getDb();
   const row = db.prepare('SELECT id, email FROM users LIMIT 1').get() as { id: number; email: string } | undefined;
   if (!row) return null;
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), row.id);
+  db.prepare('UPDATE users SET password_hash = ?, has_local_password = 1 WHERE id = ?')
+    .run(hashPassword(newPassword), row.id);
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.id);
-  return { userId: row.id, email: row.email };
+  return {
+    userId: row.id,
+    email: row.email,
+    authSource: 'password',
+    hasLocalPassword: true,
+    reauthenticatedAtMs: null,
+  };
 }

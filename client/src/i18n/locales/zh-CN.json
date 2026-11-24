@@ -60,7 +60,16 @@
     "emailChanged": "邮箱修改成功。",
     "passwordReset": "密码重置成功，请重新登录。",
     "resetCodeDockerHint": "在 Docker 中运行？重置码在容器日志中：docker logs <container>",
-    "desktopSessionFailed": "控制台无法登录本地服务器。请退出 FreeLLMAPI 并重新打开。"
+    "desktopSessionFailed": "控制台无法登录本地服务器。请退出 FreeLLMAPI 并重新打开。",
+    "signInWithSso": "使用 {provider} 登录",
+    "orContinueWithPassword": "或使用邮箱密码登录",
+    "reverifyWithSso": "使用 {provider} 重新验证",
+    "oidcReauthHint": "请通过 {provider} 确认身份以访问明文密钥。",
+    "oidcReauthSuccess": "身份已验证，有效期 5 分钟。",
+    "oidcErrorNotAllowed": "你的账号未被允许登录此仪表盘。",
+    "oidcErrorUnverifiedEmail": "登录前，身份提供方必须先验证你的邮箱地址。",
+    "oidcErrorNoAccount": "没有匹配的账号，且自动创建账号已关闭。",
+    "oidcErrorFailed": "单点登录失败，请重试。"
   },
   "common": {
     "save": "保存",

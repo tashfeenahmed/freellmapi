@@ -60,7 +60,16 @@
     "emailChanged": "เปลี่ยนอีเมลเรียบร้อยแล้ว",
     "passwordReset": "รีเซ็ตรหัสผ่านแล้ว กรุณาเข้าสู่ระบบ",
     "resetCodeDockerHint": "ใช้งานใน Docker อยู่ใช่ไหม รหัสอยู่ในบันทึกของคอนเทนเนอร์: docker logs <container>",
-    "desktopSessionFailed": "แดชบอร์ดไม่สามารถลงชื่อเข้าใช้เซิร์ฟเวอร์ในเครื่องได้ ปิด FreeLLMAPI แล้วเปิดใหม่อีกครั้ง"
+    "desktopSessionFailed": "แดชบอร์ดไม่สามารถลงชื่อเข้าใช้เซิร์ฟเวอร์ในเครื่องได้ ปิด FreeLLMAPI แล้วเปิดใหม่อีกครั้ง",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "บันทึก",

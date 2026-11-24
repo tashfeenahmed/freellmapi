@@ -60,7 +60,16 @@
     "emailChanged": "ಇಮೇಲ್ ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಯಿಸಲಾಗಿದೆ.",
     "passwordReset": "ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
     "resetCodeDockerHint": "Docker ನಲ್ಲಿ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ? ಕೋಡ್ ಕಂಟೈನರ್ ಲಾಗ್‌ನಲ್ಲಿದೆ: docker logs <container>.",
-    "desktopSessionFailed": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಸ್ಥಳೀಯ ಸರ್ವರ್‌ಗೆ ಸೈನ್ ಇನ್ ಆಗಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. FreeLLMAPI ಅನ್ನು ಮುಚ್ಚಿ ಮತ್ತೆ ತೆರೆಯಿರಿ."
+    "desktopSessionFailed": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಸ್ಥಳೀಯ ಸರ್ವರ್‌ಗೆ ಸೈನ್ ಇನ್ ಆಗಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. FreeLLMAPI ಅನ್ನು ಮುಚ್ಚಿ ಮತ್ತೆ ತೆರೆಯಿರಿ.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "ಉಳಿಸಿ",

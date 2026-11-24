@@ -60,7 +60,16 @@
     "emailChanged": "ईमेल सफलतापूर्वक बदला गया।",
     "passwordReset": "पासवर्ड रीसेट हो गया। कृपया साइन इन करें।",
     "resetCodeDockerHint": "Docker में चला रहे हैं? कोड कंटेनर लॉग में है: docker logs <container>।",
-    "desktopSessionFailed": "डैशबोर्ड लोकल सर्वर में साइन इन नहीं कर सका। FreeLLMAPI बंद करके दोबारा खोलें।"
+    "desktopSessionFailed": "डैशबोर्ड लोकल सर्वर में साइन इन नहीं कर सका। FreeLLMAPI बंद करके दोबारा खोलें।",
+    "signInWithSso": "{provider} से साइन इन करें",
+    "orContinueWithPassword": "या ईमेल से जारी रखें",
+    "reverifyWithSso": "{provider} से पुनः सत्यापित करें",
+    "oidcReauthHint": "सादा-टेक्स्ट कुंजियाँ देखने के लिए {provider} से अपनी पहचान सत्यापित करें।",
+    "oidcReauthSuccess": "अगले 5 मिनट के लिए पहचान सत्यापित हो गई है।",
+    "oidcErrorNotAllowed": "आपके खाते को इस डैशबोर्ड में साइन इन करने की अनुमति नहीं है।",
+    "oidcErrorUnverifiedEmail": "साइन इन करने से पहले आपके पहचान प्रदाता द्वारा ईमेल सत्यापित होना आवश्यक है।",
+    "oidcErrorNoAccount": "कोई मिलान खाता मौजूद नहीं है और स्वचालित खाता निर्माण अक्षम है।",
+    "oidcErrorFailed": "सिंगल साइन-ऑन विफल रहा। कृपया पुनः प्रयास करें।"
   },
   "common": {
     "save": "सहेजें",
