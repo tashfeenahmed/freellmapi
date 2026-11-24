@@ -180,7 +180,12 @@
     "updateNow": "Актуализирай сега",
     "updatingContainer": "Изтегля се новият образ и се рестартира. Страницата ще се презареди, когато FreeLLMAPI се върне.",
     "updateNowFailed": "Актуализаторът не прие заявката. Проверете дали контейнерът watchtower работи.",
-    "updateNowTimeout": "FreeLLMAPI не се е рестартирал след 5 минути. Проверете логовете на контейнера watchtower."
+    "updateNowTimeout": "FreeLLMAPI не се е рестартирал след 5 минути. Проверете логовете на контейнера watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Модели",

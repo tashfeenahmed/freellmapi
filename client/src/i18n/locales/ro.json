@@ -180,7 +180,12 @@
     "updateNow": "Actualizează acum",
     "updatingContainer": "Se descarcă noua imagine și se repornește. Pagina se reîncarcă când FreeLLMAPI revine.",
     "updateNowFailed": "Actualizatorul nu a acceptat cererea. Verifică dacă containerul watchtower rulează.",
-    "updateNowTimeout": "FreeLLMAPI nu a repornit după 5 minute. Verifică jurnalele containerului watchtower."
+    "updateNowTimeout": "FreeLLMAPI nu a repornit după 5 minute. Verifică jurnalele containerului watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modele",

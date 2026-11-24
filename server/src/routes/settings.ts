@@ -33,6 +33,11 @@ import {
   UNIFIED_MAX_TOKENS_AUTO,
   unifiedMaxTokensCap,
 } from '../lib/sampling-params.js';
+import {
+  SYSTEM_DATE_MODES,
+  getSystemDateMode,
+  setSystemDateMode,
+} from '../lib/system-date.js';
 
 export const settingsRouter = Router();
 
@@ -68,6 +73,31 @@ settingsRouter.put('/update-check', (req: Request, res: Response) => {
   }
   setSetting(UPDATE_CHECK_SETTING, parsed.data.enabled ? '1' : '0');
   res.json({ enabled: isAutoUpdateCheckEnabled() });
+});
+
+// Opt-in system-date injection into outbound system prompts (#1931).
+// 'off' (default) preserves prompt-cache stability; 'web_search' injects
+// Current date: YYYY-MM-DD (UTC) only when web search tools/context are
+// present; 'always' injects on every chat request (unless the caller's system
+// prompt already states a date).
+const systemDateSchema = z.object({ mode: z.enum(SYSTEM_DATE_MODES) }).strict();
+
+settingsRouter.get('/system-date', (_req: Request, res: Response) => {
+  res.json({ mode: getSystemDateMode() });
+});
+
+settingsRouter.put('/system-date', (req: Request, res: Response) => {
+  const parsed = systemDateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: {
+        message: `Invalid system date setting: ${parsed.error.issues.map(error => error.message).join(', ')}`,
+        type: 'invalid_request_error',
+      },
+    });
+    return;
+  }
+  res.json({ mode: setSystemDateMode(parsed.data.mode) });
 });
 
 settingsRouter.get('/compression', (_req: Request, res: Response) => {

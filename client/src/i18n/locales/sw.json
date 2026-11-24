@@ -180,7 +180,12 @@
     "updateNow": "Sasisha sasa",
     "updatingContainer": "Inavuta picha mpya na kuanza upya. Ukurasa huu utapakia upya FreeLLMAPI itakaporudi.",
     "updateNowFailed": "Kisasishaji hakikukubali ombi. Hakikisha kontena la watchtower linafanya kazi.",
-    "updateNowTimeout": "FreeLLMAPI haijaanza upya baada ya dakika 5. Angalia kumbukumbu za kontena la watchtower."
+    "updateNowTimeout": "FreeLLMAPI haijaanza upya baada ya dakika 5. Angalia kumbukumbu za kontena la watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Mifano",

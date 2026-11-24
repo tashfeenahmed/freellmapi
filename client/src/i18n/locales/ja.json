@@ -180,7 +180,12 @@
     "updateNow": "今すぐアップデート",
     "updatingContainer": "新しいイメージを取得して再起動しています。FreeLLMAPI が戻るとこのページは再読み込みされます。",
     "updateNowFailed": "アップデーターがリクエストを受け付けませんでした。watchtower コンテナが動いているか確認してください。",
-    "updateNowTimeout": "5 分経っても FreeLLMAPI が再起動していません。watchtower コンテナのログを確認してください。"
+    "updateNowTimeout": "5 分経っても FreeLLMAPI が再起動していません。watchtower コンテナのログを確認してください。",
+    "injectSystemDate": "プロンプトにシステム日付を挿入",
+    "injectSystemDateHelp": "システムプロンプトの先頭に本日の UTC 日付（YYYY-MM-DD）を追加し、Web 検索で最新情報を取得しやすくします。既に日付が含まれている場合はスキップされます。",
+    "injectSystemDateOff": "オフ",
+    "injectSystemDateWebSearch": "Web検索時",
+    "injectSystemDateAlways": "常に"
   },
   "models": {
     "title": "モデル",

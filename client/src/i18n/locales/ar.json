@@ -180,7 +180,12 @@
     "updateNow": "حدّث الآن",
     "updatingContainer": "جارٍ سحب الصورة الجديدة وإعادة التشغيل. ستُعاد تحميل هذه الصفحة عند عودة FreeLLMAPI.",
     "updateNowFailed": "لم يقبل المحدِّث الطلب. تحقّق من أن حاوية watchtower تعمل.",
-    "updateNowTimeout": "لم يُعد FreeLLMAPI التشغيل بعد 5 دقائق. راجع سجلات حاوية watchtower."
+    "updateNowTimeout": "لم يُعد FreeLLMAPI التشغيل بعد 5 دقائق. راجع سجلات حاوية watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "نماذج",

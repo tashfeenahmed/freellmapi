@@ -180,7 +180,12 @@
     "updateNow": "อัปเดตตอนนี้",
     "updatingContainer": "กำลังดึงอิมเมจใหม่และรีสตาร์ต หน้านี้จะโหลดใหม่เมื่อ FreeLLMAPI กลับมา",
     "updateNowFailed": "ตัวอัปเดตไม่รับคำขอ ตรวจสอบว่าคอนเทนเนอร์ watchtower กำลังทำงาน",
-    "updateNowTimeout": "FreeLLMAPI ยังไม่รีสตาร์ตหลังผ่านไป 5 นาที ตรวจสอบบันทึกของคอนเทนเนอร์ watchtower"
+    "updateNowTimeout": "FreeLLMAPI ยังไม่รีสตาร์ตหลังผ่านไป 5 นาที ตรวจสอบบันทึกของคอนเทนเนอร์ watchtower",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "โมเดล",

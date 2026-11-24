@@ -180,7 +180,12 @@
     "updateNow": "Perbarui sekarang",
     "updatingContainer": "Menarik image baru dan memulai ulang. Halaman ini dimuat ulang saat FreeLLMAPI kembali.",
     "updateNowFailed": "Pembaru tidak menerima permintaan. Pastikan kontainer watchtower berjalan.",
-    "updateNowTimeout": "FreeLLMAPI belum dimulai ulang setelah 5 menit. Periksa log kontainer watchtower."
+    "updateNowTimeout": "FreeLLMAPI belum dimulai ulang setelah 5 menit. Periksa log kontainer watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Model",

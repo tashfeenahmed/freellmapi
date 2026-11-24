@@ -180,7 +180,12 @@
     "updateNow": "Actualizar ahora",
     "updatingContainer": "Descargando la nueva imagen y reiniciando. Esta página se recargará cuando FreeLLMAPI vuelva.",
     "updateNowFailed": "El actualizador no aceptó la solicitud. Comprueba que el contenedor watchtower está en marcha.",
-    "updateNowTimeout": "FreeLLMAPI no se ha reiniciado tras 5 minutos. Revisa los registros del contenedor watchtower."
+    "updateNowTimeout": "FreeLLMAPI no se ha reiniciado tras 5 minutos. Revisa los registros del contenedor watchtower.",
+    "injectSystemDate": "Fecha del sistema en el prompt",
+    "injectSystemDateHelp": "Añade la fecha UTC actual (YYYY-MM-DD) al inicio del prompt del sistema para que los modelos consulten la búsqueda web con información reciente. Se omite si el cliente ya incluye una fecha.",
+    "injectSystemDateOff": "Desactivado",
+    "injectSystemDateWebSearch": "Búsqueda web",
+    "injectSystemDateAlways": "Siempre"
   },
   "models": {
     "title": "Modelos",

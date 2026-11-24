@@ -180,7 +180,12 @@
     "updateNow": "立即更新",
     "updatingContainer": "正在拉取新镜像并重启。FreeLLMAPI 恢复后此页面会自动重新加载。",
     "updateNowFailed": "更新器未接受请求。请确认 watchtower 容器正在运行。",
-    "updateNowTimeout": "5 分钟后 FreeLLMAPI 仍未重启。请查看 watchtower 容器的日志。"
+    "updateNowTimeout": "5 分钟后 FreeLLMAPI 仍未重启。请查看 watchtower 容器的日志。",
+    "injectSystemDate": "在系统提示词中注入当前日期",
+    "injectSystemDateHelp": "在系统提示词前添加当前 UTC 日期（YYYY-MM-DD），便于模型结合联网搜索获取最新信息。若调用方已包含日期则自动跳过。建议选择“关闭”或“仅联网搜索”以保持提示词缓存命中。",
+    "injectSystemDateOff": "关闭",
+    "injectSystemDateWebSearch": "联网搜索",
+    "injectSystemDateAlways": "始终"
   },
   "models": {
     "title": "模型",

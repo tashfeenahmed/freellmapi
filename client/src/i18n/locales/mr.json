@@ -180,7 +180,12 @@
     "updateNow": "आता अपडेट करा",
     "updatingContainer": "नवीन इमेज ओढली जात आहे आणि रीस्टार्ट होत आहे. FreeLLMAPI परत आल्यावर हे पेज रीलोड होईल.",
     "updateNowFailed": "अपडेटरने विनंती स्वीकारली नाही. watchtower कंटेनर चालू आहे का ते तपासा.",
-    "updateNowTimeout": "५ मिनिटांनंतरही FreeLLMAPI रीस्टार्ट झाले नाही. watchtower कंटेनरचे लॉग तपासा."
+    "updateNowTimeout": "५ मिनिटांनंतरही FreeLLMAPI रीस्टार्ट झाले नाही. watchtower कंटेनरचे लॉग तपासा.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "मॉडेल्स",

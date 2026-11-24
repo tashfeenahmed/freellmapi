@@ -180,7 +180,12 @@
     "updateNow": "Frissítés most",
     "updatingContainer": "Az új image letöltése és újraindítás. Az oldal újratöltődik, amikor a FreeLLMAPI visszatér.",
     "updateNowFailed": "A frissítő nem fogadta el a kérést. Ellenőrizze, hogy fut-e a watchtower konténer.",
-    "updateNowTimeout": "A FreeLLMAPI 5 perc után sem indult újra. Nézze meg a watchtower konténer naplóit."
+    "updateNowTimeout": "A FreeLLMAPI 5 perc után sem indult újra. Nézze meg a watchtower konténer naplóit.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modellek",

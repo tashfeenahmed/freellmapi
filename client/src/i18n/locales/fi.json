@@ -180,7 +180,12 @@
     "updateNow": "Päivitä nyt",
     "updatingContainer": "Ladataan uutta imagea ja käynnistetään uudelleen. Sivu latautuu uudelleen, kun FreeLLMAPI palaa.",
     "updateNowFailed": "Päivittäjä ei hyväksynyt pyyntöä. Tarkista, että watchtower-kontti on käynnissä.",
-    "updateNowTimeout": "FreeLLMAPI ei ole käynnistynyt uudelleen 5 minuutissa. Tarkista watchtower-kontin lokit."
+    "updateNowTimeout": "FreeLLMAPI ei ole käynnistynyt uudelleen 5 minuutissa. Tarkista watchtower-kontin lokit.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Mallit",

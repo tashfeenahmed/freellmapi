@@ -180,7 +180,12 @@
     "updateNow": "Oppdater nå",
     "updatingContainer": "Henter det nye imaget og starter på nytt. Siden lastes inn på nytt når FreeLLMAPI er tilbake.",
     "updateNowFailed": "Oppdateringstjenesten godtok ikke forespørselen. Sjekk at watchtower-containeren kjører.",
-    "updateNowTimeout": "FreeLLMAPI har ikke startet på nytt etter 5 minutter. Sjekk loggene til watchtower-containeren."
+    "updateNowTimeout": "FreeLLMAPI har ikke startet på nytt etter 5 minutter. Sjekk loggene til watchtower-containeren.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeller",
