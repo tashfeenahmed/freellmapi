@@ -268,6 +268,18 @@ const ADAPTERS: Record<string, Adapter> = {
     }
     return checked;
   },
+  classifierdev: async (_cred, modelId, body, signal) => {
+    if (modelId !== 'jev-latest') throw new DecisionError('Unsupported classifier.dev model', 400);
+    // Anonymous text only. Never forward workspace keys, paid long-context
+    // options, or the upstream's default training-data opt-in.
+    const json = await upstream('https://classifier.dev/v1/systemone', 'classifierdev', {
+      method: 'POST', redirect: 'error',
+      headers: { 'Content-Type': 'application/json', 'X-Classifier-Share-Data': 'false' },
+      body: JSON.stringify({ model: modelId, state: body.state, questions: body.questions, share_data: false }),
+    }, signal);
+    const version = 'jev-1.13.0'; // Only this resolved identity is verified for the free route.
+    return { ...checkedDecisionResult(json, 'classifierdev', version, body), modelVersion: version };
+  },
   // HAL-X uses `question`, not System One's `instructions`.
   halx: async (_cred, modelId, body, signal) => {
     if (modelId !== 'THX-01') throw new DecisionError('Unsupported HAL-X model', 400);
