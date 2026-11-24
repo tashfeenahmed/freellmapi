@@ -298,6 +298,18 @@ register(new OpenAICompatProvider({
   },
 }));
 
+// DeepInfra - OpenAI-compatible inference API (https://api.deepinfra.com/v1/openai).
+// Generous free tier: 1M tokens/day on select models (e.g., Llama-3.3-70B, DeepSeek-V3),
+// no card required. Rate limits: ~60 RPM on free models. Key from deepinfra.com.
+// Uses /v1/usage for key validation since /v1/models is public.
+register(new OpenAICompatProvider({
+  platform: 'deepinfra',
+  name: 'DeepInfra',
+  baseUrl: 'https://api.deepinfra.com/v1/openai',
+  validateUrl: 'https://api.deepinfra.com/v1/usage',
+  timeoutMs: 60_000,
+}));
+
 // GitHub Models was retired upstream on 30 July 2026 (#549): models.github.ai
 // now answers every request with 200 "OK" in plain text, so a registered
 // adapter only produced fake-healthy keys and broken streams (#1557). The

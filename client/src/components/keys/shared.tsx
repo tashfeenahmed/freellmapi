@@ -87,6 +87,10 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   { value: 'mistral', label: 'Mistral', url: 'https://console.mistral.ai/api-keys/' },
   { value: 'openrouter', label: 'OpenRouter', url: 'https://openrouter.ai/keys' },
   { value: 'cohere', label: 'Cohere', url: 'https://dashboard.cohere.com/api-keys' },
+  // DeepInfra — OpenAI-compatible inference API. Generous free tier: 1M tokens/day
+  // on select models (e.g., Llama-3.3-70B, DeepSeek-V3), no card required.
+  // Rate limits: ~60 RPM on free models. Key from deepinfra.com.
+  { value: 'deepinfra', label: 'DeepInfra', url: 'https://deepinfra.com' },
   { value: 'cloudflare', label: 'Cloudflare Workers AI', url: 'https://dash.cloudflare.com' },
   { value: 'zhipu', label: 'Zhipu AI (Z.ai)', url: 'https://z.ai/manage-apikey/apikey-list' },
   { value: 'ollama', label: 'Ollama Cloud', url: 'https://ollama.com/settings/keys' },

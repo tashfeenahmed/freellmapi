@@ -177,6 +177,10 @@ export type Platform =
   | 'sambanova'
   | 'openrouter'
   | 'cohere'
+  // DeepInfra — OpenAI-compatible inference API (https://api.deepinfra.com/v1/openai).
+  // Generous free tier: 1M tokens/day on select models (e.g., Llama-3.3-70B, DeepSeek-V3),
+  // no card required. Rate limits: ~60 RPM on free models. Key from deepinfra.com.
+  | 'deepinfra'
   // Web search APIs (#1174), not chat providers. Their keys serve POST
   // /v1/search (and the agents' web_search tools) through the catalog's
   // searchEngines registry; chat calls to them are rejected. See
