@@ -47,6 +47,13 @@ describe('no-key providers by default (#1870)', () => {
     expect(getSetting('keyless_defaults')).toBe('pending');
   });
 
+  it('makes classifier.dev eligible for keyless setup only when its decision row is enabled in this tier', () => {
+    expect(keylessPlatformsInCatalog(FREE_CATALOG)).not.toContain('classifierdev');
+    const catalog = (enabled: boolean) => ({ ...FREE_CATALOG, decisionModels: [{ platform: 'classifierdev', enabled }] });
+    expect(keylessPlatformsInCatalog(catalog(false))).not.toContain('classifierdev');
+    expect(keylessPlatformsInCatalog(catalog(true))).toContain('classifierdev');
+  });
+
   it('keeps the first answer: reopening a database does not make it new again', () => {
     setSetting('keyless_defaults', 'done');
     getDb().prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run('keyless_defaults', 'pending');

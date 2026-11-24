@@ -97,6 +97,7 @@ const PLATFORMS = [
   'tinyfish',
   'halx',
   'aisense',
+  'classifierdev',
   'freeai',
   'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare', 'bai', 'radeon', 'nvidia', 'mistral',
   'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'cloudflare', 'zhipu', 'ollama',

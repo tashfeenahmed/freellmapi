@@ -39,6 +39,7 @@ export const PLATFORMS: { value: Platform; label: string; url: string; keyless?:
   // anonymous sentinel the decision router needs to consider them configured.
   { value: 'halx', label: 'HAL-X (keyless decisions)', url: 'https://hal-x.ai', keyless: true },
   { value: 'aisense', label: 'AI SENSE (keyless decisions)', url: 'https://www.aisense.no/free-public-api-decide-api-endpoint', keyless: true },
+  { value: 'classifierdev', label: 'classifier.dev (keyless decisions)', url: 'https://classifier.dev/developers', keyless: true },
   { value: 'apinex', label: 'APINex (shared daily free chat and decisions)', url: 'https://apinex.bond/keys' },
   { value: 'onomeo', label: 'onomeo (30 free calls / 5 hours, shared)', url: 'https://onomeo.com/dashboard' },
   { value: 'iteracompute', label: 'IteraCompute (30M free tokens / month, shared)', url: 'https://iteracompute.com/free/' },

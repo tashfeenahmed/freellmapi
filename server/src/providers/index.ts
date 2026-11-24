@@ -77,6 +77,7 @@ function register(provider: BaseProvider) {
 register(new GoogleProvider({ timeoutMs: 60_000 }));
 register(new KeylessDecisionProvider('halx', 'HAL-X'));
 register(new KeylessDecisionProvider('aisense', 'AI SENSE'));
+register(new KeylessDecisionProvider('classifierdev', 'classifier.dev'));
 
 // Groq - OpenAI-compatible
 register(new OpenAICompatProvider({
