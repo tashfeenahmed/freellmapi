@@ -19,6 +19,7 @@ export const CLIENT_AGENTS = [
   'hermes-agent',
   'pi',
   'reasonix',
+  'zero',
   'zcode',
   'cursor',
   'gemini-cli',
@@ -86,6 +87,8 @@ export function classifyClientAgent(req: Request): ClientAgent {
   if (/\bpi-coding-agent\b|^pi\/\d/.test(ua)) return 'pi';
   // Reasonix sends `Reasonix/<version>` to every endpoint on its own.
   if (/^reasonix\//.test(ua)) return 'reasonix';
+  // Zero (Twigpine/zero) sends `zero/<version>` (builds add `+up.<n>.<sha>...` build metadata).
+  if (/^zero\/\d/.test(ua)) return 'zero';
   // A ZCode build without the x-zcode-* headers still leads its UA with `zcode`.
   if (/\bzcode\b/.test(ua)) return 'zcode';
   if (/opencode/.test(ua)) return 'opencode';
