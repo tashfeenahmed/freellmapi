@@ -180,7 +180,12 @@
     "updateNow": "Ενημέρωση τώρα",
     "updatingContainer": "Λήψη της νέας εικόνας και επανεκκίνηση. Η σελίδα θα φορτωθεί ξανά όταν επιστρέψει το FreeLLMAPI.",
     "updateNowFailed": "Το πρόγραμμα ενημέρωσης δεν δέχτηκε το αίτημα. Ελέγξτε ότι εκτελείται το κοντέινερ watchtower.",
-    "updateNowTimeout": "Το FreeLLMAPI δεν έχει επανεκκινηθεί μετά από 5 λεπτά. Ελέγξτε τα αρχεία καταγραφής του κοντέινερ watchtower."
+    "updateNowTimeout": "Το FreeLLMAPI δεν έχει επανεκκινηθεί μετά από 5 λεπτά. Ελέγξτε τα αρχεία καταγραφής του κοντέινερ watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Μοντέλα",

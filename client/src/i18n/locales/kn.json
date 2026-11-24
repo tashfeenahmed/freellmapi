@@ -180,7 +180,12 @@
     "updateNow": "ಈಗಲೇ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ",
     "updatingContainer": "ಹೊಸ ಇಮೇಜ್ ಎಳೆಯಲಾಗುತ್ತಿದೆ ಮತ್ತು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ. FreeLLMAPI ಮರಳಿದಾಗ ಈ ಪುಟ ಮರುಲೋಡ್ ಆಗುತ್ತದೆ.",
     "updateNowFailed": "ಅಪ್‌ಡೇಟರ್ ವಿನಂತಿಯನ್ನು ಸ್ವೀಕರಿಸಲಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ.",
-    "updateNowTimeout": "5 ನಿಮಿಷಗಳ ನಂತರವೂ FreeLLMAPI ಮರುಪ್ರಾರಂಭವಾಗಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಲಾಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ."
+    "updateNowTimeout": "5 ನಿಮಿಷಗಳ ನಂತರವೂ FreeLLMAPI ಮರುಪ್ರಾರಂಭವಾಗಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಲಾಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ಮಾದರಿಗಳು",

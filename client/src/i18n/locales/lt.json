@@ -180,7 +180,12 @@
     "updateNow": "Atnaujinti dabar",
     "updatingContainer": "Atsisiunčiamas naujas atvaizdas ir paleidžiama iš naujo. Puslapis įsikels iš naujo, kai FreeLLMAPI grįš.",
     "updateNowFailed": "Atnaujintuvas nepriėmė užklausos. Patikrinkite, ar veikia watchtower konteineris.",
-    "updateNowTimeout": "FreeLLMAPI per 5 minutes nepasileido iš naujo. Peržiūrėkite watchtower konteinerio žurnalus."
+    "updateNowTimeout": "FreeLLMAPI per 5 minutes nepasileido iš naujo. Peržiūrėkite watchtower konteinerio žurnalus.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeliai",

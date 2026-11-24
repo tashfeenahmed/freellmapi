@@ -9,6 +9,7 @@ import { isLoopbackRequest } from '../lib/loopback.js';
 import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
+import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
 import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
 import { validateSession } from '../services/auth.js';
@@ -407,9 +408,10 @@ ollamaRouter.post('/api/chat', (req, res) => {
   const options = body.options as Record<string, unknown> | undefined;
   const rawSession = req.headers['x-ollama-session-id'] ?? req.headers['x-session-id'];
   const sessionId = Array.isArray(rawSession) ? rawSession[0] : rawSession;
+  const tools = ollamaTools(body.tools);
   return runInboundChat(req, res, {
     model,
-    messages: ollamaMessages(body.messages),
+    messages: maybeInjectSystemDate(ollamaMessages(body.messages), { tools }),
     stream: body.stream !== false,
     maxTokens: ollamaMaxTokens(options?.num_predict),
     defaultMaxTokens: OLLAMA_DEFAULT_MAX_TOKENS,
@@ -419,7 +421,7 @@ ollamaRouter.post('/api/chat', (req, res) => {
     stop: Array.isArray(options?.stop)
       ? options.stop.filter((value): value is string => typeof value === 'string')
       : undefined,
-    tools: ollamaTools(body.tools),
+    tools,
     responseFormat: body.format
       ? (body.format === 'json'
         ? { type: 'json_object' }
@@ -530,7 +532,7 @@ ollamaRouter.post('/api/generate', (req, res) => {
   });
   return runInboundChat(req, res, {
     model,
-    messages,
+    messages: maybeInjectSystemDate(messages),
     stream: body.stream !== false,
     maxTokens: ollamaMaxTokens(options?.num_predict),
     defaultMaxTokens: OLLAMA_DEFAULT_MAX_TOKENS,

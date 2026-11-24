@@ -180,7 +180,12 @@
     "updateNow": "இப்போது புதுப்பி",
     "updatingContainer": "புதிய image-ஐப் பெற்று மறுதொடக்கம் செய்கிறது. FreeLLMAPI திரும்பியதும் இந்தப் பக்கம் மீண்டும் ஏற்றப்படும்.",
     "updateNowFailed": "புதுப்பிப்பான் கோரிக்கையை ஏற்கவில்லை. watchtower கொள்கலன் இயங்குகிறதா எனச் சரிபார்க்கவும்.",
-    "updateNowTimeout": "5 நிமிடங்களுக்குப் பிறகும் FreeLLMAPI மறுதொடக்கம் ஆகவில்லை. watchtower கொள்கலனின் பதிவுகளைப் பார்க்கவும்."
+    "updateNowTimeout": "5 நிமிடங்களுக்குப் பிறகும் FreeLLMAPI மறுதொடக்கம் ஆகவில்லை. watchtower கொள்கலனின் பதிவுகளைப் பார்க்கவும்.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "மாதிரிகள்",

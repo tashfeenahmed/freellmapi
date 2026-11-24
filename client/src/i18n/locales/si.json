@@ -180,7 +180,12 @@
     "updateNow": "දැන් යාවත්කාලීන කරන්න",
     "updatingContainer": "නව image එක ලබාගෙන නැවත ආරම්භ කරමින්. FreeLLMAPI නැවත පැමිණි විට මෙම පිටුව නැවත පූරණය වේ.",
     "updateNowFailed": "යාවත්කාලීනකරු ඉල්ලීම පිළිගත්තේ නැත. watchtower container එක ධාවනය වන්නේදැයි පරීක්ෂා කරන්න.",
-    "updateNowTimeout": "මිනිත්තු 5කට පසුවත් FreeLLMAPI නැවත ආරම්භ වී නැත. watchtower container හි ලොග් පරීක්ෂා කරන්න."
+    "updateNowTimeout": "මිනිත්තු 5කට පසුවත් FreeLLMAPI නැවත ආරම්භ වී නැත. watchtower container හි ලොග් පරීක්ෂා කරන්න.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ආකෘති",

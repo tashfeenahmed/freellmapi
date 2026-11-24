@@ -180,7 +180,12 @@
     "updateNow": "Aktualizovat nyní",
     "updatingContainer": "Stahuje se nový obraz a probíhá restart. Stránka se znovu načte, až bude FreeLLMAPI zpět.",
     "updateNowFailed": "Aktualizátor požadavek nepřijal. Zkontrolujte, že kontejner watchtower běží.",
-    "updateNowTimeout": "FreeLLMAPI se ani po 5 minutách nerestartoval. Zkontrolujte logy kontejneru watchtower."
+    "updateNowTimeout": "FreeLLMAPI se ani po 5 minutách nerestartoval. Zkontrolujte logy kontejneru watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modely",

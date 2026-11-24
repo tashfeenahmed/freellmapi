@@ -180,7 +180,12 @@
     "updateNow": "ယခု အပ်ဒိတ်လုပ်ရန်",
     "updatingContainer": "image အသစ်ကို ဆွဲယူပြီး ပြန်စတင်နေသည်။ FreeLLMAPI ပြန်လာသောအခါ ဤစာမျက်နှာ ပြန်ဖွင့်ပါမည်။",
     "updateNowFailed": "အပ်ဒိတ်လုပ်သူက တောင်းဆိုမှုကို မလက်ခံပါ။ watchtower container လည်ပတ်နေကြောင်း စစ်ဆေးပါ။",
-    "updateNowTimeout": "၅ မိနစ်ကြာသော်လည်း FreeLLMAPI ပြန်မစတင်သေးပါ။ watchtower container ၏ မှတ်တမ်းများကို စစ်ဆေးပါ။"
+    "updateNowTimeout": "၅ မိနစ်ကြာသော်လည်း FreeLLMAPI ပြန်မစတင်သေးပါ။ watchtower container ၏ မှတ်တမ်းများကို စစ်ဆေးပါ။",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "မော်ဒယ်များ",

@@ -12,6 +12,7 @@ import type {
 import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt } from '../lib/system-prompt.js';
+import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
 import { contentToString, estimateInputTokens, messageHasImage } from '../lib/content.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
@@ -779,6 +780,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   });
   messages = compressionResult.messages;
   res.setHeader('X-FreeLLM-Compress', formatCompressionHeader(compressionResult));
+
+  // Opt-in system date (#1931): injected after compression and behind any
+  // client-profile enforced prompt.
+  messages = maybeInjectSystemDate(messages, { tools });
 
   // Server-enforced system prompt (#411): after compression so it is never
   // compressed away, first in the list so the caller's own instructions

@@ -15,6 +15,7 @@ import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, Me
 import multer from 'multer';
 import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
+import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { contentToString, estimateInputTokens, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../lib/content.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
@@ -2066,6 +2067,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   });
   messages = compressionResult.messages;
   res.setHeader('X-FreeLLM-Compress', formatCompressionHeader(compressionResult));
+
+  // Opt-in system date (#1931): injected after compression (never compressed
+  // away) and right behind any client-profile enforced system prompt.
+  messages = maybeInjectSystemDate(messages, { tools });
 
   // Server-enforced system prompt (#411): injected AFTER compression so it is
   // never compressed away, and FIRST in the list so a caller-supplied system

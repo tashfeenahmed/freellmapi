@@ -180,7 +180,12 @@
     "updateNow": "Melite ugbu a",
     "updatingContainer": "Na-adọta onyonyo ọhụrụ ma na-amalitegharị. Ibe a ga-ebugharị mgbe FreeLLMAPI lọghachiri.",
     "updateNowFailed": "Onye mmelite anabataghị arịrịọ ahụ. Lelee ma akpa watchtower na-arụ ọrụ.",
-    "updateNowTimeout": "FreeLLMAPI amalitegharịbeghị mgbe nkeji 5 gachara. Lelee ndekọ akpa watchtower."
+    "updateNowTimeout": "FreeLLMAPI amalitegharịbeghị mgbe nkeji 5 gachara. Lelee ndekọ akpa watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Ụdị",

@@ -180,7 +180,12 @@
     "updateNow": "Обновить сейчас",
     "updatingContainer": "Загружается новый образ и выполняется перезапуск. Страница перезагрузится, когда FreeLLMAPI вернётся.",
     "updateNowFailed": "Служба обновления не приняла запрос. Проверьте, что контейнер watchtower запущен.",
-    "updateNowTimeout": "FreeLLMAPI не перезапустился за 5 минут. Проверьте журналы контейнера watchtower."
+    "updateNowTimeout": "FreeLLMAPI не перезапустился за 5 минут. Проверьте журналы контейнера watchtower.",
+    "injectSystemDate": "Системная дата в промпте",
+    "injectSystemDateHelp": "Добавляет текущую дату UTC (YYYY-MM-DD) в начало системного промпта, чтобы модели использовали актуальный год при веб-поиске. Пропускается, если дата уже указана.",
+    "injectSystemDateOff": "Выкл",
+    "injectSystemDateWebSearch": "Веб-поиск",
+    "injectSystemDateAlways": "Всегда"
   },
   "models": {
     "title": "Модели",

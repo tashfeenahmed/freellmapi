@@ -180,7 +180,12 @@
     "updateNow": "Cập nhật ngay",
     "updatingContainer": "Đang kéo image mới và khởi động lại. Trang này sẽ tải lại khi FreeLLMAPI hoạt động trở lại.",
     "updateNowFailed": "Trình cập nhật không chấp nhận yêu cầu. Hãy kiểm tra container watchtower đang chạy.",
-    "updateNowTimeout": "FreeLLMAPI chưa khởi động lại sau 5 phút. Hãy xem nhật ký của container watchtower."
+    "updateNowTimeout": "FreeLLMAPI chưa khởi động lại sau 5 phút. Hãy xem nhật ký của container watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Người mẫu",

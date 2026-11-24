@@ -180,7 +180,12 @@
     "updateNow": "עדכן עכשיו",
     "updatingContainer": "מושך את האימג׳ החדש ומפעיל מחדש. הדף ייטען מחדש כש-FreeLLMAPI יחזור.",
     "updateNowFailed": "המעדכן לא קיבל את הבקשה. ודאו שמכולת watchtower פועלת.",
-    "updateNowTimeout": "FreeLLMAPI לא הופעל מחדש אחרי 5 דקות. בדקו את היומנים של מכולת watchtower."
+    "updateNowTimeout": "FreeLLMAPI לא הופעל מחדש אחרי 5 דקות. בדקו את היומנים של מכולת watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "דגמים",

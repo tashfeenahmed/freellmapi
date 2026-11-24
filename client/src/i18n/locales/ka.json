@@ -180,7 +180,12 @@
     "updateNow": "ახლავე განახლება",
     "updatingContainer": "ახალი იმიჯის ჩამოტვირთვა და გადატვირთვა. გვერდი გადაიტვირთება, როცა FreeLLMAPI დაბრუნდება.",
     "updateNowFailed": "განახლების სერვისმა მოთხოვნა არ მიიღო. შეამოწმეთ, მუშაობს თუ არა watchtower კონტეინერი.",
-    "updateNowTimeout": "FreeLLMAPI 5 წუთის შემდეგაც არ გადაიტვირთა. შეამოწმეთ watchtower კონტეინერის ჟურნალები."
+    "updateNowTimeout": "FreeLLMAPI 5 წუთის შემდეგაც არ გადაიტვირთა. შეამოწმეთ watchtower კონტეინერის ჟურნალები.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "მოდელები",

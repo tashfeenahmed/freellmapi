@@ -180,7 +180,12 @@
     "updateNow": "ବର୍ତ୍ତମାନ ଅପଡେଟ୍ କରନ୍ତୁ",
     "updatingContainer": "ନୂଆ ଇମେଜ୍ ଟାଣାଯାଉଛି ଏବଂ ପୁନଃ ଆରମ୍ଭ ହେଉଛି। FreeLLMAPI ଫେରିଲେ ଏହି ପୃଷ୍ଠା ପୁନଃ ଲୋଡ୍ ହେବ।",
     "updateNowFailed": "ଅପଡେଟର ଅନୁରୋଧ ଗ୍ରହଣ କଲା ନାହିଁ। watchtower କଣ୍ଟେନର ଚାଲୁଛି କି ନାହିଁ ଯାଞ୍ଚ କରନ୍ତୁ।",
-    "updateNowTimeout": "୫ ମିନିଟ ପରେ ମଧ୍ୟ FreeLLMAPI ପୁନଃ ଆରମ୍ଭ ହୋଇନାହିଁ। watchtower କଣ୍ଟେନରର ଲଗ୍ ଦେଖନ୍ତୁ।"
+    "updateNowTimeout": "୫ ମିନିଟ ପରେ ମଧ୍ୟ FreeLLMAPI ପୁନଃ ଆରମ୍ଭ ହୋଇନାହିଁ। watchtower କଣ୍ଟେନରର ଲଗ୍ ଦେଖନ୍ତୁ।",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ମଡେଲଗୁଡିକ",

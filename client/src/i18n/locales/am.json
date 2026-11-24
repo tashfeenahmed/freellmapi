@@ -180,7 +180,12 @@
     "updateNow": "አሁን አዘምን",
     "updatingContainer": "አዲሱን ምስል እያወረደ እንደገና በመጀመር ላይ። FreeLLMAPI ሲመለስ ይህ ገጽ እንደገና ይጫናል።",
     "updateNowFailed": "አዘማኙ ጥያቄውን አልተቀበለም። የwatchtower ኮንቴይነር እየሰራ መሆኑን ያረጋግጡ።",
-    "updateNowTimeout": "FreeLLMAPI ከ5 ደቂቃ በኋላም እንደገና አልጀመረም። የwatchtower ኮንቴይነርን ምዝግብ ማስታወሻዎች ይመልከቱ።"
+    "updateNowTimeout": "FreeLLMAPI ከ5 ደቂቃ በኋላም እንደገና አልጀመረም። የwatchtower ኮንቴይነርን ምዝግብ ማስታወሻዎች ይመልከቱ።",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ሞዴሎች",

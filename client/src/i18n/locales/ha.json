@@ -180,7 +180,12 @@
     "updateNow": "Sabunta yanzu",
     "updatingContainer": "Ana jan sabon hoto ana sake farawa. Wannan shafin zai sake lodawa idan FreeLLMAPI ya dawo.",
     "updateNowFailed": "Mai sabuntawa bai karɓi buƙatar ba. Duba ko kwantena watchtower yana aiki.",
-    "updateNowTimeout": "FreeLLMAPI bai sake farawa ba bayan minti 5. Duba bayanan log na kwantena watchtower."
+    "updateNowTimeout": "FreeLLMAPI bai sake farawa ba bayan minti 5. Duba bayanan log na kwantena watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Samfura",

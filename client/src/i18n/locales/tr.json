@@ -180,7 +180,12 @@
     "updateNow": "Şimdi güncelle",
     "updatingContainer": "Yeni imaj çekiliyor ve yeniden başlatılıyor. FreeLLMAPI geri geldiğinde bu sayfa yenilenecek.",
     "updateNowFailed": "Güncelleyici isteği kabul etmedi. watchtower konteynerinin çalıştığından emin olun.",
-    "updateNowTimeout": "FreeLLMAPI 5 dakika sonra hâlâ yeniden başlamadı. watchtower konteynerinin günlüklerine bakın."
+    "updateNowTimeout": "FreeLLMAPI 5 dakika sonra hâlâ yeniden başlamadı. watchtower konteynerinin günlüklerine bakın.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeller",

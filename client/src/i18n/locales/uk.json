@@ -180,7 +180,12 @@
     "updateNow": "Оновити зараз",
     "updatingContainer": "Завантажується новий образ і виконується перезапуск. Сторінка перезавантажиться, коли FreeLLMAPI повернеться.",
     "updateNowFailed": "Служба оновлення не прийняла запит. Перевірте, що контейнер watchtower запущено.",
-    "updateNowTimeout": "FreeLLMAPI не перезапустився за 5 хвилин. Перегляньте журнали контейнера watchtower."
+    "updateNowTimeout": "FreeLLMAPI не перезапустився за 5 хвилин. Перегляньте журнали контейнера watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Моделі",

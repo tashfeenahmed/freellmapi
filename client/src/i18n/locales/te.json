@@ -180,7 +180,12 @@
     "updateNow": "ఇప్పుడే అప్‌డేట్ చేయండి",
     "updatingContainer": "కొత్త ఇమేజ్‌ను తెచ్చి రీస్టార్ట్ అవుతోంది. FreeLLMAPI తిరిగి వచ్చాక ఈ పేజీ రీలోడ్ అవుతుంది.",
     "updateNowFailed": "అప్‌డేటర్ అభ్యర్థనను అంగీకరించలేదు. watchtower కంటైనర్ నడుస్తోందో లేదో చూడండి.",
-    "updateNowTimeout": "5 నిమిషాల తర్వాత కూడా FreeLLMAPI రీస్టార్ట్ కాలేదు. watchtower కంటైనర్ లాగ్‌లను చూడండి."
+    "updateNowTimeout": "5 నిమిషాల తర్వాత కూడా FreeLLMAPI రీస్టార్ట్ కాలేదు. watchtower కంటైనర్ లాగ్‌లను చూడండి.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "మోడల్స్",

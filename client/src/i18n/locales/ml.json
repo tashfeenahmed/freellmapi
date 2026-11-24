@@ -180,7 +180,12 @@
     "updateNow": "ഇപ്പോൾ അപ്‌ഡേറ്റ് ചെയ്യുക",
     "updatingContainer": "പുതിയ ഇമേജ് എടുത്ത് റീസ്റ്റാർട്ട് ചെയ്യുന്നു. FreeLLMAPI തിരിച്ചെത്തുമ്പോൾ ഈ പേജ് റീലോഡ് ചെയ്യും.",
     "updateNowFailed": "അപ്‌ഡേറ്റർ അഭ്യർത്ഥന സ്വീകരിച്ചില്ല. watchtower കണ്ടെയ്‌നർ പ്രവർത്തിക്കുന്നുണ്ടോ എന്ന് പരിശോധിക്കുക.",
-    "updateNowTimeout": "5 മിനിറ്റിനുശേഷവും FreeLLMAPI റീസ്റ്റാർട്ട് ആയില്ല. watchtower കണ്ടെയ്‌നറിന്റെ ലോഗുകൾ പരിശോധിക്കുക."
+    "updateNowTimeout": "5 മിനിറ്റിനുശേഷവും FreeLLMAPI റീസ്റ്റാർട്ട് ആയില്ല. watchtower കണ്ടെയ്‌നറിന്റെ ലോഗുകൾ പരിശോധിക്കുക.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "മോഡലുകൾ",
