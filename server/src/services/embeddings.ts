@@ -456,7 +456,8 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
              rpm_limit = ?,
              rpd_limit = ?,
              tpm_limit = ?,
-             tpd_limit = ?
+             tpd_limit = ?,
+             source = 'user'
        WHERE id = ?
     `).run(
       reg.family,
@@ -480,8 +481,8 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
   const model = db.prepare(`
     INSERT INTO embedding_models
       (family, platform, model_id, display_name, dimensions, max_input_tokens, priority, enabled, quota_label, key_id,
-       input_type, rpm_limit, rpd_limit, tpm_limit, tpd_limit)
-    VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+       input_type, rpm_limit, rpd_limit, tpm_limit, tpd_limit, source)
+    VALUES (?, 'custom', ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, 'user')
   `).run(
     reg.family,
     reg.modelId,
