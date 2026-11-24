@@ -111,6 +111,8 @@
     "generalDescription": "Jazyk a vzhled tohoto panelu.",
     "startAtLogin": "Spustit při startu systému",
     "startAtLoginHelp": "Po přihlášení k počítači automaticky spustí FreeLLMAPI.",
+    "readyOnlyModels": "Zobrazit v /v1/models pouze připravené modely",
+    "readyOnlyModelsHelp": "Pro klienty, kteří nemohou filtr odeslat sami, například pro výběr modelů v Open WebUI, nastaví ?execution_status=ready jako výchozí.",
     "advancedDescription": "Prahové hodnoty a pojistky kompresního řetězce.",
     "compressionTitle": "Komprese promptů",
     "compressionDescription": "Zmenšete velikost požadavku před směrováním se zachováním kódu, chyb, cest, čísel a definic nástrojů.",

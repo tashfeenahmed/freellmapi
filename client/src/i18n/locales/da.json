@@ -111,6 +111,8 @@
     "generalDescription": "Sprog og udseende for dette dashboard.",
     "startAtLogin": "Start ved systemstart",
     "startAtLoginHelp": "Start FreeLLMAPI automatisk, når du logger på din computer.",
+    "readyOnlyModels": "Vis kun klare modeller i /v1/models",
+    "readyOnlyModelsHelp": "Gør ?execution_status=ready til standard for klienter, der ikke selv kan sende filteret, som Open WebUIs modelvælger.",
     "advancedDescription": "Tærskler og sikkerhedskontakter for komprimeringspipelinen.",
     "compressionTitle": "Promptkomprimering",
     "compressionDescription": "Reducer forespørgslens størrelse før routing, mens kode, fejl, stier, tal og værktøjsdefinitioner bevares.",

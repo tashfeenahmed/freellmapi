@@ -111,6 +111,8 @@
     "generalDescription": "A vezérlőpult nyelve és megjelenése.",
     "startAtLogin": "Indítás rendszerindításkor",
     "startAtLoginHelp": "Automatikusan indítsa el a FreeLLMAPI-t, amikor bejelentkezik a számítógépére.",
+    "readyOnlyModels": "Csak a kész modellek listázása a /v1/models végponton",
+    "readyOnlyModelsHelp": "A ?execution_status=ready beállítást teszi alapértelmezetté azoknál a klienseknél, amelyek nem tudják maguk elküldeni a szűrőt, például az Open WebUI modellválasztójánál.",
     "advancedDescription": "A tömörítési folyamat küszöbértékei és biztonsági kapcsolói.",
     "compressionTitle": "Prompt-tömörítés",
     "compressionDescription": "Csökkenti a kérés méretét az útválasztás előtt, megőrizve a kódot, a hibákat, az elérési utakat, a számokat és az eszközdefiníciókat.",

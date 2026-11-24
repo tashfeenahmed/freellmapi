@@ -111,6 +111,8 @@
     "generalDescription": "Limba și aspectul acestui panou.",
     "startAtLogin": "Pornește la pornirea sistemului",
     "startAtLoginHelp": "Lansați automat FreeLLMAPI când vă conectați la computer.",
+    "readyOnlyModels": "Afișează în /v1/models doar modelele pregătite",
+    "readyOnlyModelsHelp": "Face ca ?execution_status=ready să fie valoarea implicită pentru clienții care nu pot trimite filtrul singuri, cum ar fi selectorul de modele din Open WebUI.",
     "advancedDescription": "Praguri și comutatoare de siguranță pentru lanțul de comprimare.",
     "compressionTitle": "Comprimarea prompturilor",
     "compressionDescription": "Reduce dimensiunea cererilor înainte de rutare, păstrând codul, erorile, căile, numerele și definițiile instrumentelor.",

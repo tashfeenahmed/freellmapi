@@ -111,6 +111,8 @@
     "generalDescription": "Lugha na mwonekano wa dashibodi hii.",
     "startAtLogin": "Anza wakati mfumo unapoanza",
     "startAtLoginHelp": "Zindua FreeLLMAPI kiotomatiki unapoingia kwenye kompyuta yako.",
+    "readyOnlyModels": "Onyesha modeli zilizo tayari pekee kwenye /v1/models",
+    "readyOnlyModelsHelp": "Hufanya ?execution_status=ready kuwa chaguo-msingi kwa wateja wasioweza kutuma kichujio wenyewe, kama kichagua modeli cha Open WebUI.",
     "advancedDescription": "Vizingiti na swichi za usalama za mfumo wa ubanaji.",
     "compressionTitle": "Ubanaji wa agizo",
     "compressionDescription": "Punguza ukubwa wa ombi kabla ya uelekezaji huku ukihifadhi msimbo, hitilafu, njia, nambari, na ufafanuzi wa zana.",

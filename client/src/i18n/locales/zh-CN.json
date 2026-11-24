@@ -111,6 +111,8 @@
     "generalDescription": "此仪表盘的语言与外观。",
     "startAtLogin": "系统启动时启动",
     "startAtLoginHelp": "在您登录计算机时自动启动 FreeLLMAPI。",
+    "readyOnlyModels": "在 /v1/models 中仅列出可用模型",
+    "readyOnlyModelsHelp": "让无法自行发送筛选条件的客户端（例如 Open WebUI 的模型选择器）默认使用 ?execution_status=ready。",
     "advancedDescription": "压缩流程的阈值与安全开关。",
     "compressionTitle": "提示词压缩",
     "compressionDescription": "在路由前减小请求大小，同时保留代码、错误信息、路径、数字和工具定义。",

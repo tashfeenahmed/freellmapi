@@ -111,6 +111,8 @@
     "generalDescription": "Ngôn ngữ và giao diện của bảng điều khiển này.",
     "startAtLogin": "Khởi động khi hệ thống khởi động",
     "startAtLoginHelp": "Tự động khởi chạy FreeLLMAPI khi bạn đăng nhập vào máy tính.",
+    "readyOnlyModels": "Chỉ liệt kê các mô hình sẵn sàng trong /v1/models",
+    "readyOnlyModelsHelp": "Đặt ?execution_status=ready làm mặc định cho những ứng dụng khách không thể tự gửi bộ lọc, chẳng hạn trình chọn mô hình của Open WebUI.",
     "advancedDescription": "Ngưỡng và công tắc an toàn cho quy trình nén.",
     "compressionTitle": "Nén lời nhắc",
     "compressionDescription": "Giảm kích thước yêu cầu trước khi định tuyến trong khi vẫn giữ nguyên mã, lỗi, đường dẫn, số và định nghĩa công cụ.",

@@ -111,6 +111,8 @@
     "generalDescription": "ភាសា និងរូបរាងរបស់ផ្ទាំងគ្រប់គ្រងនេះ។",
     "startAtLogin": "ចាប់ផ្តើមពេលប្រព័ន្ធបើក",
     "startAtLoginHelp": "ចាប់ផ្តើម FreeLLMAPI ដោយស្វ័យប្រវត្តិ ពេលអ្នកចូលកុំព្យូទ័រ។",
+    "readyOnlyModels": "រាយតែម៉ូដែលដែលរួចរាល់ក្នុង /v1/models",
+    "readyOnlyModelsHelp": "ធ្វើឱ្យ ?execution_status=ready ជាលំនាំដើមសម្រាប់អតិថិជនដែលមិនអាចផ្ញើតម្រងដោយខ្លួនឯង ដូចជាកម្មវិធីជ្រើសរើសម៉ូដែលរបស់ Open WebUI។",
     "advancedDescription": "កម្រិតកំណត់ និងកុងតាក់សុវត្ថិភាពសម្រាប់ដំណើរការបង្ហាប់។",
     "compressionTitle": "ការបង្ហាប់ prompt",
     "compressionDescription": "កាត់បន្ថយទំហំសំណើមុនពេលបញ្ជូន ដោយរក្សាកូដ កំហុស ផ្លូវ លេខ និងនិយមន័យឧបករណ៍។",

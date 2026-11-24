@@ -111,6 +111,8 @@
     "generalDescription": "આ ડેશબોર્ડની ભાષા અને દેખાવ.",
     "startAtLogin": "સિસ્ટમ સ્ટાર્ટઅપ પર શરૂ કરો",
     "startAtLoginHelp": "તમે તમારા કમ્પ્યુટર પર સાઇન ઇન કરો ત્યારે FreeLLMAPI ને આપમેળે લૉન્ચ કરો.",
+    "readyOnlyModels": "/v1/models માં ફક્ત તૈયાર મોડેલોની સૂચિ બતાવો",
+    "readyOnlyModelsHelp": "જે ક્લાયન્ટ પોતે ફિલ્ટર મોકલી શકતા નથી, જેમ કે Open WebUI નું મોડેલ પિકર, તેમના માટે ?execution_status=ready ને ડિફોલ્ટ બનાવે છે.",
     "advancedDescription": "કમ્પ્રેશન પાઇપલાઇન માટે મર્યાદાઓ અને સલામતી સ્વિચ.",
     "compressionTitle": "પ્રોમ્પ્ટ કમ્પ્રેશન",
     "compressionDescription": "કોડ, ભૂલો, પાથ, સંખ્યાઓ અને ટૂલ વ્યાખ્યાઓ સાચવીને રાઉટિંગ પહેલાં વિનંતીનું કદ ઘટાડો.",

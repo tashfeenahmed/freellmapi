@@ -111,6 +111,8 @@
     "generalDescription": "Język i wygląd tego panelu.",
     "startAtLogin": "Uruchamiaj przy starcie systemu",
     "startAtLoginHelp": "Automatycznie uruchamiaj FreeLLMAPI po zalogowaniu się do komputera.",
+    "readyOnlyModels": "Wyświetlaj w /v1/models tylko gotowe modele",
+    "readyOnlyModelsHelp": "Ustawia ?execution_status=ready jako domyślne dla klientów, którzy nie mogą sami wysłać filtra, np. selektora modeli Open WebUI.",
     "advancedDescription": "Progi i zabezpieczenia potoku kompresji.",
     "compressionTitle": "Kompresja promptów",
     "compressionDescription": "Zmniejszaj rozmiar żądań przed routingiem, zachowując kod, błędy, ścieżki, liczby i definicje narzędzi.",

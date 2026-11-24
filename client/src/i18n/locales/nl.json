@@ -111,6 +111,8 @@
     "generalDescription": "Taal en uiterlijk van dit dashboard.",
     "startAtLogin": "Starten bij het opstarten van het systeem",
     "startAtLoginHelp": "Start FreeLLMAPI automatisch wanneer u zich bij uw computer aanmeldt.",
+    "readyOnlyModels": "Toon alleen gereed zijnde modellen in /v1/models",
+    "readyOnlyModelsHelp": "Maakt ?execution_status=ready de standaard voor clients die het filter niet zelf kunnen sturen, zoals de modelkiezer van Open WebUI.",
     "advancedDescription": "Drempelwaarden en veiligheidsschakelaars voor de compressiepipeline.",
     "compressionTitle": "Promptcompressie",
     "compressionDescription": "Verklein de omvang van verzoeken vóór routering, met behoud van code, fouten, paden, getallen en tooldefinities.",

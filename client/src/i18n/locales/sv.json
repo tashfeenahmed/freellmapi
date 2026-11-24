@@ -111,6 +111,8 @@
     "generalDescription": "Språk och utseende för den här instrumentpanelen.",
     "startAtLogin": "Starta vid systemstart",
     "startAtLoginHelp": "Starta FreeLLMAPI automatiskt när du loggar in på datorn.",
+    "readyOnlyModels": "Visa bara redo modeller i /v1/models",
+    "readyOnlyModelsHelp": "Gör ?execution_status=ready till standard för klienter som inte kan skicka filtret själva, till exempel Open WebUI:s modellväljare.",
     "advancedDescription": "Tröskelvärden och säkerhetsreglage för komprimeringspipelinen.",
     "compressionTitle": "Promptkomprimering",
     "compressionDescription": "Minska förfrågningsstorleken före routing samtidigt som kod, fel, sökvägar, siffror och verktygsdefinitioner bevaras.",

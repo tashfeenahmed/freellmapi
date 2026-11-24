@@ -111,6 +111,8 @@
     "generalDescription": "የዚህ ዳሽቦርድ ቋንቋ እና አቀራረብ።",
     "startAtLogin": "በስርዓት ሲጀመር ይጀምሩ",
     "startAtLoginHelp": "ወደ ኮምፒውተርዎ ሲገቡ FreeLLMAPI በራስ-ሰር ያስነሱ",
+    "readyOnlyModels": "በ/v1/models ውስጥ ዝግጁ ሞዴሎችን ብቻ ዘርዝር",
+    "readyOnlyModelsHelp": "ማጣሪያውን በራሳቸው ማስረከብ ለማይችሉ ደንበኞች፣ ለምሳሌ የOpen WebUI ሞዴል መራጭ፣ ?execution_status=ready ን ነባሪ ያደርጋል።",
     "advancedDescription": "የጭመቃ ሂደት ገደቦች እና የደህንነት መቀየሪያዎች።",
     "compressionTitle": "የፕሮምፕት ጭመቃ",
     "compressionDescription": "ኮድን፣ ስህተቶችን፣ ዱካዎችን፣ ቁጥሮችን እና የመሣሪያ ትርጓሜዎችን በመጠበቅ ከመላክ በፊት የጥያቄውን መጠን ይቀንሱ።",

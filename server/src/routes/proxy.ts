@@ -38,7 +38,7 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { advertisedContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { advertisedContextWindow, buildModelListing, isModelsReadyOnlyDefault, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
 import { buildCodexCatalog } from '../services/codex-catalog.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
@@ -362,11 +362,21 @@ proxyRouter.get('/models', (req: Request, res: Response) => {
   const esValues: Record<string, NormalizedModel['executionStatus']> = {
     ready: 'ready', needskey: 'needsKey', exhausted: 'exhausted',
   };
-  const es = esValues[String(req.query.execution_status ?? '').toLowerCase()];
+  const statusParam = req.query.execution_status;
+  const es = statusParam === undefined ? undefined : esValues[String(statusParam).toLowerCase()];
+  // #2051: a bare request with no model filter of its own gets the stored
+  // default. Any explicit `?execution_status=` / `?available=` wins, including
+  // an unrecognised status value that is documented to filter nothing.
+  const hasExplicitFilter = statusParam !== undefined
+    || req.query.available !== undefined
+    || req.query.connected !== undefined
+    || req.query.ready !== undefined;
+  const readyOnlyDefault = !hasExplicitFilter && isModelsReadyOnlyDefault();
+  const executionStatus = readyOnlyDefault ? 'ready' : es;
 
   res.json({
     object: 'list',
-    data: buildCatalogEntries({ onlyAvailable, executionStatus: es }),
+    data: buildCatalogEntries({ onlyAvailable, executionStatus, readyOnlyDefault }),
   });
 });
 
@@ -423,7 +433,15 @@ proxyRouter.get(['/models/:id', '/models/*rest'], (req: Request, res: Response) 
 // The `?available=` / `?execution_status=` filters narrow only the catalog
 // rows — `auto`, `fusion` and the named chains are router entries, not models
 // with keys of their own.
-function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus?: NormalizedModel['executionStatus'] } = {}): Array<Record<string, unknown>> {
+function buildCatalogEntries(filters: {
+  onlyAvailable?: boolean;
+  executionStatus?: NormalizedModel['executionStatus'];
+  // True when `executionStatus` came from the stored default (#2051) rather
+  // than from the request. Only then are router entries hidden when nothing is
+  // ready: an explicit filter keeps its long-standing behaviour of always
+  // listing `auto`, `fusion` and the named chains.
+  readyOnlyDefault?: boolean;
+} = {}): Array<Record<string, unknown>> {
   const { models: allListed, autoContextWindow } = buildModelListing();
   const listed = filters.onlyAvailable ? allListed.filter(m => m.available === 1) : allListed;
 
@@ -497,48 +515,58 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
     ? listed.filter(m => m.executionStatus === filters.executionStatus)
     : listed;
 
-  return [
-    {
-      id: AUTO_MODEL_ID,
-      object: 'model',
-      created: 0,
-      owned_by: 'freellmapi',
-      name: 'Auto (router picks the best available model)',
-      context_window: autoContextWindow,
-      // `context_length` is OpenRouter's field name and the one most
-      // OpenAI-compatible clients read; emit both so whichever a client
-      // looks for is populated. Additive — clients ignore unknown fields.
-      context_length: autoContextWindow,
-      available: true,
-      unavailable_reason: null,
-    },
-    {
-      id: FUSION_MODEL_ID,
-      object: 'model',
-      created: 0,
-      owned_by: 'freellmapi',
-      name: 'Fusion (panel of models answer in parallel, a judge synthesizes one answer)',
-      context_window: autoContextWindow,
-      context_length: autoContextWindow,
-      // Available whenever auto is — fusion needs at least one routable model.
-      available: autoContextWindow != null,
-      unavailable_reason: autoContextWindow != null ? null : 'no_models',
-    },
-    ...claudeFamilyEntries,
-    ...profileRows.map(p => {
-      const ctx = advertisedContextWindow(servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]));
-      return {
-        id: `auto:${p.name.toLowerCase()}`,
+  // Advertise `auto` / `fusion` / named chains only when the stored default
+  // left at least one model that can serve a request now (#2051). Otherwise a
+  // ready-only listing would still offer a route with nothing behind it.
+  const hasReadyModel = esFiltered.some(m => m.executionStatus === 'ready');
+  const routerEntries: Array<Record<string, unknown>> = filters.readyOnlyDefault && !hasReadyModel
+    ? []
+    : [
+      {
+        id: AUTO_MODEL_ID,
         object: 'model',
         created: 0,
         owned_by: 'freellmapi',
-        name: `Auto: ${p.name} (named fallback chain)`,
-        context_window: ctx,
-        context_length: ctx,
-        available: p.usable === 1,
-        unavailable_reason: p.usable === 1 ? null : 'no_models',
-      };
-    }),
+        name: 'Auto (router picks the best available model)',
+        context_window: autoContextWindow,
+        // `context_length` is OpenRouter's field name and the one most
+        // OpenAI-compatible clients read; emit both so whichever a client
+        // looks for is populated. Additive — clients ignore unknown fields.
+        context_length: autoContextWindow,
+        available: true,
+        unavailable_reason: null,
+      },
+      {
+        id: FUSION_MODEL_ID,
+        object: 'model',
+        created: 0,
+        owned_by: 'freellmapi',
+        name: 'Fusion (panel of models answer in parallel, a judge synthesizes one answer)',
+        context_window: autoContextWindow,
+        context_length: autoContextWindow,
+        // Available whenever auto is — fusion needs at least one routable model.
+        available: autoContextWindow != null,
+        unavailable_reason: autoContextWindow != null ? null : 'no_models',
+      },
+      ...claudeFamilyEntries,
+      ...profileRows.map(p => {
+        const ctx = advertisedContextWindow(servableContextWindow(JSON.parse(p.ctxs ?? '[]') as (number | null)[]));
+        return {
+          id: `auto:${p.name.toLowerCase()}`,
+          object: 'model',
+          created: 0,
+          owned_by: 'freellmapi',
+          name: `Auto: ${p.name} (named fallback chain)`,
+          context_window: ctx,
+          context_length: ctx,
+          available: p.usable === 1,
+          unavailable_reason: p.usable === 1 ? null : 'no_models',
+        };
+      }),
+    ];
+
+  return [
+    ...routerEntries,
     ...esFiltered.map(m => ({
       id: m.id,
       object: 'model',

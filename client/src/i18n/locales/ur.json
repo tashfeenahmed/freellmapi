@@ -111,6 +111,8 @@
     "generalDescription": "اس ڈیش بورڈ کی زبان اور ظاہری شکل۔",
     "startAtLogin": "سسٹم اسٹارٹ اپ پر شروع کریں",
     "startAtLoginHelp": "جب آپ اپنے کمپیوٹر میں سائن ان کرتے ہیں تو FreeLLMAPI کو خودکار طور پر لانچ کریں۔",
+    "readyOnlyModels": "/v1/models میں صرف تیار ماڈلز دکھائیں",
+    "readyOnlyModelsHelp": "ان کلائنٹس کے لیے ?execution_status=ready کو ڈیفالٹ بناتا ہے جو خود فلٹر نہیں بھیج سکتے، جیسے Open WebUI کا ماڈل چننے والا۔",
     "advancedDescription": "کمپریشن پائپ لائن کے لیے حدود اور حفاظتی سوئچز۔",
     "compressionTitle": "پرامپٹ کمپریشن",
     "compressionDescription": "کوڈ، ایررز، پاتھز، نمبرز اور ٹول ڈیفینیشنز کو محفوظ رکھتے ہوئے روٹنگ سے پہلے درخواست کا سائز کم کریں۔",

@@ -111,6 +111,8 @@
     "generalDescription": "Bahasa dan tampilan dasbor ini.",
     "startAtLogin": "Mulai saat sistem dimulai",
     "startAtLoginHelp": "Luncurkan FreeLLMAPI secara otomatis saat Anda masuk ke komputer.",
+    "readyOnlyModels": "Hanya tampilkan model yang siap di /v1/models",
+    "readyOnlyModelsHelp": "Menjadikan ?execution_status=ready sebagai default bagi klien yang tidak dapat mengirim filter sendiri, seperti pemilih model Open WebUI.",
     "advancedDescription": "Ambang batas dan sakelar pengaman untuk alur kompresi.",
     "compressionTitle": "Kompresi prompt",
     "compressionDescription": "Kurangi ukuran permintaan sebelum perutean sambil mempertahankan kode, error, path, angka, dan definisi alat.",

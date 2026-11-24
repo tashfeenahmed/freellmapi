@@ -111,6 +111,8 @@
     "generalDescription": "Ushbu boshqaruv panelining tili va ko'rinishi.",
     "startAtLogin": "Tizim ishga tushganda ishga tushirish",
     "startAtLoginHelp": "Kompyuteringizga kirganingizda FreeLLMAPI avtomatik ravishda ishga tushsin.",
+    "readyOnlyModels": "/v1/models da faqat tayyor modellarni ko'rsatish",
+    "readyOnlyModelsHelp": "Filtrni o'zi yubora olmaydigan mijozlar uchun, masalan, Open WebUI model tanlagichi uchun ?execution_status=ready ni standart qiladi.",
     "advancedDescription": "Siqish jarayoni uchun chegaralar va xavfsizlik kalitlari.",
     "compressionTitle": "Promptni siqish",
     "compressionDescription": "Kod, xatolar, yo'llar, raqamlar va vosita ta'riflarini saqlagan holda marshrutlashdan oldin so'rov hajmini kamaytiring.",

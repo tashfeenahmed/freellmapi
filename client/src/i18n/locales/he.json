@@ -111,6 +111,8 @@
     "generalDescription": "שפה ומראה של לוח הבקרה הזה.",
     "startAtLogin": "הפעלה עם הפעלת המערכת",
     "startAtLoginHelp": "השק את FreeLLMAPI אוטומטית בכניסה למחשב.",
+    "readyOnlyModels": "הצג רק מודלים מוכנים ב-/v1/models",
+    "readyOnlyModelsHelp": "הופך את ?execution_status=ready לברירת מחדל עבור לקוחות שלא יכולים לשלוח את הסינון בעצמם, כמו בורר המודלים של Open WebUI.",
     "advancedDescription": "ספים ומתגי בטיחות עבור צינור הדחיסה.",
     "compressionTitle": "דחיסת פרומפטים",
     "compressionDescription": "הקטנת גודל הבקשה לפני הניתוב תוך שמירה על קוד, שגיאות, נתיבים, מספרים והגדרות כלים.",

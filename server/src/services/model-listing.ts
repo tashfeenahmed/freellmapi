@@ -1,5 +1,5 @@
 import type { ModelListRow } from '@freellmapi/shared/types.js';
-import { getDb } from '../db/index.js';
+import { getDb, getSetting } from '../db/index.js';
 import { isUnifyEnabled, getModelGroups } from './model-groups.js';
 import { CONTEXT_WINDOW_SAFETY_FACTOR, hasUsableKeyForModel } from './router.js';
 
@@ -38,6 +38,17 @@ export interface ModelListing {
   // among models that can serve a request right now (null when nothing is
   // connected). Computed over available models regardless of any caller filter.
   autoContextWindow: number | null;
+}
+
+// #2051: a dashboard switch that makes `?execution_status=ready` the answer to
+// a bare GET /v1/models. Clients such as Open WebUI's model picker send no
+// query parameters at all, so without this they keep offering models whose
+// keys are all on cooldown and fail only when a request is sent. Off by
+// default: the full catalog stays the default for new installations.
+export const MODELS_READY_ONLY_SETTING = 'models_ready_only_default';
+
+export function isModelsReadyOnlyDefault(): boolean {
+  return getSetting(MODELS_READY_ONLY_SETTING) === '1';
 }
 
 // `ready` — at least one key could actually serve a request for this model

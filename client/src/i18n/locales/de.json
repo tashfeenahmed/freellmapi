@@ -111,6 +111,8 @@
     "generalDescription": "Sprache und Erscheinungsbild dieses Dashboards.",
     "startAtLogin": "Beim Systemstart starten",
     "startAtLoginHelp": "FreeLLMAPI automatisch starten, wenn Sie sich an Ihrem Computer anmelden.",
+    "readyOnlyModels": "Nur bereite Modelle in /v1/models auflisten",
+    "readyOnlyModelsHelp": "Macht ?execution_status=ready zur Voreinstellung für Clients, die den Filter nicht selbst senden können, etwa die Modellauswahl von Open WebUI.",
     "advancedDescription": "Schwellenwerte und Sicherheitsschalter für die Komprimierungs-Pipeline.",
     "compressionTitle": "Prompt-Komprimierung",
     "compressionDescription": "Reduziert die Anfragegröße vor dem Routing und bewahrt dabei Code, Fehler, Pfade, Zahlen und Tool-Definitionen.",

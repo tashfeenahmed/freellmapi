@@ -111,6 +111,8 @@
     "generalDescription": "このダッシュボードの言語と外観。",
     "startAtLogin": "システム起動時に開始",
     "startAtLoginHelp": "コンピューターにサインインすると FreeLLMAPI を自動的に起動します。",
+    "readyOnlyModels": "/v1/models には準備完了のモデルだけを表示",
+    "readyOnlyModelsHelp": "?execution_status=ready を、Open WebUI のモデル選択など、フィルターを自分で送れないクライアントの既定値にします。",
     "advancedDescription": "圧縮パイプラインのしきい値と安全スイッチ。",
     "compressionTitle": "プロンプト圧縮",
     "compressionDescription": "コード、エラー、パス、数値、ツール定義を保持したまま、ルーティング前にリクエストサイズを削減します。",

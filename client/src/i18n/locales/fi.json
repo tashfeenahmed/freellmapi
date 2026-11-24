@@ -111,6 +111,8 @@
     "generalDescription": "Tämän hallintapaneelin kieli ja ulkoasu.",
     "startAtLogin": "Käynnistä järjestelmän käynnistyessä",
     "startAtLoginHelp": "Käynnistä FreeLLMAPI automaattisesti, kun kirjaudut tietokoneelle.",
+    "readyOnlyModels": "Näytä /v1/models-päätepisteessä vain valmiit mallit",
+    "readyOnlyModelsHelp": "Tekee ?execution_status=ready-asetuksesta oletuksen asiakkaille, jotka eivät voi lähettää suodatinta itse, kuten Open WebUI:n mallivalitsimelle.",
     "advancedDescription": "Pakkausputken raja-arvot ja turvakytkimet.",
     "compressionTitle": "Promptien pakkaus",
     "compressionDescription": "Pienennä pyynnön kokoa ennen reititystä säilyttäen koodin, virheet, polut, numerot ja työkalumääritykset.",
