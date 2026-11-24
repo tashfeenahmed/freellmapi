@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb } from '../../db/index.js';
+import { up as embeddingProvenanceUp, down as embeddingProvenanceDown } from '../../db/migrations/20261118_000001_embedding_source_provenance.js';
 import { applyCatalog } from '../../services/catalog-sync.js';
 import { mintDashboardToken, isGatedApiPath } from '../helpers/auth.js';
 
@@ -184,18 +185,51 @@ describe('embedding_models.source provenance', () => {
   });
 
   it('POST /api/embeddings/custom stamps source=user', async () => {
-    const res = await request('POST', '/api/embeddings/custom', {
-      baseUrl: 'http://127.0.0.1:9333/v1',
-      model: 'prov-custom-embed',
-      apiKey: 'sk-test-' + 'b'.repeat(8),
-    });
-    // The probe may fail (the fake endpoint answers nothing), but the row must
-    // still be user-owned whenever it was created.
-    if (res.status === 201) {
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).startsWith('http://127.0.0.1:9333/')) {
+        return new Response(
+          JSON.stringify({ data: [{ index: 0, embedding: [0.1, 0.2, 0.3, 0.4] }], usage: { prompt_tokens: 2 } }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return origFetch(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const res = await request('POST', '/api/embeddings/custom', {
+        baseUrl: 'http://127.0.0.1:9333/v1',
+        model: 'prov-custom-embed',
+        apiKey: 'sk-test-' + 'b'.repeat(8),
+      });
+      expect(res.status).toBe(201);
       const row = getDb()
         .prepare("SELECT source FROM embedding_models WHERE platform = 'custom' AND model_id = 'prov-custom-embed'")
         .get() as { source: string } | undefined;
       expect(row?.source).toBe('user');
+    } finally {
+      globalThis.fetch = origFetch;
     }
+  });
+
+  it('migration backfill does not flip catalog rows to user when cached catalog has embeddings: []', () => {
+    const db = getDb();
+    db.prepare(`
+      INSERT OR REPLACE INTO settings (key, value)
+      VALUES ('catalog_applied_json', '{"version":"2026.01.01","models":[],"embeddings":[]}')
+    `).run();
+
+    // Simulate upgrading from pre-provenance schema with an empty cached embeddings array.
+    embeddingProvenanceDown(db);
+    embeddingProvenanceUp(db);
+
+    const catalogRows = db
+      .prepare("SELECT COUNT(*) AS n FROM embedding_models WHERE platform != 'custom' AND key_id IS NULL AND source = 'catalog'")
+      .get() as { n: number };
+    expect(catalogRows.n).toBeGreaterThan(0);
+
+    const customRow = db
+      .prepare("SELECT source FROM embedding_models WHERE platform = 'custom' AND model_id = 'prov-custom-embed'")
+      .get() as { source: string } | undefined;
+    expect(customRow?.source).toBe('user');
   });
 });

@@ -74,13 +74,17 @@ export function up(db: Db): void {
       .get() as { value: string } | undefined;
     if (!setting) return;
     const parsed = JSON.parse(setting.value) as { embeddings?: unknown };
-    if (!parsed || !Array.isArray(parsed.embeddings)) return;
+    // An empty embeddings array means "leave embeddings untouched" (same rule
+    // as catalog-sync.ts); treating [] as an authoritative list would flip
+    // every catalog embedding row to source='user'.
+    if (!parsed || !Array.isArray(parsed.embeddings) || parsed.embeddings.length === 0) return;
     const inCatalog = new Set<string>();
     for (const e of parsed.embeddings as { platform?: unknown; modelId?: unknown }[]) {
       if (typeof e?.platform === 'string' && typeof e?.modelId === 'string') {
         inCatalog.add(`${e.platform}:${e.modelId}`);
       }
     }
+    if (inCatalog.size === 0) return;
     const rows = db
       .prepare("SELECT id, platform, model_id FROM embedding_models WHERE source = 'catalog'")
       .all() as { id: number; platform: string; model_id: string }[];
