@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { z } from 'zod';
 import type { Db } from '../db/types.js';
-import { getDb, getSetting, setSetting } from '../db/index.js';
+import { getDb, getSetting } from '../db/index.js';
 import { encrypt } from '../lib/crypto.js';
 import { resolveProvider } from '../providers/index.js';
 import { setCustomWeights, setRoutingStrategy, setKeySelectionStrategy } from './router.js';
@@ -10,7 +10,7 @@ import { customModelSeed } from './custom-model-seed.js';
 import { createUser, userCount } from './auth.js';
 import {
   SETTING_LICENSE_KEY,
-  refreshLicenseStatus,
+  storeActivatedLicense,
   syncCatalog,
   validateLicenseKey,
 } from './catalog-sync.js';
@@ -555,8 +555,7 @@ export async function activateConfiguredLicense(key: string): Promise<void> {
       console.warn(`[config] license: key rejected (${result.reason ?? 'invalid'}) — left unconfigured`);
       return;
     }
-    setSetting(SETTING_LICENSE_KEY, trimmed);
-    await refreshLicenseStatus();
+    await storeActivatedLicense(trimmed, result);
     // Live-tier sync kicks off right away so the upgrade is visible within
     // seconds; its own catch-all logs failures.
     void syncCatalog(true);
