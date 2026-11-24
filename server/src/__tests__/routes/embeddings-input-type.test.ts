@@ -195,4 +195,33 @@ describe('custom embedding registration with an input_type', () => {
     expect(body.error.message).toMatch(/input_type/);
     expect(body.error.message).toMatch(/asymmetric/i);
   });
+
+  it('echoes stored inputType and accepts explicit null to clear per-model rate limits', async () => {
+    globalThis.fetch = vi.fn(async () => embeddingResponse(1024)) as any;
+
+    const created = await post(app, '/api/embeddings/custom', {
+      baseUrl: 'http://127.0.0.1:8181/v1',
+      model: 'clear-limits-embed',
+      family: 'clear-limits-embed',
+      inputType: 'query',
+      rpmLimit: 30,
+      rpdLimit: 500,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.inputType).toBe('query');
+    expect(created.body.rpmLimit).toBe(30);
+    expect(created.body.rpdLimit).toBe(500);
+
+    // Explicit null clears rpmLimit while absent rpdLimit is preserved.
+    const cleared = await post(app, '/api/embeddings/custom', {
+      baseUrl: 'http://127.0.0.1:8181/v1',
+      model: 'clear-limits-embed',
+      family: 'clear-limits-embed',
+      rpmLimit: null,
+    });
+    expect(cleared.status).toBe(201);
+    expect(cleared.body.inputType).toBe('query');
+    expect(cleared.body.rpmLimit).toBeNull();
+    expect(cleared.body.rpdLimit).toBe(500);
+  });
 });

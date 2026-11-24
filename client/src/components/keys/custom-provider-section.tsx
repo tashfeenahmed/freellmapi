@@ -45,6 +45,16 @@ const EMBEDDING_INPUT_TYPE_UNSET = 'unset'
 const EMBEDDING_INPUT_TYPE_NONE = 'none'
 const EMBEDDING_INPUT_TYPES = ['query', 'passage'] as const
 
+function parseOptionalPositiveInt(raw: string): { valid: boolean; value: number | undefined } {
+  const trimmed = raw.trim()
+  if (!trimmed) return { valid: true, value: undefined }
+  if (!/^[1-9]\d*$/.test(trimmed)) return { valid: false, value: undefined }
+  const n = Number(trimmed)
+  return Number.isSafeInteger(n) && n > 0
+    ? { valid: true, value: n }
+    : { valid: false, value: undefined }
+}
+
 // Always rendered inside the Add key dialog: no outer section chrome/heading.
 // `onAdded` lets that dialog close (and surface a toast) once a custom model is
 // saved.
@@ -92,6 +102,12 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       ? `${t('validation.url')} (http://localhost:8080/v1)`
       : null
   const modelError = models.length === 0 ? t('validation.required') : null
+  const parsedRpm = parseOptionalPositiveInt(rpmLimit)
+  const parsedRpd = parseOptionalPositiveInt(rpdLimit)
+  const parsedTpm = parseOptionalPositiveInt(tpmLimit)
+  const parsedTpd = parseOptionalPositiveInt(tpdLimit)
+  const hasInvalidEmbeddingLimit = customType === 'embedding'
+    && (!parsedRpm.valid || !parsedRpd.valid || !parsedTpm.valid || !parsedTpd.valid)
 
   const { data: embeddingsData } = useQuery<{ families: { family: string }[] }>({
     queryKey: ['embeddings'],
@@ -114,6 +130,10 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       setModel('')
       setDisplayName('')
       setFamily('')
+      setRpmLimit('')
+      setRpdLimit('')
+      setTpmLimit('')
+      setTpdLimit('')
       setEmbeddingInputType(EMBEDDING_INPUT_TYPE_UNSET)
       setMonthlyTokenBudget('')
       setSupportsTools(true)
@@ -127,7 +147,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (baseUrlError || modelError) {
+    if (baseUrlError || modelError || hasInvalidEmbeddingLimit) {
       setAttempted(true)
       return
     }
@@ -160,10 +180,10 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       // Sending 0 would read as "a limit of zero" and permanently block the row,
       // so a blank field is omitted rather than coerced.
       const limits = {
-        rpmLimit: rpmLimit.trim() ? Number(rpmLimit) : undefined,
-        rpdLimit: rpdLimit.trim() ? Number(rpdLimit) : undefined,
-        tpmLimit: tpmLimit.trim() ? Number(tpmLimit) : undefined,
-        tpdLimit: tpdLimit.trim() ? Number(tpdLimit) : undefined,
+        rpmLimit: parsedRpm.value,
+        rpdLimit: parsedRpd.value,
+        tpmLimit: parsedTpm.value,
+        tpdLimit: parsedTpd.value,
       }
       addCustom.mutate({
         path: '/api/embeddings/custom',
@@ -344,6 +364,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
                 inputMode="numeric"
                 placeholder={t('models.limitRpm')}
                 aria-label={t('models.limitRpmHint')}
+                aria-invalid={attempted && !parsedRpm.valid}
                 className="w-[80px] font-mono text-xs"
               />
               <Input
@@ -352,6 +373,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
                 inputMode="numeric"
                 placeholder={t('models.limitRpd')}
                 aria-label={t('models.limitRpdHint')}
+                aria-invalid={attempted && !parsedRpd.valid}
                 className="w-[80px] font-mono text-xs"
               />
               <Input
@@ -360,6 +382,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
                 inputMode="numeric"
                 placeholder={t('models.limitTpm')}
                 aria-label={t('models.limitTpmHint')}
+                aria-invalid={attempted && !parsedTpm.valid}
                 className="w-[80px] font-mono text-xs"
               />
               <Input
@@ -368,6 +391,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
                 inputMode="numeric"
                 placeholder={t('models.limitTpd')}
                 aria-label={t('models.limitTpdHint')}
+                aria-invalid={attempted && !parsedTpd.valid}
                 className="w-[80px] font-mono text-xs"
               />
             </div>

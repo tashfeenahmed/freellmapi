@@ -720,7 +720,9 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
     // existed.
     const limits = { rpm: row.rpm_limit, rpd: row.rpd_limit, tpm: row.tpm_limit, tpd: row.tpd_limit };
     const ledgerModelId = embeddingRateLimitModelId(row.model_id);
+    let retryKey = false;
     do {
+      retryKey = false;
       const { credential, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs, providerMinuteBlocked } =
         // providerMinuteCap: the provider ACCOUNT's per-minute budget is shared
         // with chat (NVIDIA NIM meters ~40 requests/minute across the whole
@@ -754,20 +756,20 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
 
       // Per-model windows, the same two gates the chat router runs before it
       // dispatches (services/router.ts: canMakeRequest then canUseTokens). A
-      // blocked row is SKIPPED before any upstream call — the provider is never
-      // billed for a request it would have rejected — and the family chain
-      // moves on, so one exhausted provider cannot strand a family that has a
-      // healthy sibling. (For a custom platform the inner loop retries a
-      // sibling key first: the window is per key, so a fresh credential on the
-      // same endpoint may still have headroom.)
+      // blocked key is SKIPPED before any upstream call — the provider is never
+      // billed for a request it would have rejected — and the inner loop tries
+      // any sibling key on the same platform first (windows are tracked per
+      // key), before moving on to the next provider in the family.
       if (!canMakeRequest(row.platform, ledgerModelId, credential.id, limits)) {
         credential.release();
         noteLimitBlock('rpm/rpd window exhausted', row.platform);
+        retryKey = true;
         continue;
       }
       if (!canUseTokens(row.platform, ledgerModelId, credential.id, estimatedTokens, limits)) {
         credential.release();
         noteLimitBlock('tpm/tpd window exhausted', row.platform);
+        retryKey = true;
         continue;
       }
 
@@ -820,7 +822,7 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
         releaseLease(leaseId);
         credential.release();
       }
-    } while (row.platform === 'custom');
+    } while (retryKey || row.platform === 'custom');
   }
 
   // Every candidate that could have served was skipped by OUR OWN windows and

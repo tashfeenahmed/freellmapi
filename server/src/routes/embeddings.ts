@@ -95,12 +95,12 @@ const customEmbeddingSchema = z.object({
   inputType: z.enum(['query', 'passage']).nullable().optional(),
   // Optional per-model windows, the same names/shape the chat custom-model
   // registration uses (routes/models.ts). Positive integers only: 0 would read
-  // as "a limit of zero" (a permanently blocked row), so "no limit" is
-  // expressed by omitting the field, which stores NULL.
-  rpmLimit: z.number().int().positive().optional(),
-  rpdLimit: z.number().int().positive().optional(),
-  tpmLimit: z.number().int().positive().optional(),
-  tpdLimit: z.number().int().positive().optional(),
+  // as "a limit of zero" (a permanently blocked row). Absent = keep stored
+  // value, null = clear to unlimited, positive integer = set cap.
+  rpmLimit: z.number().int().positive().nullable().optional(),
+  rpdLimit: z.number().int().positive().nullable().optional(),
+  tpmLimit: z.number().int().positive().nullable().optional(),
+  tpdLimit: z.number().int().positive().nullable().optional(),
 });
 
 function decryptExistingKey(row: { encrypted_key: string; iv: string; auth_tag: string } | undefined): string | null {
@@ -218,12 +218,17 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
     }
     throw err;
   }
-  const storedName = (db.prepare('SELECT display_name FROM embedding_models WHERE id = ?')
-    .get(result.modelDbId) as { display_name: string }).display_name;
-  const storedLimits = db.prepare(`
-    SELECT rpm_limit, rpd_limit, tpm_limit, tpd_limit FROM embedding_models WHERE id = ?
+  const stored = db.prepare(`
+    SELECT display_name, input_type, rpm_limit, rpd_limit, tpm_limit, tpd_limit
+      FROM embedding_models
+     WHERE id = ?
   `).get(result.modelDbId) as {
-    rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null;
+    display_name: string;
+    input_type: string | null;
+    rpm_limit: number | null;
+    rpd_limit: number | null;
+    tpm_limit: number | null;
+    tpd_limit: number | null;
   };
   res.status(201).json({
     success: true,
@@ -232,16 +237,17 @@ embeddingsRouter.post('/custom', async (req: Request, res: Response) => {
     platform: 'custom',
     baseUrl,
     model: modelId,
-    displayName: storedName,
+    displayName: stored.display_name,
     family,
     dimensions,
+    inputType: stored.input_type,
     // Echo what was actually stored, not what was submitted: a re-registration
     // that omitted the windows keeps the earlier values, and the dashboard
     // should be able to show that without a second GET.
-    rpmLimit: storedLimits.rpm_limit,
-    rpdLimit: storedLimits.rpd_limit,
-    tpmLimit: storedLimits.tpm_limit,
-    tpdLimit: storedLimits.tpd_limit,
+    rpmLimit: stored.rpm_limit,
+    rpdLimit: stored.rpd_limit,
+    tpmLimit: stored.tpm_limit,
+    tpdLimit: stored.tpd_limit,
     maskedKey: maskKey(result.storedKeyForMask),
   });
 });

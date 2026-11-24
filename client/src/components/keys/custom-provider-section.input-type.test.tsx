@@ -100,4 +100,25 @@ describe('custom embedding input_type', () => {
     // clears a stored input_type.
     expect((await addEmbedding('none')).inputType).toBeNull()
   })
+
+  it('validates positive integer rate limits and resets them after submit', async () => {
+    setValue(selectWithOption('embedding'), 'embedding')
+    setValue(container.querySelector<HTMLInputElement>('input[placeholder="http://127.0.0.1:11434/v1"]')!, 'http://127.0.0.1:9000/v1')
+    setValue(container.querySelector<HTMLTextAreaElement>('textarea')!, 'nemotron-embed')
+    const rpmInput = container.querySelector<HTMLInputElement>('input[placeholder="RPM"]')!
+
+    // Invalid input (non-numeric or 0) blocks submit rather than sending NaN/null.
+    setValue(rpmInput, 'abc')
+    await act(async () => { container.querySelector('form')!.requestSubmit() })
+    expect(vi.mocked(apiFetch).mock.calls.filter(([path]) => path === '/api/embeddings/custom')).toHaveLength(0)
+    expect(rpmInput.getAttribute('aria-invalid')).toBe('true')
+
+    // Valid positive integer submits and resets after success.
+    setValue(rpmInput, '40')
+    await act(async () => { container.querySelector('form')!.requestSubmit() })
+    const posts = vi.mocked(apiFetch).mock.calls.filter(([path]) => path === '/api/embeddings/custom')
+    expect(posts).toHaveLength(1)
+    expect(JSON.parse(String(posts[0]![1]!.body)).rpmLimit).toBe(40)
+    expect(rpmInput.value).toBe('')
+  })
 })

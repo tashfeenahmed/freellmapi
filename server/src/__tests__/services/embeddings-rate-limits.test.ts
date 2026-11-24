@@ -207,4 +207,24 @@ describe('embeddings rate limits', () => {
     expect(result.platform).toBe('openrouter');
     expect(String(fetchMock.mock.calls[0][0])).toContain('openrouter.ai');
   });
+
+  it('tries a sibling key on the same native platform when the first key exhausts its per-model rpm window', async () => {
+    const firstKey = addKey('nvidia', 'nv-key-1');
+    addKey('nvidia', 'nv-key-2');
+    addEmbeddingRow({ family: 'multi-key-embed', platform: 'nvidia', modelId: 'nvidia/multi-key-embed', dims: 8, priority: 1, rpm: 1 });
+
+    // Exhaust key 1's per-model RPM window; key 2 is untouched.
+    spend('nvidia', embeddingRateLimitModelId('nvidia/multi-key-embed'), firstKey, 1);
+
+    const seenAuthHeaders: string[] = [];
+    mockFetch(async (_url, init) => {
+      const headers = init?.headers as Record<string, string> | undefined;
+      seenAuthHeaders.push(headers?.Authorization ?? headers?.authorization ?? '');
+      return okEmbeddingResponse(8);
+    });
+
+    const result = await runEmbeddings('multi-key-embed', ['hello']);
+    expect(result.platform).toBe('nvidia');
+    expect(seenAuthHeaders).toEqual(['Bearer nv-key-2']);
+  });
 });
