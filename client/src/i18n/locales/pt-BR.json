@@ -60,7 +60,16 @@
     "emailChanged": "E-mail alterado com sucesso.",
     "passwordReset": "Senha redefinida com sucesso. Por favor, entre novamente.",
     "resetCodeDockerHint": "Está usando Docker? O código está no log do contêiner: docker logs <container>.",
-    "desktopSessionFailed": "O painel não conseguiu entrar no servidor local. Feche o FreeLLMAPI e abra-o novamente."
+    "desktopSessionFailed": "O painel não conseguiu entrar no servidor local. Feche o FreeLLMAPI e abra-o novamente.",
+    "signInWithSso": "Entrar com {provider}",
+    "orContinueWithPassword": "ou continuar com e-mail",
+    "reverifyWithSso": "Verificar novamente com {provider}",
+    "oidcReauthHint": "Confirme sua identidade com {provider} para acessar chaves em texto simples.",
+    "oidcReauthSuccess": "Identidade verificada pelos próximos 5 minutos.",
+    "oidcErrorNotAllowed": "Sua conta não tem permissão para entrar neste painel.",
+    "oidcErrorUnverifiedEmail": "Seu provedor de identidade precisa verificar seu e-mail antes de entrar.",
+    "oidcErrorNoAccount": "Nenhuma conta correspondente existe e o provisionamento automático está desativado.",
+    "oidcErrorFailed": "Falha no login único. Tente novamente."
   },
   "common": {
     "save": "Salvar",

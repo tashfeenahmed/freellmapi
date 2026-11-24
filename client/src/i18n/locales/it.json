@@ -60,7 +60,16 @@
     "emailChanged": "Email modificata con successo.",
     "passwordReset": "Password reimpostata con successo. Accedi di nuovo.",
     "resetCodeDockerHint": "Usi Docker? Il codice è nel log del container: docker logs <container>.",
-    "desktopSessionFailed": "La dashboard non è riuscita ad accedere al server locale. Chiudi FreeLLMAPI e riaprilo."
+    "desktopSessionFailed": "La dashboard non è riuscita ad accedere al server locale. Chiudi FreeLLMAPI e riaprilo.",
+    "signInWithSso": "Accedi con {provider}",
+    "orContinueWithPassword": "oppure continua con l'email",
+    "reverifyWithSso": "Verifica di nuovo con {provider}",
+    "oidcReauthHint": "Conferma la tua identità con {provider} per accedere alle chiavi in chiaro.",
+    "oidcReauthSuccess": "Identità verificata per i prossimi 5 minuti.",
+    "oidcErrorNotAllowed": "Il tuo account non è autorizzato ad accedere a questa dashboard.",
+    "oidcErrorUnverifiedEmail": "Il provider di identità deve verificare il tuo indirizzo email prima dell'accesso.",
+    "oidcErrorNoAccount": "Non esiste alcun account corrispondente e la creazione automatica è disattivata.",
+    "oidcErrorFailed": "Accesso SSO non riuscito. Riprova."
   },
   "common": {
     "save": "Salva",

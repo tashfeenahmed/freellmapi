@@ -60,7 +60,16 @@
     "emailChanged": "Correo electrónico cambiado correctamente.",
     "passwordReset": "Contraseña restablecida correctamente. Por favor, inicia sesión.",
     "resetCodeDockerHint": "¿Usas Docker? El código está en el registro del contenedor: docker logs <container>.",
-    "desktopSessionFailed": "El panel no pudo iniciar sesión en el servidor local. Cierra FreeLLMAPI y vuelve a abrirlo."
+    "desktopSessionFailed": "El panel no pudo iniciar sesión en el servidor local. Cierra FreeLLMAPI y vuelve a abrirlo.",
+    "signInWithSso": "Iniciar sesión con {provider}",
+    "orContinueWithPassword": "o continuar con correo",
+    "reverifyWithSso": "Volver a verificar con {provider}",
+    "oidcReauthHint": "Confirma tu identidad con {provider} para acceder a las claves en texto plano.",
+    "oidcReauthSuccess": "Identidad verificada durante los próximos 5 minutos.",
+    "oidcErrorNotAllowed": "Tu cuenta no tiene permiso para iniciar sesión en este panel.",
+    "oidcErrorUnverifiedEmail": "Tu proveedor de identidad debe verificar tu correo electrónico antes de iniciar sesión.",
+    "oidcErrorNoAccount": "No existe una cuenta coincidente y la creación automática está desactivada.",
+    "oidcErrorFailed": "El inicio de sesión único falló. Inténtalo de nuevo."
   },
   "common": {
     "save": "Guardar",

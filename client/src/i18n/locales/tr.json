@@ -60,7 +60,16 @@
     "emailChanged": "E-posta değiştirildi.",
     "passwordReset": "Şifre sıfırlandı. Lütfen giriş yapın.",
     "resetCodeDockerHint": "Docker içinde mi çalışıyor? Kod konteyner günlüğündedir: docker logs <container>.",
-    "desktopSessionFailed": "Kontrol paneli yerel sunucuya giriş yapamadı. FreeLLMAPI uygulamasını kapatıp yeniden açın."
+    "desktopSessionFailed": "Kontrol paneli yerel sunucuya giriş yapamadı. FreeLLMAPI uygulamasını kapatıp yeniden açın.",
+    "signInWithSso": "{provider} ile oturum aç",
+    "orContinueWithPassword": "veya e-posta ile devam et",
+    "reverifyWithSso": "{provider} ile yeniden doğrula",
+    "oidcReauthHint": "Düz metin anahtarlara erişmek için kimliğini {provider} ile doğrula.",
+    "oidcReauthSuccess": "Kimlik önümüzdeki 5 dakika için doğrulandı.",
+    "oidcErrorNotAllowed": "Hesabının bu panoda oturum açma izni yok.",
+    "oidcErrorUnverifiedEmail": "Oturum açmadan önce kimlik sağlayıcın e-posta adresini doğrulamalıdır.",
+    "oidcErrorNoAccount": "Eşleşen bir hesap yok ve otomatik hesap oluşturma kapalı.",
+    "oidcErrorFailed": "Tek oturum açma başarısız oldu. Lütfen tekrar dene."
   },
   "common": {
     "save": "Kaydet",

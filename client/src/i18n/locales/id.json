@@ -60,7 +60,16 @@
     "emailChanged": "E-mail berhasil diubah.",
     "passwordReset": "Kata sandi telah direset. Silakan masuk.",
     "resetCodeDockerHint": "Menjalankan di Docker? Kode ada di log container: docker logs <container>.",
-    "desktopSessionFailed": "Dasbor tidak dapat masuk ke server lokal. Tutup FreeLLMAPI lalu buka lagi."
+    "desktopSessionFailed": "Dasbor tidak dapat masuk ke server lokal. Tutup FreeLLMAPI lalu buka lagi.",
+    "signInWithSso": "Masuk dengan {provider}",
+    "orContinueWithPassword": "atau lanjutkan dengan email",
+    "reverifyWithSso": "Verifikasi ulang dengan {provider}",
+    "oidcReauthHint": "Konfirmasi identitas Anda dengan {provider} untuk mengakses kunci teks biasa.",
+    "oidcReauthSuccess": "Identitas terverifikasi selama 5 menit ke depan.",
+    "oidcErrorNotAllowed": "Akun Anda tidak diizinkan masuk ke dasbor ini.",
+    "oidcErrorUnverifiedEmail": "Penyedia identitas Anda harus memverifikasi alamat email Anda sebelum masuk.",
+    "oidcErrorNoAccount": "Tidak ada akun yang cocok dan pembuatan akun otomatis dinonaktifkan.",
+    "oidcErrorFailed": "Login SSO gagal. Silakan coba lagi."
   },
   "common": {
     "save": "Simpan",

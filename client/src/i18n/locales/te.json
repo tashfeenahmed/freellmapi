@@ -60,7 +60,16 @@
     "emailChanged": "ఇమెయిల్ విజయవంతంగా మార్చబడింది.",
     "passwordReset": "పాస్‌వర్డ్ రీసెట్ అయింది. దయచేసి సైన్ ఇన్ చేయండి.",
     "resetCodeDockerHint": "Docker లో నడుపుతున్నారా? కోడ్ కంటైనర్ లాగ్‌లో ఉంది: docker logs <container>.",
-    "desktopSessionFailed": "డాష్‌బోర్డ్ లోకల్ సర్వర్‌కు సైన్ ఇన్ కాలేకపోయింది. FreeLLMAPI ని మూసివేసి మళ్లీ తెరవండి."
+    "desktopSessionFailed": "డాష్‌బోర్డ్ లోకల్ సర్వర్‌కు సైన్ ఇన్ కాలేకపోయింది. FreeLLMAPI ని మూసివేసి మళ్లీ తెరవండి.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "సేవ్ చేయండి",

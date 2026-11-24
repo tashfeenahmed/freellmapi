@@ -60,7 +60,16 @@
     "emailChanged": "इमेल सफलतापूर्वक परिवर्तन भयो।",
     "passwordReset": "पासवर्ड रिसेट भयो। कृपया साइन इन गर्नुहोस्।",
     "resetCodeDockerHint": "Docker मा चलाइरहनुभएको छ? कोड कन्टेनर लगमा छ: docker logs <container>।",
-    "desktopSessionFailed": "ड्यासबोर्डले लोकल सर्भरमा साइन इन गर्न सकेन। FreeLLMAPI बन्द गरेर फेरि खोल्नुहोस्।"
+    "desktopSessionFailed": "ड्यासबोर्डले लोकल सर्भरमा साइन इन गर्न सकेन। FreeLLMAPI बन्द गरेर फेरि खोल्नुहोस्।",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "बचत गर्नुहोस्",

@@ -60,7 +60,16 @@
     "emailChanged": "Adresse e-mail modifiée avec succès.",
     "passwordReset": "Mot de passe réinitialisé avec succès. Veuillez vous connecter.",
     "resetCodeDockerHint": "Vous utilisez Docker ? Le code se trouve dans le journal du conteneur : docker logs <container>.",
-    "desktopSessionFailed": "Le tableau de bord n'a pas pu se connecter au serveur local. Quittez FreeLLMAPI et rouvrez-le."
+    "desktopSessionFailed": "Le tableau de bord n'a pas pu se connecter au serveur local. Quittez FreeLLMAPI et rouvrez-le.",
+    "signInWithSso": "Se connecter avec {provider}",
+    "orContinueWithPassword": "ou continuer par e-mail",
+    "reverifyWithSso": "Revérifier avec {provider}",
+    "oidcReauthHint": "Confirmez votre identité avec {provider} pour accéder aux clés en clair.",
+    "oidcReauthSuccess": "Identité vérifiée pour les 5 prochaines minutes.",
+    "oidcErrorNotAllowed": "Votre compte n'est pas autorisé à se connecter à ce tableau de bord.",
+    "oidcErrorUnverifiedEmail": "Votre fournisseur d'identité doit vérifier votre adresse e-mail avant la connexion.",
+    "oidcErrorNoAccount": "Aucun compte correspondant n'existe et la création automatique est désactivée.",
+    "oidcErrorFailed": "L'authentification unique a échoué. Veuillez réessayer."
   },
   "common": {
     "save": "Enregistrer",

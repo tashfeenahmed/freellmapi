@@ -12,7 +12,13 @@ import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { budgetInputSchema } from '../lib/budget-input.js';
-import { verifyCredentials, recordReauthFailure, clearReauthFailures } from '../services/auth.js';
+import {
+  verifyCredentials,
+  recordReauthFailure,
+  clearReauthFailures,
+  isSessionRecentlyReauthenticated,
+  type SessionUser,
+} from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential, normalizeGroupLabel, setCustomEndpointGroup } from '../services/custom-endpoint.js';
@@ -625,7 +631,19 @@ function skipsReauth(req: Request): boolean {
 // otherwise the response has been sent.
 function passesReauth(req: Request, res: Response, action: string): boolean {
   if (skipsReauth(req)) return true;
-  const user = (req as any).user as { userId: number; email: string };
+  const user = (req as any).user as SessionUser;
+  // #2008: OIDC sessions can step-up re-authenticate with the IdP (prompt=login,
+  // max_age=60) for a 5-minute window instead of re-entering a local password.
+  if (isSessionRecentlyReauthenticated(user)) return true;
+  if (!user.hasLocalPassword && user.authSource === 'oidc') {
+    res.status(403).json({
+      error: {
+        message: `SSO re-verification required to ${action}`,
+        type: 'oidc_reauth_required',
+      },
+    });
+    return false;
+  }
   const password = req.headers['x-reauth-password'] as string | undefined;
   if (!password) {
     res.status(403).json({ error: { message: `Password verification required to ${action}`, type: 'authentication_error' } });

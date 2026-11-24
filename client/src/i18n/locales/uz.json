@@ -60,7 +60,16 @@
     "emailChanged": "E-pochta muvaffaqiyatli o'zgartirildi.",
     "passwordReset": "Parol tiklandi. Iltimos, kiring.",
     "resetCodeDockerHint": "Docker ichida ishlayaptimi? Kod konteyner jurnalida: docker logs <container>.",
-    "desktopSessionFailed": "Boshqaruv paneli lokal serverga kira olmadi. FreeLLMAPI dasturini yopib, qayta oching."
+    "desktopSessionFailed": "Boshqaruv paneli lokal serverga kira olmadi. FreeLLMAPI dasturini yopib, qayta oching.",
+    "signInWithSso": "{provider} orqali kirish",
+    "orContinueWithPassword": "yoki email bilan davom eting",
+    "reverifyWithSso": "{provider} orqali qayta tasdiqlash",
+    "oidcReauthHint": "Ochiq kalitlarga kirish uchun shaxsingizni {provider} orqali tasdiqlang.",
+    "oidcReauthSuccess": "Shaxsingiz keyingi 5 daqiqa davomida tasdiqlandi.",
+    "oidcErrorNotAllowed": "Hisobingiz ushbu boshqaruv paneliga kirish huquqiga ega emas.",
+    "oidcErrorUnverifiedEmail": "Kirishdan oldin identifikatsiya provayderingiz email manzilingizni tasdiqlashi kerak.",
+    "oidcErrorNoAccount": "Mos keladigan hisob topilmadi va avtomatik hisob yaratish o'chirilgan.",
+    "oidcErrorFailed": "Yagona kirish (SSO) amalga oshmadi. Qaytadan urinib ko'ring."
   },
   "common": {
     "save": "Saqlash",

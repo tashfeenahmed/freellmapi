@@ -60,7 +60,16 @@
     "emailChanged": "ایمیل با موفقیت تغییر کرد.",
     "passwordReset": "رمز عبور بازنشانی شد. لطفاً وارد شوید.",
     "resetCodeDockerHint": "در Docker اجرا می‌کنید؟ کد در لاگ کانتینر است: docker logs <container>.",
-    "desktopSessionFailed": "داشبورد نتوانست به سرور محلی وارد شود. FreeLLMAPI را ببندید و دوباره باز کنید."
+    "desktopSessionFailed": "داشبورد نتوانست به سرور محلی وارد شود. FreeLLMAPI را ببندید و دوباره باز کنید.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "ذخیره کنید",

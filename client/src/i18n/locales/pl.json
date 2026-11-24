@@ -60,7 +60,16 @@
     "emailChanged": "E-mail został zmieniony.",
     "passwordReset": "Hasło zresetowane. Zaloguj się ponownie.",
     "resetCodeDockerHint": "Serwer działa w kontenerze Docker? Kod znajduje się w logu kontenera: docker logs <container>.",
-    "desktopSessionFailed": "Panel nie mógł zalogować się do lokalnego serwera. Zamknij FreeLLMAPI i otwórz go ponownie."
+    "desktopSessionFailed": "Panel nie mógł zalogować się do lokalnego serwera. Zamknij FreeLLMAPI i otwórz go ponownie.",
+    "signInWithSso": "Zaloguj się przez {provider}",
+    "orContinueWithPassword": "lub kontynuuj przez e-mail",
+    "reverifyWithSso": "Potwierdź ponownie przez {provider}",
+    "oidcReauthHint": "Potwierdź tożsamość w {provider}, aby uzyskać dostęp do jawnych kluczy.",
+    "oidcReauthSuccess": "Tożsamość zweryfikowana na kolejne 5 minut.",
+    "oidcErrorNotAllowed": "Twoje konto nie ma uprawnień do logowania się do tego panelu.",
+    "oidcErrorUnverifiedEmail": "Dostawca tożsamości musi zweryfikować Twój adres e-mail przed zalogowaniem.",
+    "oidcErrorNoAccount": "Brak pasującego konta, a automatyczne tworzenie kont jest wyłączone.",
+    "oidcErrorFailed": "Logowanie jednokrotne nie powiodło się. Spróbuj ponownie."
   },
   "common": {
     "save": "Zapisz",

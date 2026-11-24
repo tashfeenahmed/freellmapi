@@ -60,7 +60,16 @@
     "emailChanged": "A yí ìmẹ́lì padà.",
     "passwordReset": "A tún ọ̀rọ̀ aṣínà ṣe. Jọ̀wọ́ wọlé.",
     "resetCodeDockerHint": "Ṣé o ń lo Docker? Kóòdù náà wà nínú ìwé ìṣẹ̀lẹ̀ kọ́ntéènà: docker logs <container>.",
-    "desktopSessionFailed": "Dáṣíbọ́ọ̀dù kò lè wọlé sí olùpèsè agbègbè. Pa FreeLLMAPI, kí o sì tún ṣí i."
+    "desktopSessionFailed": "Dáṣíbọ́ọ̀dù kò lè wọlé sí olùpèsè agbègbè. Pa FreeLLMAPI, kí o sì tún ṣí i.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Fipamọ",

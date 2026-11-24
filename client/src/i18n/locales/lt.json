@@ -60,7 +60,16 @@
     "emailChanged": "El. paštas pakeistas.",
     "passwordReset": "Slaptažodis atstatytas. Prisijunkite.",
     "resetCodeDockerHint": "Naudojate Docker? Kodas yra konteinerio žurnale: docker logs <container>.",
-    "desktopSessionFailed": "Valdymo skydeliui nepavyko prisijungti prie vietinio serverio. Uždarykite FreeLLMAPI ir atidarykite iš naujo."
+    "desktopSessionFailed": "Valdymo skydeliui nepavyko prisijungti prie vietinio serverio. Uždarykite FreeLLMAPI ir atidarykite iš naujo.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Išsaugoti",

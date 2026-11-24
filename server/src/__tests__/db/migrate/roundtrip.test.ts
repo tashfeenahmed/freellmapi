@@ -58,6 +58,7 @@ const PROFILE_ROUTING_STRATEGY_FILENAME = '20261111_000002_profile_routing_strat
 const EMBEDDING_RATE_LIMITS_FILENAME = '20261117_000001_embedding_rate_limits.ts';
 const CUSTOM_EMBEDDING_INPUT_TYPE_FILENAME = '20261117_000002_custom_embedding_input_type.ts';
 const EMBEDDING_SOURCE_PROVENANCE_FILENAME = '20261118_000001_embedding_source_provenance.ts';
+const OIDC_IDENTITIES_FILENAME = '20261124_000001_oidc_identities.ts';
 
 interface SchemaRow {
   type: string;
@@ -163,6 +164,7 @@ describe('migration round trip', () => {
         EMBEDDING_RATE_LIMITS_FILENAME,
         CUSTOM_EMBEDDING_INPUT_TYPE_FILENAME,
         EMBEDDING_SOURCE_PROVENANCE_FILENAME,
+        OIDC_IDENTITIES_FILENAME,
       ]);
     } finally {
       db.close();

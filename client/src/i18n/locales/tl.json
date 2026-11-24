@@ -60,7 +60,16 @@
     "emailChanged": "Matagumpay na napalitan ang e-mail.",
     "passwordReset": "Na-reset ang password. Mag-sign in po.",
     "resetCodeDockerHint": "Tumatakbo sa Docker? Nasa container log ang code: docker logs <container>.",
-    "desktopSessionFailed": "Hindi nakapag-sign in ang dashboard sa lokal na server. Isara ang FreeLLMAPI at buksan itong muli."
+    "desktopSessionFailed": "Hindi nakapag-sign in ang dashboard sa lokal na server. Isara ang FreeLLMAPI at buksan itong muli.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "I-save",
