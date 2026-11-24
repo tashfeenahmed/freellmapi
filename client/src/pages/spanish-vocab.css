@@ -1,0 +1,338 @@
+.vocab-page {
+  --vocab-ink: #293a31;
+  --vocab-muted: #788179;
+  --vocab-green: #57745e;
+  --vocab-coral: #d3785f;
+  --vocab-paper: #fbf8f2;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 1.65rem clamp(1.25rem, 5vw, 4rem) 2rem;
+  color: var(--vocab-ink);
+  background:
+    radial-gradient(ellipse at 50% 46%, rgb(239 232 215 / 62%) 0, transparent 48%),
+    var(--vocab-paper);
+  font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+}
+
+.vocab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.vocab-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--vocab-ink);
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.055em;
+}
+
+.vocab-brand-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.7rem;
+  color: white;
+  background: var(--vocab-green);
+}
+
+.vocab-level,
+.vocab-eyebrow {
+  color: var(--vocab-green);
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+}
+
+.vocab-level {
+  padding: 0.48rem 0.75rem;
+  border: 1px solid #e8e4da;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 54%);
+}
+
+.vocab-lesson {
+  width: min(100%, 560px);
+  margin: clamp(2.3rem, 7vh, 4.5rem) auto 0;
+  text-align: center;
+}
+
+.vocab-eyebrow {
+  margin: 0 0 0.7rem;
+}
+
+.vocab-intro h1 {
+  margin: 0;
+  color: var(--vocab-ink);
+  font-size: clamp(2rem, 5vw, 2.85rem);
+  font-weight: 680;
+  letter-spacing: -0.065em;
+  line-height: 1.12;
+}
+
+.vocab-intro h1 span {
+  color: var(--vocab-coral);
+}
+
+.vocab-subtitle {
+  margin: 0.75rem 0 0;
+  color: var(--vocab-muted);
+  font-size: 0.92rem;
+}
+
+.vocab-card-area {
+  position: relative;
+  margin: 2.2rem 0 1.45rem;
+  padding: 0 0.6rem 0.6rem;
+}
+
+.vocab-card-area::before,
+.vocab-card-area::after {
+  position: absolute;
+  z-index: 0;
+  top: 0.4rem;
+  right: 1.4rem;
+  bottom: 0;
+  left: 1.4rem;
+  border: 1px solid #e7e1d5;
+  border-radius: 1.35rem;
+  background: #f3efe6;
+  content: '';
+  transform: rotate(2.2deg);
+}
+
+.vocab-card-area::after {
+  right: 0.85rem;
+  left: 0.85rem;
+  background: #f8f5ee;
+  transform: rotate(-1.1deg);
+}
+
+.vocab-flashcard {
+  position: relative;
+  z-index: 1;
+  min-height: 285px;
+  overflow: hidden;
+  border: 1px solid #eae5da;
+  border-radius: 1.35rem;
+  background: #fffefa;
+  box-shadow: 0 14px 36px rgb(61 54 39 / 8%), 0 2px 6px rgb(61 54 39 / 4%);
+  transition: background-color 200ms ease, transform 200ms ease;
+}
+
+.vocab-flashcard.is-flipped {
+  background: #f7fbf5;
+}
+
+.vocab-card-face {
+  display: flex;
+  width: 100%;
+  min-height: 285px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1.7rem 1.35rem;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+}
+
+.vocab-card-face:focus-visible {
+  outline: 3px solid rgb(87 116 94 / 55%);
+  outline-offset: -5px;
+}
+
+.vocab-card-topline {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.35rem;
+  left: 1.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--vocab-muted);
+  font-size: 0.64rem;
+  font-weight: 720;
+  letter-spacing: 0.12em;
+}
+
+.vocab-card-count {
+  color: #9c9b8e;
+  font-variant-numeric: tabular-nums;
+}
+
+.vocab-card-word {
+  color: var(--vocab-ink);
+  font-size: clamp(2.2rem, 8vw, 3.65rem);
+  font-weight: 640;
+  letter-spacing: -0.065em;
+  line-height: 1.12;
+}
+
+.vocab-flashcard.is-flipped .vocab-card-word {
+  color: var(--vocab-green);
+}
+
+.vocab-card-hint {
+  margin-top: 0.8rem;
+  color: var(--vocab-muted);
+  font-size: 0.85rem;
+}
+
+.vocab-card-flip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 2rem;
+  color: var(--vocab-green);
+  font-size: 0.76rem;
+  font-weight: 620;
+}
+
+.vocab-controls {
+  display: grid;
+  grid-template-columns: 1fr minmax(100px, 1.4fr) 1fr;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.vocab-nav-button {
+  display: inline-flex;
+  min-height: 2.7rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0 0.8rem;
+  border: 1px solid #e4dfd4;
+  border-radius: 0.8rem;
+  color: var(--vocab-ink);
+  background: #fffefa;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 620;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.vocab-nav-button:hover:not(:disabled) {
+  border-color: #b8c5b8;
+  background: #f5f8f3;
+}
+
+.vocab-nav-button:disabled {
+  color: #b5b4ac;
+  cursor: not-allowed;
+}
+
+.vocab-nav-button:focus-visible {
+  outline: 3px solid rgb(87 116 94 / 45%);
+  outline-offset: 2px;
+}
+
+.vocab-next-button {
+  border-color: var(--vocab-green);
+  color: white;
+  background: var(--vocab-green);
+}
+
+.vocab-next-button:hover:not(:disabled) {
+  border-color: #45634c;
+  background: #45634c;
+}
+
+.vocab-next-button:disabled {
+  border-color: #b5c1b4;
+  color: white;
+  background: #b5c1b4;
+}
+
+.vocab-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: var(--vocab-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.vocab-progress-track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #e7e4dc;
+}
+
+.vocab-progress-value {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--vocab-coral);
+  transition: width 180ms ease;
+}
+
+.vocab-footer-note {
+  margin: 1.5rem 0 0;
+  color: #92958b;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 560px) {
+  .vocab-page {
+    min-height: 100dvh;
+    margin: 0;
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .vocab-level {
+    font-size: 0.57rem;
+  }
+
+  .vocab-lesson {
+    margin-top: 2.7rem;
+  }
+
+  .vocab-card-area {
+    margin-top: 1.8rem;
+  }
+
+  .vocab-flashcard,
+  .vocab-card-face {
+    min-height: 260px;
+  }
+
+  .vocab-card-face {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .vocab-card-topline {
+    right: 1rem;
+    left: 1rem;
+  }
+
+  .vocab-controls {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 1rem;
+  }
+
+  .vocab-progress {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vocab-flashcard,
+  .vocab-nav-button,
+  .vocab-progress-value {
+    transition: none;
+  }
+}

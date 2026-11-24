@@ -1,0 +1,2002 @@
+[
+  {
+    "spanish": "ser",
+    "english": "to be"
+  },
+  {
+    "spanish": "estar",
+    "english": "to be"
+  },
+  {
+    "spanish": "tener",
+    "english": "to have"
+  },
+  {
+    "spanish": "hacer",
+    "english": "to do / make"
+  },
+  {
+    "spanish": "ir",
+    "english": "to go"
+  },
+  {
+    "spanish": "venir",
+    "english": "to come"
+  },
+  {
+    "spanish": "decir",
+    "english": "to say / tell"
+  },
+  {
+    "spanish": "hablar",
+    "english": "to speak / talk"
+  },
+  {
+    "spanish": "comer",
+    "english": "to eat"
+  },
+  {
+    "spanish": "beber",
+    "english": "to drink"
+  },
+  {
+    "spanish": "vivir",
+    "english": "to live"
+  },
+  {
+    "spanish": "trabajar",
+    "english": "to work"
+  },
+  {
+    "spanish": "estudiar",
+    "english": "to study"
+  },
+  {
+    "spanish": "aprender",
+    "english": "to learn"
+  },
+  {
+    "spanish": "enseñar",
+    "english": "to teach"
+  },
+  {
+    "spanish": "leer",
+    "english": "to read"
+  },
+  {
+    "spanish": "escribir",
+    "english": "to write"
+  },
+  {
+    "spanish": "escuchar",
+    "english": "to listen"
+  },
+  {
+    "spanish": "ver",
+    "english": "to see / watch"
+  },
+  {
+    "spanish": "mirar",
+    "english": "to look at / watch"
+  },
+  {
+    "spanish": "comprar",
+    "english": "to buy"
+  },
+  {
+    "spanish": "vender",
+    "english": "to sell"
+  },
+  {
+    "spanish": "pagar",
+    "english": "to pay"
+  },
+  {
+    "spanish": "usar",
+    "english": "to use"
+  },
+  {
+    "spanish": "llevar",
+    "english": "to carry / wear / take"
+  },
+  {
+    "spanish": "traer",
+    "english": "to bring"
+  },
+  {
+    "spanish": "abrir",
+    "english": "to open"
+  },
+  {
+    "spanish": "cerrar",
+    "english": "to close"
+  },
+  {
+    "spanish": "entrar",
+    "english": "to enter"
+  },
+  {
+    "spanish": "salir",
+    "english": "to leave / go out"
+  },
+  {
+    "spanish": "preguntar",
+    "english": "to ask"
+  },
+  {
+    "spanish": "responder",
+    "english": "to answer"
+  },
+  {
+    "spanish": "explicar",
+    "english": "to explain"
+  },
+  {
+    "spanish": "contar",
+    "english": "to tell / count"
+  },
+  {
+    "spanish": "llamar",
+    "english": "to call"
+  },
+  {
+    "spanish": "contestar",
+    "english": "to answer"
+  },
+  {
+    "spanish": "ayudar",
+    "english": "to help"
+  },
+  {
+    "spanish": "invitar",
+    "english": "to invite"
+  },
+  {
+    "spanish": "conocer",
+    "english": "to know / meet"
+  },
+  {
+    "spanish": "conversar",
+    "english": "to converse"
+  },
+  {
+    "spanish": "repetir",
+    "english": "to repeat"
+  },
+  {
+    "spanish": "recordar",
+    "english": "to remember"
+  },
+  {
+    "spanish": "olvidar",
+    "english": "to forget"
+  },
+  {
+    "spanish": "entender",
+    "english": "to understand"
+  },
+  {
+    "spanish": "pensar",
+    "english": "to think"
+  },
+  {
+    "spanish": "creer",
+    "english": "to believe"
+  },
+  {
+    "spanish": "saber",
+    "english": "to know"
+  },
+  {
+    "spanish": "esperar",
+    "english": "to wait / hope"
+  },
+  {
+    "spanish": "necesitar",
+    "english": "to need"
+  },
+  {
+    "spanish": "querer",
+    "english": "to want / love"
+  },
+  {
+    "spanish": "viajar",
+    "english": "to travel"
+  },
+  {
+    "spanish": "caminar",
+    "english": "to walk"
+  },
+  {
+    "spanish": "correr",
+    "english": "to run"
+  },
+  {
+    "spanish": "conducir",
+    "english": "to drive"
+  },
+  {
+    "spanish": "subir",
+    "english": "to go up / get on"
+  },
+  {
+    "spanish": "bajar",
+    "english": "to go down / get off"
+  },
+  {
+    "spanish": "llegar",
+    "english": "to arrive"
+  },
+  {
+    "spanish": "volver",
+    "english": "to return"
+  },
+  {
+    "spanish": "regresar",
+    "english": "to return"
+  },
+  {
+    "spanish": "seguir",
+    "english": "to follow / continue"
+  },
+  {
+    "spanish": "parar",
+    "english": "to stop"
+  },
+  {
+    "spanish": "cruzar",
+    "english": "to cross"
+  },
+  {
+    "spanish": "visitar",
+    "english": "to visit"
+  },
+  {
+    "spanish": "reservar",
+    "english": "to reserve / book"
+  },
+  {
+    "spanish": "buscar",
+    "english": "to look for"
+  },
+  {
+    "spanish": "gustar",
+    "english": "to like"
+  },
+  {
+    "spanish": "encantar",
+    "english": "to love / really like"
+  },
+  {
+    "spanish": "preferir",
+    "english": "to prefer"
+  },
+  {
+    "spanish": "odiar",
+    "english": "to hate"
+  },
+  {
+    "spanish": "sentir",
+    "english": "to feel"
+  },
+  {
+    "spanish": "disfrutar",
+    "english": "to enjoy"
+  },
+  {
+    "spanish": "interesar",
+    "english": "to interest"
+  },
+  {
+    "spanish": "importar",
+    "english": "to matter"
+  },
+  {
+    "spanish": "desear",
+    "english": "to wish / desire"
+  },
+  {
+    "spanish": "decidir",
+    "english": "to decide"
+  },
+  {
+    "spanish": "elegir",
+    "english": "to choose"
+  },
+  {
+    "spanish": "intentar",
+    "english": "to try"
+  },
+  {
+    "spanish": "poder",
+    "english": "can / to be able to"
+  },
+  {
+    "spanish": "deber",
+    "english": "should / must / to owe"
+  },
+  {
+    "spanish": "poner",
+    "english": "to put"
+  },
+  {
+    "spanish": "dar",
+    "english": "to give"
+  },
+  {
+    "spanish": "conseguir",
+    "english": "to get / achieve"
+  },
+  {
+    "spanish": "pedir",
+    "english": "to ask for / request"
+  },
+  {
+    "spanish": "dormir",
+    "english": "to sleep"
+  },
+  {
+    "spanish": "morir",
+    "english": "to die"
+  },
+  {
+    "spanish": "nacer",
+    "english": "to be born"
+  },
+  {
+    "spanish": "crecer",
+    "english": "to grow"
+  },
+  {
+    "spanish": "cambiar",
+    "english": "to change"
+  },
+  {
+    "spanish": "empezar",
+    "english": "to start"
+  },
+  {
+    "spanish": "terminar",
+    "english": "to finish"
+  },
+  {
+    "spanish": "acabar",
+    "english": "to finish / end"
+  },
+  {
+    "spanish": "continuar",
+    "english": "to continue"
+  },
+  {
+    "spanish": "lograr",
+    "english": "to achieve"
+  },
+  {
+    "spanish": "perder",
+    "english": "to lose / miss"
+  },
+  {
+    "spanish": "ganar",
+    "english": "to win / earn"
+  },
+  {
+    "spanish": "recibir",
+    "english": "to receive"
+  },
+  {
+    "spanish": "enviar",
+    "english": "to send"
+  },
+  {
+    "spanish": "devolver",
+    "english": "to return / give back"
+  },
+  {
+    "spanish": "guardar",
+    "english": "to save / keep"
+  },
+  {
+    "spanish": "mostrar",
+    "english": "to show"
+  },
+  {
+    "spanish": "ofrecer",
+    "english": "to offer"
+  },
+  {
+    "spanish": "aceptar",
+    "english": "to accept"
+  },
+  {
+    "spanish": "rechazar",
+    "english": "to reject"
+  },
+  {
+    "spanish": "permitir",
+    "english": "to allow"
+  },
+  {
+    "spanish": "prohibir",
+    "english": "to prohibit"
+  },
+  {
+    "spanish": "evitar",
+    "english": "to avoid"
+  },
+  {
+    "spanish": "planear",
+    "english": "to plan"
+  },
+  {
+    "spanish": "organizar",
+    "english": "to organize"
+  },
+  {
+    "spanish": "resolver",
+    "english": "to solve"
+  },
+  {
+    "spanish": "comprobar",
+    "english": "to check / verify"
+  },
+  {
+    "spanish": "revisar",
+    "english": "to review / check"
+  },
+  {
+    "spanish": "corregir",
+    "english": "to correct"
+  },
+  {
+    "spanish": "mejorar",
+    "english": "to improve"
+  },
+  {
+    "spanish": "empeorar",
+    "english": "to get worse"
+  },
+  {
+    "spanish": "expresar",
+    "english": "to express"
+  },
+  {
+    "spanish": "significar",
+    "english": "to mean"
+  },
+  {
+    "spanish": "incluir",
+    "english": "to include"
+  },
+  {
+    "spanish": "añadir",
+    "english": "to add"
+  },
+  {
+    "spanish": "eliminar",
+    "english": "to eliminate / delete"
+  },
+  {
+    "spanish": "comparar",
+    "english": "to compare"
+  },
+  {
+    "spanish": "describir",
+    "english": "to describe"
+  },
+  {
+    "spanish": "considerar",
+    "english": "to consider"
+  },
+  {
+    "spanish": "imaginar",
+    "english": "to imagine"
+  },
+  {
+    "spanish": "comunicar",
+    "english": "to communicate"
+  },
+  {
+    "spanish": "informar",
+    "english": "to inform"
+  },
+  {
+    "spanish": "avisar",
+    "english": "to notify / warn"
+  },
+  {
+    "spanish": "mencionar",
+    "english": "to mention"
+  },
+  {
+    "spanish": "comentar",
+    "english": "to comment"
+  },
+  {
+    "spanish": "discutir",
+    "english": "to discuss / argue"
+  },
+  {
+    "spanish": "charlar",
+    "english": "to chat"
+  },
+  {
+    "spanish": "oír",
+    "english": "to hear"
+  },
+  {
+    "spanish": "gritar",
+    "english": "to shout"
+  },
+  {
+    "spanish": "susurrar",
+    "english": "to whisper"
+  },
+  {
+    "spanish": "pronunciar",
+    "english": "to pronounce"
+  },
+  {
+    "spanish": "traducir",
+    "english": "to translate"
+  },
+  {
+    "spanish": "aclarar",
+    "english": "to clarify"
+  },
+  {
+    "spanish": "confirmar",
+    "english": "to confirm"
+  },
+  {
+    "spanish": "negar",
+    "english": "to deny"
+  },
+  {
+    "spanish": "prometer",
+    "english": "to promise"
+  },
+  {
+    "spanish": "recomendar",
+    "english": "to recommend"
+  },
+  {
+    "spanish": "sugerir",
+    "english": "to suggest"
+  },
+  {
+    "spanish": "aconsejar",
+    "english": "to advise"
+  },
+  {
+    "spanish": "solicitar",
+    "english": "to request / apply for"
+  },
+  {
+    "spanish": "felicitar",
+    "english": "to congratulate"
+  },
+  {
+    "spanish": "agradecer",
+    "english": "to thank"
+  },
+  {
+    "spanish": "disculparse",
+    "english": "to apologize"
+  },
+  {
+    "spanish": "saludar",
+    "english": "to greet"
+  },
+  {
+    "spanish": "despedirse",
+    "english": "to say goodbye"
+  },
+  {
+    "spanish": "presentar",
+    "english": "to introduce /present"
+  },
+  {
+    "spanish": "presentarse",
+    "english": "to introduce oneself"
+  },
+  {
+    "spanish": "contactar",
+    "english": "to contact"
+  },
+  {
+    "spanish": "advertir",
+    "english": "to warn"
+  },
+  {
+    "spanish": "convencer",
+    "english": "to convince"
+  },
+  {
+    "spanish": "inspirar",
+    "english": "to inspire"
+  },
+  {
+    "spanish": "motivar",
+    "english": "to motivate"
+  },
+  {
+    "spanish": "criticar",
+    "english": "to criticize"
+  },
+  {
+    "spanish": "opinar",
+    "english": "to give an opinion"
+  },
+  {
+    "spanish": "acordar",
+    "english": "to agree / arrange"
+  },
+  {
+    "spanish": "practicar",
+    "english": "to practice"
+  },
+  {
+    "spanish": "investigar",
+    "english": "to research"
+  },
+  {
+    "spanish": "analizar",
+    "english": "to analyze"
+  },
+  {
+    "spanish": "prepararse",
+    "english": "to prepare oneself"
+  },
+  {
+    "spanish": "asistir",
+    "english": "to attend"
+  },
+  {
+    "spanish": "participar",
+    "english": "to participate"
+  },
+  {
+    "spanish": "completar",
+    "english": "to complete"
+  },
+  {
+    "spanish": "entregar",
+    "english": "to submit / deliver"
+  },
+  {
+    "spanish": "aprobar",
+    "english": "to pass / approve"
+  },
+  {
+    "spanish": "suspender",
+    "english": "to fail / suspend"
+  },
+  {
+    "spanish": "graduarse",
+    "english": "to graduate"
+  },
+  {
+    "spanish": "memorizar",
+    "english": "to memorize"
+  },
+  {
+    "spanish": "concentrarse",
+    "english": "to concentrate"
+  },
+  {
+    "spanish": "descansar",
+    "english": "to rest"
+  },
+  {
+    "spanish": "colaborar",
+    "english": "to collaborate"
+  },
+  {
+    "spanish": "cooperar",
+    "english": "to cooperate"
+  },
+  {
+    "spanish": "dirigir",
+    "english": "to direct / manage"
+  },
+  {
+    "spanish": "liderar",
+    "english": "to lead"
+  },
+  {
+    "spanish": "coordinar",
+    "english": "to coordinate"
+  },
+  {
+    "spanish": "administrar",
+    "english": "to manage / administer"
+  },
+  {
+    "spanish": "contratar",
+    "english": "to hire"
+  },
+  {
+    "spanish": "renunciar",
+    "english": "to resign"
+  },
+  {
+    "spanish": "entrevistar",
+    "english": "to interview"
+  },
+  {
+    "spanish": "capacitar",
+    "english": "to train"
+  },
+  {
+    "spanish": "cobrar",
+    "english": "to charge / collect payment"
+  },
+  {
+    "spanish": "negociar",
+    "english": "to negotiate"
+  },
+  {
+    "spanish": "firmar",
+    "english": "to sign"
+  },
+  {
+    "spanish": "reunirse",
+    "english": "to meet"
+  },
+  {
+    "spanish": "asignar",
+    "english": "to assign"
+  },
+  {
+    "spanish": "actualizar",
+    "english": "to update"
+  },
+  {
+    "spanish": "imprimir",
+    "english": "to print"
+  },
+  {
+    "spanish": "copiar",
+    "english": "to copy"
+  },
+  {
+    "spanish": "pegar",
+    "english": "to paste / stick"
+  },
+  {
+    "spanish": "descargar",
+    "english": "to download"
+  },
+  {
+    "spanish": "montar",
+    "english": "to ride / mount"
+  },
+  {
+    "spanish": "girar",
+    "english": "to turn"
+  },
+  {
+    "spanish": "doblar",
+    "english": "to turn / fold"
+  },
+  {
+    "spanish": "pasar",
+    "english": "to pass / spend time"
+  },
+  {
+    "spanish": "explorar",
+    "english": "to explore"
+  },
+  {
+    "spanish": "alojarse",
+    "english": "to stay / lodge"
+  },
+  {
+    "spanish": "volar",
+    "english": "to fly"
+  },
+  {
+    "spanish": "navegar",
+    "english": "to sail / navigate"
+  },
+  {
+    "spanish": "aterrizar",
+    "english": "to land"
+  },
+  {
+    "spanish": "despegar",
+    "english": "to take off"
+  },
+  {
+    "spanish": "aparcar",
+    "english": "to park"
+  },
+  {
+    "spanish": "estacionar",
+    "english": "to park"
+  },
+  {
+    "spanish": "perderse",
+    "english": "to get lost"
+  },
+  {
+    "spanish": "orientarse",
+    "english": "to find one's way"
+  },
+  {
+    "spanish": "partir",
+    "english": "to depart"
+  },
+  {
+    "spanish": "transportar",
+    "english": "to transport"
+  },
+  {
+    "spanish": "recoger",
+    "english": "to pick up / collect"
+  },
+  {
+    "spanish": "acompañar",
+    "english": "to accompany"
+  },
+  {
+    "spanish": "quedarse",
+    "english": "to stay"
+  },
+  {
+    "spanish": "mudarse",
+    "english": "to move house"
+  },
+  {
+    "spanish": "desplazarse",
+    "english": "to travel / move around"
+  },
+  {
+    "spanish": "despertarse",
+    "english": "to wake up"
+  },
+  {
+    "spanish": "levantarse",
+    "english": "to get up"
+  },
+  {
+    "spanish": "ducharse",
+    "english": "to shower"
+  },
+  {
+    "spanish": "bañarse",
+    "english": "to bathe"
+  },
+  {
+    "spanish": "lavarse",
+    "english": "to wash oneself"
+  },
+  {
+    "spanish": "vestirse",
+    "english": "to get dressed"
+  },
+  {
+    "spanish": "cepillarse",
+    "english": "to brush oneself"
+  },
+  {
+    "spanish": "peinarse",
+    "english": "to comb one's hair"
+  },
+  {
+    "spanish": "afeitarse",
+    "english": "to shave"
+  },
+  {
+    "spanish": "maquillarse",
+    "english": "to put on makeup"
+  },
+  {
+    "spanish": "cocinar",
+    "english": "to cook"
+  },
+  {
+    "spanish": "hornear",
+    "english": "to bake"
+  },
+  {
+    "spanish": "freír",
+    "english": "to fry"
+  },
+  {
+    "spanish": "cortar",
+    "english": "to cut"
+  },
+  {
+    "spanish": "mezclar",
+    "english": "to mix"
+  },
+  {
+    "spanish": "lavar",
+    "english": "to wash"
+  },
+  {
+    "spanish": "limpiar",
+    "english": "to clean"
+  },
+  {
+    "spanish": "barrer",
+    "english": "to sweep"
+  },
+  {
+    "spanish": "fregar",
+    "english": "to scrub / wash dishes"
+  },
+  {
+    "spanish": "secar",
+    "english": "to dry"
+  },
+  {
+    "spanish": "ordenar",
+    "english": "to organize / tidy"
+  },
+  {
+    "spanish": "arreglar",
+    "english": "to fix / arrange"
+  },
+  {
+    "spanish": "reparar",
+    "english": "to repair"
+  },
+  {
+    "spanish": "encender",
+    "english": "to turn on / light"
+  },
+  {
+    "spanish": "apagar",
+    "english": "to turn off"
+  },
+  {
+    "spanish": "romper",
+    "english": "to break"
+  },
+  {
+    "spanish": "construir",
+    "english": "to build"
+  },
+  {
+    "spanish": "decorar",
+    "english": "to decorate"
+  },
+  {
+    "spanish": "alquilar",
+    "english": "to rent"
+  },
+  {
+    "spanish": "tirar",
+    "english": "to throw / throw away"
+  },
+  {
+    "spanish": "acostarse",
+    "english": "to go to bed"
+  },
+  {
+    "spanish": "sentarse",
+    "english": "to sit down"
+  },
+  {
+    "spanish": "acostumbrarse",
+    "english": "to get used to"
+  },
+  {
+    "spanish": "relajarse",
+    "english": "to relax"
+  },
+  {
+    "spanish": "divertirse",
+    "english": "to have fun"
+  },
+  {
+    "spanish": "aburrirse",
+    "english": "to get bored"
+  },
+  {
+    "spanish": "alegrarse",
+    "english": "to become happy"
+  },
+  {
+    "spanish": "preocuparse",
+    "english": "to worry"
+  },
+  {
+    "spanish": "enojarse",
+    "english": "to get angry"
+  },
+  {
+    "spanish": "molestarse",
+    "english": "to get annoyed"
+  },
+  {
+    "spanish": "sorprenderse",
+    "english": "to be surprised"
+  },
+  {
+    "spanish": "asustarse",
+    "english": "to get scared"
+  },
+  {
+    "spanish": "confiar",
+    "english": "to trust"
+  },
+  {
+    "spanish": "dudar",
+    "english": "to doubt"
+  },
+  {
+    "spanish": "temer",
+    "english": "to fear"
+  },
+  {
+    "spanish": "amar",
+    "english": "to love"
+  },
+  {
+    "spanish": "apreciar",
+    "english": "to appreciate"
+  },
+  {
+    "spanish": "valorar",
+    "english": "to value"
+  },
+  {
+    "spanish": "respetar",
+    "english": "to respect"
+  },
+  {
+    "spanish": "admirar",
+    "english": "to admire"
+  },
+  {
+    "spanish": "perdonar",
+    "english": "to forgive"
+  },
+  {
+    "spanish": "arrepentirse",
+    "english": "to regret"
+  },
+  {
+    "spanish": "quejarse",
+    "english": "to complain"
+  },
+  {
+    "spanish": "preocupar",
+    "english": "to worry / concern"
+  },
+  {
+    "spanish": "sorprender",
+    "english": "to surprise"
+  },
+  {
+    "spanish": "molestar",
+    "english": "to bother"
+  },
+  {
+    "spanish": "doler",
+    "english": "to hurt"
+  },
+  {
+    "spanish": "parecer",
+    "english": "to seem / appear"
+  },
+  {
+    "spanish": "resultar",
+    "english": "to turn out / result"
+  },
+  {
+    "spanish": "funcionar",
+    "english": "to work / function"
+  },
+  {
+    "spanish": "fallar",
+    "english": "to fail / malfunction"
+  },
+  {
+    "spanish": "faltar",
+    "english": "to be missing / lack"
+  },
+  {
+    "spanish": "sobrar",
+    "english": "to be left over"
+  },
+  {
+    "spanish": "depender",
+    "english": "to depend"
+  },
+  {
+    "spanish": "pertenecer",
+    "english": "to belong"
+  },
+  {
+    "spanish": "consistir",
+    "english": "to consist"
+  },
+  {
+    "spanish": "ocurrirse",
+    "english": "to occur to someone"
+  },
+  {
+    "spanish": "existir",
+    "english": "to exist"
+  },
+  {
+    "spanish": "aparecer",
+    "english": "to appear"
+  },
+  {
+    "spanish": "desaparecer",
+    "english": "to disappear"
+  },
+  {
+    "spanish": "ocurrir",
+    "english": "to happen"
+  },
+  {
+    "spanish": "suceder",
+    "english": "to happen"
+  },
+  {
+    "spanish": "descubrir",
+    "english": "to discover"
+  },
+  {
+    "spanish": "encontrar",
+    "english": "to find"
+  },
+  {
+    "spanish": "reconocer",
+    "english": "to recognize"
+  },
+  {
+    "spanish": "comprender",
+    "english": "to understand"
+  },
+  {
+    "spanish": "manifestar",
+    "english": "to express / state"
+  },
+  {
+    "spanish": "demostrar",
+    "english": "to demonstrate / show"
+  },
+  {
+    "spanish": "probar",
+    "english": "to try / taste / prove"
+  },
+  {
+    "spanish": "experimentar",
+    "english": "to experience / experiment"
+  },
+  {
+    "spanish": "observar",
+    "english": "to observe"
+  },
+  {
+    "spanish": "examinar",
+    "english": "to examine"
+  },
+  {
+    "spanish": "estudiar",
+    "english": "to study"
+  },
+  {
+    "spanish": "memorizar",
+    "english": "to memorize"
+  },
+  {
+    "spanish": "reflexionar",
+    "english": "to reflect"
+  },
+  {
+    "spanish": "meditar",
+    "english": "to meditate"
+  },
+  {
+    "spanish": "razonar",
+    "english": "to reason"
+  },
+  {
+    "spanish": "calcular",
+    "english": "to calculate"
+  },
+  {
+    "spanish": "medir",
+    "english": "to measure"
+  },
+  {
+    "spanish": "pesar",
+    "english": "to weigh"
+  },
+  {
+    "spanish": "contar",
+    "english": "to count"
+  },
+  {
+    "spanish": "sumar",
+    "english": "to add"
+  },
+  {
+    "spanish": "restar",
+    "english": "to subtract"
+  },
+  {
+    "spanish": "multiplicar",
+    "english": "to multiply"
+  },
+  {
+    "spanish": "dividir",
+    "english": "to divide"
+  },
+  {
+    "spanish": "ordenar",
+    "english": "to order / arrange"
+  },
+  {
+    "spanish": "clasificar",
+    "english": "to classify"
+  },
+  {
+    "spanish": "separar",
+    "english": "to separate"
+  },
+  {
+    "spanish": "unir",
+    "english": "to join / unite"
+  },
+  {
+    "spanish": "conectar",
+    "english": "to connect"
+  },
+  {
+    "spanish": "desconectar",
+    "english": "to disconnect"
+  },
+  {
+    "spanish": "instalar",
+    "english": "to install"
+  },
+  {
+    "spanish": "configurar",
+    "english": "to configure"
+  },
+  {
+    "spanish": "programar",
+    "english": "to program / schedule"
+  },
+  {
+    "spanish": "diseñar",
+    "english": "to design"
+  },
+  {
+    "spanish": "crear",
+    "english": "to create"
+  },
+  {
+    "spanish": "dibujar",
+    "english": "to draw"
+  },
+  {
+    "spanish": "pintar",
+    "english": "to paint"
+  },
+  {
+    "spanish": "fotografiar",
+    "english": "to photograph"
+  },
+  {
+    "spanish": "grabar",
+    "english": "to record"
+  },
+  {
+    "spanish": "filmar",
+    "english": "to film"
+  },
+  {
+    "spanish": "publicar",
+    "english": "to publish / post"
+  },
+  {
+    "spanish": "compartir",
+    "english": "to share"
+  },
+  {
+    "spanish": "editar",
+    "english": "to edit"
+  },
+  {
+    "spanish": "guardar",
+    "english": "to save"
+  },
+  {
+    "spanish": "borrar",
+    "english": "to erase / delete"
+  },
+  {
+    "spanish": "buscar",
+    "english": "to search"
+  },
+  {
+    "spanish": "navegar",
+    "english": "to browse / surf"
+  },
+  {
+    "spanish": "teclear",
+    "english": "to type"
+  },
+  {
+    "spanish": "escanear",
+    "english": "to scan"
+  },
+  {
+    "spanish": "adjuntar",
+    "english": "to attach"
+  },
+  {
+    "spanish": "enviar",
+    "english": "to send"
+  },
+  {
+    "spanish": "recibir",
+    "english": "to receive"
+  },
+  {
+    "spanish": "responder",
+    "english": "to reply / answer"
+  },
+  {
+    "spanish": "reenviar",
+    "english": "to forward"
+  },
+  {
+    "spanish": "archivar",
+    "english": "to archive"
+  },
+  {
+    "spanish": "organizar",
+    "english": "to organize"
+  },
+  {
+    "spanish": "cuidar",
+    "english": "to take care of"
+  },
+  {
+    "spanish": "proteger",
+    "english": "to protect"
+  },
+  {
+    "spanish": "salvar",
+    "english": "to save / rescue"
+  },
+  {
+    "spanish": "curar",
+    "english": "to cure / heal"
+  },
+  {
+    "spanish": "tratar",
+    "english": "to treat / try"
+  },
+  {
+    "spanish": "examinarse",
+    "english": "to get examined"
+  },
+  {
+    "spanish": "respirar",
+    "english": "to breathe"
+  },
+  {
+    "spanish": "toser",
+    "english": "to cough"
+  },
+  {
+    "spanish": "estornudar",
+    "english": "to sneeze"
+  },
+  {
+    "spanish": "sangrar",
+    "english": "to bleed"
+  },
+  {
+    "spanish": "descansar",
+    "english": "to rest"
+  },
+  {
+    "spanish": "recuperarse",
+    "english": "to recover"
+  },
+  {
+    "spanish": "enfermar",
+    "english": "to become ill"
+  },
+  {
+    "spanish": "mejorarse",
+    "english": "to get better"
+  },
+  {
+    "spanish": "alimentar",
+    "english": "to feed"
+  },
+  {
+    "spanish": "alimentarse",
+    "english": "to nourish oneself"
+  },
+  {
+    "spanish": "engordar",
+    "english": "to gain weight"
+  },
+  {
+    "spanish": "adelgazar",
+    "english": "to lose weight"
+  },
+  {
+    "spanish": "sudar",
+    "english": "to sweat"
+  },
+  {
+    "spanish": "llorar",
+    "english": "to cry"
+  },
+  {
+    "spanish": "reír",
+    "english": "to laugh"
+  },
+  {
+    "spanish": "sonreír",
+    "english": "to smile"
+  },
+  {
+    "spanish": "gritar",
+    "english": "to shout"
+  },
+  {
+    "spanish": "bostezar",
+    "english": "to yawn"
+  },
+  {
+    "spanish": "suspirar",
+    "english": "to sigh"
+  },
+  {
+    "spanish": "temblar",
+    "english": "to tremble"
+  },
+  {
+    "spanish": "latir",
+    "english": "to beat / throb"
+  },
+  {
+    "spanish": "oler",
+    "english": "to smell"
+  },
+  {
+    "spanish": "saborear",
+    "english": "to savor"
+  },
+  {
+    "spanish": "tocar",
+    "english": "to touch / play"
+  },
+  {
+    "spanish": "besar",
+    "english": "to kiss"
+  },
+  {
+    "spanish": "abrazar",
+    "english": "to hug"
+  },
+  {
+    "spanish": "acariciar",
+    "english": "to caress / stroke"
+  },
+  {
+    "spanish": "saludar",
+    "english": "to greet"
+  },
+  {
+    "spanish": "invitar",
+    "english": "to invite"
+  },
+  {
+    "spanish": "celebrar",
+    "english": "to celebrate"
+  },
+  {
+    "spanish": "bailar",
+    "english": "to dance"
+  },
+  {
+    "spanish": "cantar",
+    "english": "to sing"
+  },
+  {
+    "spanish": "jugar",
+    "english": "to play"
+  },
+  {
+    "spanish": "actuar",
+    "english": "to act / perform"
+  },
+  {
+    "spanish": "competir",
+    "english": "to compete"
+  },
+  {
+    "spanish": "entrenar",
+    "english": "to train"
+  },
+  {
+    "spanish": "ganar",
+    "english": "to win"
+  },
+  {
+    "spanish": "perder",
+    "english": "to lose"
+  },
+  {
+    "spanish": "empatar",
+    "english": "to draw / tie"
+  },
+  {
+    "spanish": "nadar",
+    "english": "to swim"
+  },
+  {
+    "spanish": "saltar",
+    "english": "to jump"
+  },
+  {
+    "spanish": "patinar",
+    "english": "to skate"
+  },
+  {
+    "spanish": "esquiar",
+    "english": "to ski"
+  },
+  {
+    "spanish": "pescar",
+    "english": "to fish"
+  },
+  {
+    "spanish": "cazar",
+    "english": "to hunt"
+  },
+  {
+    "spanish": "acampar",
+    "english": "to camp"
+  },
+  {
+    "spanish": "pasear",
+    "english": "to take a walk"
+  },
+  {
+    "spanish": "montar",
+    "english": "to ride"
+  },
+  {
+    "spanish": "fotografiar",
+    "english": "to photograph"
+  },
+  {
+    "spanish": "coleccionar",
+    "english": "to collect"
+  },
+  {
+    "spanish": "dibujar",
+    "english": "to draw"
+  },
+  {
+    "spanish": "tejer",
+    "english": "to knit / weave"
+  },
+  {
+    "spanish": "coser",
+    "english": "to sew"
+  },
+  {
+    "spanish": "bordar",
+    "english": "to embroider"
+  },
+  {
+    "spanish": "comprar",
+    "english": "to buy"
+  },
+  {
+    "spanish": "vender",
+    "english": "to sell"
+  },
+  {
+    "spanish": "gastar",
+    "english": "to spend"
+  },
+  {
+    "spanish": "ahorrar",
+    "english": "to save money"
+  },
+  {
+    "spanish": "invertir",
+    "english": "to invest"
+  },
+  {
+    "spanish": "prestar",
+    "english": "to lend"
+  },
+  {
+    "spanish": "robar",
+    "english": "to steal"
+  },
+  {
+    "spanish": "costar",
+    "english": "to cost"
+  },
+  {
+    "spanish": "valer",
+    "english": "to be worth"
+  },
+  {
+    "spanish": "deber",
+    "english": "to owe"
+  },
+  {
+    "spanish": "facturar",
+    "english": "to bill / invoice"
+  },
+  {
+    "spanish": "reservar",
+    "english": "to book"
+  },
+  {
+    "spanish": "cancelar",
+    "english": "to cancel"
+  },
+  {
+    "spanish": "entregar",
+    "english": "to deliver"
+  },
+  {
+    "spanish": "transportar",
+    "english": "to transport"
+  },
+  {
+    "spanish": "fabricar",
+    "english": "to manufacture"
+  },
+  {
+    "spanish": "producir",
+    "english": "to produce"
+  },
+  {
+    "spanish": "vender",
+    "english": "to sell"
+  },
+  {
+    "spanish": "distribuir",
+    "english": "to distribute"
+  },
+  {
+    "spanish": "importar",
+    "english": "to import"
+  },
+  {
+    "spanish": "exportar",
+    "english": "to export"
+  },
+  {
+    "spanish": "consumir",
+    "english": "to consume"
+  },
+  {
+    "spanish": "servir",
+    "english": "to serve"
+  },
+  {
+    "spanish": "atender",
+    "english": "to attend to / assist"
+  },
+  {
+    "spanish": "preparar",
+    "english": "to prepare"
+  },
+  {
+    "spanish": "cobrar",
+    "english": "to charge / collect"
+  },
+  {
+    "spanish": "devolver",
+    "english": "to return / refund"
+  },
+  {
+    "spanish": "cambiar",
+    "english": "to change / exchange"
+  },
+  {
+    "spanish": "elegir",
+    "english": "to choose"
+  },
+  {
+    "spanish": "ofrecer",
+    "english": "to offer"
+  },
+  {
+    "spanish": "mostrar",
+    "english": "to show"
+  },
+  {
+    "spanish": "reclamar",
+    "english": "to complain / claim"
+  },
+  {
+    "spanish": "solucionar",
+    "english": "to solve / resolve"
+  },
+  {
+    "spanish": "resolver",
+    "english": "to solve"
+  },
+  {
+    "spanish": "satisfacer",
+    "english": "to satisfy"
+  },
+  {
+    "spanish": "atender",
+    "english": "to assist / serve"
+  },
+  {
+    "spanish": "registrar",
+    "english": "to register / record"
+  },
+  {
+    "spanish": "identificar",
+    "english": "to identify"
+  },
+  {
+    "spanish": "verificar",
+    "english": "to verify"
+  },
+  {
+    "spanish": "autorizar",
+    "english": "to authorize"
+  },
+  {
+    "spanish": "cancelar",
+    "english": "to cancel"
+  },
+  {
+    "spanish": "renovar",
+    "english": "to renew"
+  },
+  {
+    "spanish": "solucionar",
+    "english": "to solve"
+  },
+  {
+    "spanish": "reparar",
+    "english": "to repair"
+  },
+  {
+    "spanish": "mantener",
+    "english": "to maintain / keep"
+  },
+  {
+    "spanish": "conservar",
+    "english": "to preserve / keep"
+  },
+  {
+    "spanish": "reducir",
+    "english": "to reduce"
+  },
+  {
+    "spanish": "aumentar",
+    "english": "to increase"
+  },
+  {
+    "spanish": "disminuir",
+    "english": "to decrease"
+  },
+  {
+    "spanish": "ampliar",
+    "english": "to expand"
+  },
+  {
+    "spanish": "desarrollar",
+    "english": "to develop"
+  },
+  {
+    "spanish": "progresar",
+    "english": "to progress"
+  },
+  {
+    "spanish": "avanzar",
+    "english": "to advance"
+  },
+  {
+    "spanish": "alcanzar",
+    "english": "to reach / achieve"
+  },
+  {
+    "spanish": "superar",
+    "english": "to overcome / surpass"
+  },
+  {
+    "spanish": "evitar",
+    "english": "to avoid"
+  },
+  {
+    "spanish": "prevenir",
+    "english": "to prevent"
+  },
+  {
+    "spanish": "predecir",
+    "english": "to predict"
+  },
+  {
+    "spanish": "advertir",
+    "english": "to warn"
+  },
+  {
+    "spanish": "descartar",
+    "english": "to discard / rule out"
+  },
+  {
+    "spanish": "seleccionar",
+    "english": "to select"
+  },
+  {
+    "spanish": "preferir",
+    "english": "to prefer"
+  },
+  {
+    "spanish": "requerir",
+    "english": "to require"
+  },
+  {
+    "spanish": "negarse",
+    "english": "to refuse"
+  },
+  {
+    "spanish": "permitir",
+    "english": "to allow"
+  },
+  {
+    "spanish": "obligar",
+    "english": "to force"
+  },
+  {
+    "spanish": "proponer",
+    "english": "to propose"
+  },
+  {
+    "spanish": "sugerir",
+    "english": "to suggest"
+  },
+  {
+    "spanish": "intentar",
+    "english": "to attempt"
+  },
+  {
+    "spanish": "conseguir",
+    "english": "to obtain / achieve"
+  },
+  {
+    "spanish": "merecer",
+    "english": "to deserve"
+  },
+  {
+    "spanish": "merecerse",
+    "english": "to deserve"
+  },
+  {
+    "spanish": "pertenecer",
+    "english": "to belong"
+  },
+  {
+    "spanish": "depender",
+    "english": "to depend"
+  },
+  {
+    "spanish": "consistir",
+    "english": "to consist"
+  },
+  {
+    "spanish": "contener",
+    "english": "to contain"
+  },
+  {
+    "spanish": "incluir",
+    "english": "to include"
+  },
+  {
+    "spanish": "excluir",
+    "english": "to exclude"
+  },
+  {
+    "spanish": "existir",
+    "english": "to exist"
+  },
+  {
+    "spanish": "ocupar",
+    "english": "to occupy"
+  },
+  {
+    "spanish": "llenar",
+    "english": "to fill"
+  },
+  {
+    "spanish": "vaciar",
+    "english": "to empty"
+  },
+  {
+    "spanish": "cubrir",
+    "english": "to cover"
+  },
+  {
+    "spanish": "descubrir",
+    "english": "to discover"
+  },
+  {
+    "spanish": "ocultar",
+    "english": "to hide"
+  },
+  {
+    "spanish": "esconder",
+    "english": "to hide"
+  },
+  {
+    "spanish": "aparecer",
+    "english": "to appear"
+  },
+  {
+    "spanish": "desaparecer",
+    "english": "to disappear"
+  },
+  {
+    "spanish": "transformar",
+    "english": "to transform"
+  },
+  {
+    "spanish": "convertir",
+    "english": "to convert / turn into"
+  },
+  {
+    "spanish": "reemplazar",
+    "english": "to replace"
+  },
+  {
+    "spanish": "sustituir",
+    "english": "to substitute / replace"
+  },
+  {
+    "spanish": "reparar",
+    "english": "to repair"
+  },
+  {
+    "spanish": "destruir",
+    "english": "to destroy"
+  },
+  {
+    "spanish": "romper",
+    "english": "to break"
+  },
+  {
+    "spanish": "reconstruir",
+    "english": "to rebuild"
+  },
+  {
+    "spanish": "mantener",
+    "english": "to maintain"
+  },
+  {
+    "spanish": "sobrevivir",
+    "english": "to survive"
+  },
+  {
+    "spanish": "existir",
+    "english": "to exist"
+  },
+  {
+    "spanish": "adaptarse",
+    "english": "to adapt"
+  }
+]
