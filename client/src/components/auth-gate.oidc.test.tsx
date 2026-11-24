@@ -34,11 +34,21 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 }
 
-async function flush() {
-  await act(async () => {
-    await Promise.resolve()
-    await new Promise(resolve => setTimeout(resolve, 0))
-  })
+async function waitFor(assertion: () => void, timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs
+  let lastErr: unknown
+  while (Date.now() < deadline) {
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 10))
+    })
+    try {
+      assertion()
+      return
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  throw lastErr
 }
 
 function mount() {
@@ -70,9 +80,10 @@ describe('AuthGate OIDC sign-in (#2008)', () => {
     }))
 
     mount()
-    await flush()
-    expect(container.textContent).toContain('Sign in with Authentik')
-    expect(container.querySelector('#auth-email')).not.toBeNull()
+    await waitFor(() => {
+      expect(container.textContent).toContain('Sign in with Authentik')
+      expect(container.querySelector('#auth-email')).not.toBeNull()
+    })
 
     // Now test passwordLoginDisabled=true
     act(() => root.unmount())
@@ -89,9 +100,10 @@ describe('AuthGate OIDC sign-in (#2008)', () => {
       return json({}, 404)
     }))
     mount()
-    await flush()
-    expect(container.textContent).toContain('Sign in with Pocket ID')
-    expect(container.querySelector('#auth-email')).toBeNull()
+    await waitFor(() => {
+      expect(container.textContent).toContain('Sign in with Pocket ID')
+      expect(container.querySelector('#auth-email')).toBeNull()
+    })
   })
 
   it('exchanges #oidc_code from the URL fragment, strips it, and renders the dashboard', async () => {
@@ -117,12 +129,11 @@ describe('AuthGate OIDC sign-in (#2008)', () => {
     }))
 
     mount()
-    await flush()
-    await flush()
-
-    expect(window.location.hash).toBe('')
-    expect(getToken()).toBe('oidc-session-token')
-    expect(container.querySelector('[data-testid="app"]')?.textContent).toBe('Dashboard')
+    await waitFor(() => {
+      expect(window.location.hash).toBe('')
+      expect(getToken()).toBe('oidc-session-token')
+      expect(container.querySelector('[data-testid="app"]')?.textContent).toBe('Dashboard')
+    })
   })
 
   it('displays a localized error when #oidc_error arrives', async () => {
@@ -140,9 +151,9 @@ describe('AuthGate OIDC sign-in (#2008)', () => {
     }))
 
     mount()
-    await flush()
-
-    expect(window.location.hash).toBe('')
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain('not permitted')
+    await waitFor(() => {
+      expect(window.location.hash).toBe('')
+      expect(container.querySelector('[role="alert"]')?.textContent).toContain('not permitted')
+    })
   })
 })
