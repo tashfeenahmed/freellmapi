@@ -180,6 +180,18 @@ interface CatalogEmbedding {
   priority: number;
   enabled: boolean;
   quotaLabel: string;
+  /** Optional per-model rate-limit windows, the embedding counterpart of
+   *  `CatalogModel.limits`. The chat catalogue carries these under a nested
+   *  `limits` object because one chat model has one row; an embedding entry is
+   *  already per-provider, so the four windows sit flat on the entry and stay
+   *  absent until the catalogue actually knows them. Absent/null = "no
+   *  opinion", i.e. the column stays NULL and nothing is throttled — which is
+   *  exactly how every row behaved before these columns existed, so an older
+   *  catalogue that never publishes them keeps syncing unchanged. */
+  rpm?: number | null;
+  rpd?: number | null;
+  tpm?: number | null;
+  tpd?: number | null;
 }
 
 interface CatalogTranscriptionModel {
@@ -351,6 +363,18 @@ export function catalogShapeProblems(value: unknown): string[] {
     if (!num(m?.dimensions)) return 'dimensions is not a number';
     if (!num(m?.priority)) return 'priority is not a number';
     if (!bool(m?.enabled)) return 'enabled is not a boolean';
+    // The four rate-limit windows are OPTIONAL (an older catalogue omits them
+    // entirely) and nullable (the catalogue may know a model has no published
+    // cap). A present value has to be a whole, non-negative count of
+    // requests/tokens — a string here would land in an INTEGER column and
+    // silently coerce, so reject the payload instead of storing nonsense.
+    for (const key of ['rpm', 'rpd', 'tpm', 'tpd'] as const) {
+      const value = m?.[key];
+      if (value === undefined || value === null) continue;
+      if (!num(value) || !Number.isInteger(value) || value < 0) {
+        return `${key} is not a non-negative integer`;
+      }
+    }
     return null;
   });
   each('transcriptionModels', (m) => {
@@ -576,16 +600,17 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     UPDATE embedding_models SET
       family = @family, display_name = @displayName, dimensions = @dimensions,
       max_input_tokens = @maxInputTokens, priority = @priority,
-      quota_label = @quotaLabel, enabled = @enabled
+      quota_label = @quotaLabel, enabled = @enabled,
+      rpm_limit = @rpm, rpd_limit = @rpd, tpm_limit = @tpm, tpd_limit = @tpd
     WHERE id = @id
   `);
   const insertEmbedding = db.prepare(`
     INSERT INTO embedding_models
       (family, platform, model_id, display_name, dimensions, max_input_tokens,
-       priority, enabled, quota_label)
+       priority, enabled, quota_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit)
     VALUES
       (@family, @platform, @modelId, @displayName, @dimensions, @maxInputTokens,
-       @priority, @enabled, @quotaLabel)
+       @priority, @enabled, @quotaLabel, @rpm, @rpd, @tpm, @tpd)
   `);
 
   const apply = db.transaction(() => {
@@ -837,6 +862,13 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
           maxInputTokens: m.maxInputTokens,
           priority: m.priority,
           quotaLabel: m.quotaLabel,
+          // Catalogue metadata always wins, exactly like the chat path: a
+          // published cap replaces whatever the row carried, and an omitted
+          // one writes NULL ("no opinion") rather than reviving an old value.
+          rpm: m.rpm ?? null,
+          rpd: m.rpd ?? null,
+          tpm: m.tpm ?? null,
+          tpd: m.tpd ?? null,
         };
         if (row) {
           const enabled = m.enabled ? row.enabled : 0; // catalog and local disables both win
