@@ -9,6 +9,8 @@ describe('native Puter wire protocol',()=>{
   afterEach(()=>vi.unstubAllGlobals());
   it.each([
     ['qwen4-max', 'alibaba:qwen/qwen4-max'],
+    ['qwen3.8-max', 'alibaba:qwen/qwen3.8-max'],
+    ['qwen3.7-max', 'alibaba:qwen/qwen3.7-max'],
     ['qwen3.7-flash', 'alibaba:qwen/qwen3.7-flash'],
     ['qwen3.6-flash', 'alibaba:qwen/qwen3.6-flash'],
     ['qwen3.6-plus', 'alibaba:qwen/qwen3.6-plus'],

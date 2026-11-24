@@ -190,6 +190,7 @@ export type Platform =
   | 'keenable'
   | 'halx'
   | 'aisense'
+  | 'classifierdev'
   | 'brave'
   | 'outcrawl'
   | 'tinyfish'
