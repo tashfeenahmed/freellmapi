@@ -33,7 +33,7 @@ describe('SilvR renewable media routes', () => {
     expect(TRANSCRIPTION_PLATFORMS.has('silvr')).toBe(true);
     expect(CATALOG_DECISION_PLATFORMS.has('silvr')).toBe(true);
   });
-  it.each([['gemini-embedding-2', 3072], ['gemini-embedding-001', 3072], ['text-embedding-3-small', 1536]] as const)('routes %s with exact native dimensions and sorted input order', async (id, dimensions) => {
+  it.each([['nemotron-3-5-embed-1b', 2048], ['nemotron-3-5-embed-8b', 4096], ['gemini-embedding-2', 3072], ['gemini-embedding-001', 3072], ['text-embedding-3-small', 1536]] as const)('routes %s with exact native dimensions and sorted input order', async (id, dimensions) => {
     embedding(id, dimensions);
     const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ model: id, data: [{ index: 1, embedding: Array(dimensions).fill(0.2) }, { index: 0, embedding: Array(dimensions).fill(0.1) }], usage: { prompt_tokens: 4 } }));
     expect(await runEmbeddings('test-family', ['one', 'two'])).toMatchObject({ platform: 'silvr', modelId: id, dimensions, inputTokens: 4 });

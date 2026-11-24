@@ -47,4 +47,31 @@ describe('custom provider "Fetch models" button (#1457)', () => {
     })
     expect(fetchModelsButton().disabled).toBe(false)
   })
+
+  it('submits monthlyTokenBudget when configured for a custom chat endpoint (#2030)', async () => {
+    const urlInput = container.querySelector<HTMLInputElement>('input[placeholder="http://127.0.0.1:11434/v1"]')!
+    const modelInput = container.querySelector<HTMLTextAreaElement>('textarea')!
+    const budgetInput = container.querySelector<HTMLInputElement>('#custom-monthly-token-budget')!
+    expect(budgetInput).not.toBeNull()
+
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(urlInput, 'http://127.0.0.1:11434/v1')
+      urlInput.dispatchEvent(new Event('input', { bubbles: true }))
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(modelInput, 'qwen3:4b')
+      modelInput.dispatchEvent(new Event('input', { bubbles: true }))
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(budgetInput, '~30M')
+      budgetInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+
+    const submit = container.querySelector<HTMLButtonElement>('button[type="submit"]')!
+    await act(async () => { submit.click() })
+
+    const postCall = vi.mocked(apiFetch).mock.calls.find(([path]) => path === '/api/keys/custom')
+    expect(postCall).toBeDefined()
+    expect(JSON.parse(String((postCall![1] as RequestInit).body))).toMatchObject({
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      models: ['qwen3:4b'],
+      monthlyTokenBudget: '~30M',
+    })
+  })
 })

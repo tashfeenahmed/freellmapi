@@ -5,6 +5,7 @@ import type { Platform } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { getProvider, hasProvider } from '../providers/index.js';
 import { deleteUnusedCustomEndpointKey } from '../lib/custom-provider-cleanup.js';
+import { budgetInputSchema } from '../lib/budget-input.js';
 import {
   isCatalogManagedModel,
   overriddenFieldNames,
@@ -97,6 +98,7 @@ const createModelSchema = z.object({
   rpdLimit: z.number().int().positive().nullable().optional(),
   tpmLimit: z.number().int().positive().nullable().optional(),
   tpdLimit: z.number().int().positive().nullable().optional(),
+  monthlyTokenBudget: budgetInputSchema.optional(),
   supportsVision: z.boolean().optional(),
   supportsTools: z.boolean().optional(),
   keyId: z.number().int().positive().nullable().optional(),
@@ -178,7 +180,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
         enabled, supports_vision, supports_tools, key_id, source, endpoint_scope
       ) VALUES (
         @platform, @modelId, @displayName, @intelligenceRank, @speedRank, @sizeLabel,
-        @rpmLimit, @rpdLimit, @tpmLimit, @tpdLimit, '', @contextWindow,
+        @rpmLimit, @rpdLimit, @tpmLimit, @tpdLimit, @monthlyTokenBudget, @contextWindow,
         1, @supportsVision, @supportsTools, @keyId, 'user', @endpointScope
       )
     `).run({
@@ -192,6 +194,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       rpdLimit: data.rpdLimit ?? null,
       tpmLimit: data.tpmLimit ?? null,
       tpdLimit: data.tpdLimit ?? null,
+      monthlyTokenBudget: data.monthlyTokenBudget?.trim() ?? '',
       contextWindow: data.contextWindow ?? null,
       supportsVision: data.supportsVision ? 1 : 0,
       supportsTools: data.supportsTools !== undefined ? (data.supportsTools ? 1 : 0) : 1,
@@ -226,6 +229,7 @@ modelsRouter.post('/', (req: Request, res: Response) => {
       rpdLimit: data.rpdLimit ?? null,
       tpmLimit: data.tpmLimit ?? null,
       tpdLimit: data.tpdLimit ?? null,
+      monthlyTokenBudget: data.monthlyTokenBudget?.trim() ?? '',
       supportsVision: Boolean(data.supportsVision),
       supportsTools: data.supportsTools ?? true,
       enabled: true,
@@ -419,7 +423,9 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
   // Use the same key selection, quota gates and in-flight reservations as
   // inference, pinned to this model so Test cannot silently try another one.
   const inputEstimate = 16;
-  const outputLimit = 4;
+  // Reasoning models spend their first tokens thinking, and OpenAI-family
+  // upstreams reject max_output_tokens below 16, so a tiny cap fails live models.
+  const outputLimit = 256;
   const route = routePinnedModel(id, inputEstimate + outputLimit);
   if (!route) {
     res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
@@ -440,7 +446,8 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
     const inputTokens = response.usage?.prompt_tokens ?? Math.max(0, (response.usage?.total_tokens ?? inputEstimate + outputTokens) - outputTokens);
     recordRequest(route.platform, route.modelId, route.keyId);
     recordTokens(route.platform, route.modelId, route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
-    if (!contentToString(message?.content ?? '') && !message?.tool_calls?.length) {
+    // Reasoning text alone still proves the model is served.
+    if (!contentToString(message?.content ?? '') && !message?.reasoning_content && !message?.tool_calls?.length) {
       const error = 'Empty completion; the test output limit may be too small for this model.';
       // The upstream completed a request even though it produced no usable
       // answer. Error rows do not settle the monthly ledger automatically.

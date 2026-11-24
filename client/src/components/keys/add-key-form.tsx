@@ -146,7 +146,8 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
     },
   })
 
-  const needsAccountId = platform === 'cloudflare'
+  const speechFlow = platform === 'speechflow'
+  const needsAccountId = speechFlow || platform === 'cloudflare'
   const needsProjectId = platform === 'jamai'
   // Key-optional providers (Kilo, OVH, AI Horde) work anonymously, but accept a
   // real key too (#1331): the field stays editable and may be left blank.
@@ -186,7 +187,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
     // A blank key on a key-optional provider enables its anonymous tier; the
     // backend stores a sentinel and sends no Authorization header.
     const key = needsProjectId ? `${projectId.trim()}:${apiKey.trim()}`
-      : isKeyless ? apiKey.trim() : (needsAccountId ? `${accountId}:${apiKey}` : apiKey)
+      : isKeyless ? apiKey.trim() : (needsAccountId ? `${accountId.trim()}:${apiKey.trim()}` : apiKey)
     addKey.mutate({ platform, key, label: label || undefined })
   }
 
@@ -198,7 +199,10 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
           <ModelCombobox
             value={platform}
             options={platformOptions}
-            onSelect={v => setPlatform(v as Platform)}
+            onSelect={v => {
+              if (v !== platform && (speechFlow || v === 'speechflow')) { setApiKey(''); setAccountId('') }
+              setPlatform(v as Platform)
+            }}
             ariaLabel={t('keys.platform')}
             triggerPlaceholder={t('keys.selectPlatform')}
             placeholder={t('keys.filterPlaceholder')}
@@ -238,11 +242,11 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
         )}
         {needsAccountId && (
           <div className="space-y-1.5">
-            <Label className="text-xs">{t('keys.accountId')}</Label>
+            <Label className="text-xs">{speechFlow ? 'keyId' : t('keys.accountId')}</Label>
             <Input
               value={accountId}
               onChange={e => setAccountId(e.target.value)}
-              placeholder="a1b2c3d4…"
+              placeholder={speechFlow ? 'keyId' : 'a1b2c3d4…'}
               className="w-[200px] font-mono text-xs"
               aria-invalid={addAttempted && !!accountIdError}
             />
@@ -251,7 +255,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
         )}
         <div className="space-y-1.5 flex-1 min-w-[240px]">
           <div className="flex items-center justify-between gap-2">
-            <Label className="text-xs">{needsProjectId ? `${t('keys.apiToken')} (PAT)` : needsAccountId ? t('keys.apiToken') : t('keys.customApiKey')}</Label>
+            <Label className="text-xs">{needsProjectId ? `${t('keys.apiToken')} (PAT)` : speechFlow ? 'keySecret' : needsAccountId ? t('keys.apiToken') : t('keys.customApiKey')}</Label>
             {canPasteSeveral && (
               <button
                 type="button"
@@ -276,7 +280,7 @@ export function AddKeyForm({ onSuccess, initialPlatform }: { onSuccess: (offer?:
               type="password"
               value={apiKey}
               onChange={e => setApiKey(e.target.value)}
-              placeholder={needsProjectId ? 'jamai_pat_…' : isKeyless ? t('keys.keyOptionalPlaceholder') : (needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
+              placeholder={needsProjectId ? 'jamai_pat_…' : isKeyless ? t('keys.keyOptionalPlaceholder') : (speechFlow ? 'keySecret' : needsAccountId ? t('keys.bearerTokenPlaceholder') : t('keys.pasteKeyPlaceholder'))}
               className="font-mono text-xs"
               aria-invalid={addAttempted && !!keyError}
             />

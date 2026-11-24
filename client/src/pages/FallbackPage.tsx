@@ -19,6 +19,7 @@ import { Boxes, ChevronDown, Search, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useI18n } from '@/i18n'
 import { apiFetch } from '@/lib/api'
+import { toast } from '@/lib/toast'
 import {
   buildGroups,
   clampRankToIndex,
@@ -148,6 +149,9 @@ export default function FallbackPage() {
   const { data: tokenUsage } = useQuery<TokenUsageData>({
     queryKey: ['fallback', 'token-usage'],
     queryFn: () => apiFetch('/api/fallback/token-usage'),
+    // Proxy traffic moves the used figures without any dashboard mutation to
+    // invalidate this query, so poll it like the routing table (#2030).
+    refetchInterval: 30_000,
   })
 
   const { data: routing } = useQuery<RoutingData>({
@@ -175,6 +179,45 @@ export default function FallbackPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fallback'] })
       setLocalEntries(null)
+    },
+  })
+
+  // Per-model "On" switches persist immediately (#2024), like the switches on a
+  // model's own page. Only the toggled rows are sent, at their SAVED priority:
+  // PUT /api/fallback upserts row by row, so a partial list leaves the rest of
+  // the chain alone, and an unsaved reorder or bulk edit stays staged behind the
+  // Save bar instead of being committed by an unrelated click. Each write is
+  // pinned to the chain it was made against (?profile=, as the read is since
+  // #1047) and they run one at a time, so rapid clicks on one switch land in
+  // click order; the table refetches only once the last one settles, so an
+  // early response cannot repaint over a later click.
+  const toggleQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const pendingTogglesRef = useRef(0)
+  const toggleMutation = useMutation({
+    mutationFn: ({ profileId, items }: {
+      profileId: number | null
+      items: { modelDbId: number; priority: number; enabled: boolean }[]
+    }) => {
+      const url = profileId != null ? `/api/fallback?profile=${profileId}` : '/api/fallback'
+      const run = () => apiFetch(url, { method: 'PUT', body: JSON.stringify(items) })
+      const queued = toggleQueueRef.current.then(run, run)
+      toggleQueueRef.current = queued.catch(() => {})
+      return queued
+    },
+    onMutate: () => { pendingTogglesRef.current += 1 },
+    onError: (err: Error, { profileId, items }) => {
+      // Put the failed switches back (unless a later click already moved them),
+      // in the cache and in any staged edit, so Save cannot resend them.
+      const failed = new Map(items.map(i => [i.modelDbId, i.enabled]))
+      const revert = (list: FallbackEntry[]) => list.map(e =>
+        failed.get(e.modelDbId) === e.enabled ? { ...e, enabled: !e.enabled } : e)
+      queryClient.setQueryData<FallbackEntry[]>(['fallback', 'chain', profileId], old => (old ? revert(old) : old))
+      setStaged(prev => (prev && prev.profileId === profileId ? { ...prev, entries: revert(prev.entries) } : prev))
+      if (err?.message) toast.error(err.message)
+    },
+    onSettled: () => {
+      pendingTogglesRef.current = Math.max(0, pendingTogglesRef.current - 1)
+      if (pendingTogglesRef.current === 0) queryClient.invalidateQueries({ queryKey: ['fallback'] })
     },
   })
 
@@ -283,15 +326,26 @@ export default function FallbackPage() {
 
   function handleGroupToggle(memberIds: number[], enabled: boolean) {
     const ids = new Set(memberIds)
-    setLocalEntries(allEntries.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e)))
+    const flip = (list: FallbackEntry[]) => list.map(e => (ids.has(e.modelDbId) ? { ...e, enabled } : e))
+    const queryKey = ['fallback', 'chain', activeProfileId]
+    // A refetch already in flight would land the pre-click rows over the switch.
+    void queryClient.cancelQueries({ queryKey })
+    queryClient.setQueryData<FallbackEntry[]>(queryKey, old => (old ? flip(old) : old))
+    if (localEntries) setLocalEntries(flip(localEntries))
+    toggleMutation.mutate({
+      profileId: activeProfileId,
+      items: entries
+        .filter(e => ids.has(e.modelDbId))
+        .map(e => ({ modelDbId: e.modelDbId, priority: e.priority, enabled })),
+    })
   }
 
   // Bulk on/off over what is currently on screen (#895). Curating a chain by
   // hand means turning most of the catalog off, which one row at a time over
   // 200 models nobody does. It deliberately follows the filters: "search groq,
   // disable all" is the useful gesture, and touching hidden rows would be a
-  // surprise. Like every other edit here it stages into localEntries and waits
-  // for Save.
+  // surprise. Unlike a single switch (#2024) it stages into localEntries and
+  // waits for Save, so a stray click cannot rewrite the whole chain at once.
   const visibleMemberIds = visibleGroups.flatMap(g => g.members.map(m => m.modelDbId))
   const visibleEnabledCount = visibleGroups.filter(g => g.members.some(m => m.enabled)).length
 

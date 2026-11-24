@@ -13,6 +13,7 @@ import { LINKUP_BASE_URL } from '../providers/linkup.js';
 import { PARALLEL_BASE_URL, PARALLEL_MCP_URL } from '../providers/parallel.js';
 import { KEENABLE_APP_TITLE, KEENABLE_BASE_URL } from '../providers/keenable.js';
 import { OUTCRAWL_BASE_URL } from '../providers/outcrawl.js';
+import { TINYFISH_SEARCH_URL } from '../providers/tinyfish.js';
 import { isAnonymousCredential } from '../lib/credential.js';
 import { randomUUID } from 'node:crypto';
 import { secondsUntilNextMonth } from './key-budget.js';
@@ -497,6 +498,24 @@ const ADAPTERS: Record<string, Adapter> = {
     }));
     return { results: keepHits(hits) };
   },
+
+  // TinyFish returns hits in rank order with no score and takes no result
+  // count, so the list is cut to n here. It has a real news vertical.
+  tinyfish: async (cred, query, opts, n) => {
+    const url = new URL(TINYFISH_SEARCH_URL);
+    url.searchParams.set('query', query);
+    url.searchParams.set('domain_type', opts.topic === 'news' ? 'news' : 'web');
+    const parsed = await upstream(url.toString(), 'tinyfish', {
+      method: 'GET',
+      headers: { 'X-API-Key': cred.key.trim(), Accept: 'application/json' },
+    }, opts.signal) as { results?: Array<Record<string, unknown>> };
+    const hits = (Array.isArray(parsed?.results) ? parsed.results : []).slice(0, n).map(r => ({
+      title: str(r.title) || str(r.url),
+      url: str(r.url),
+      content: str(r.snippet),
+    }));
+    return { results: keepHits(hits) };
+  },
 };
 
 /** Platforms with a search adapter. catalog-sync gates searchEngines rows on
@@ -583,6 +602,7 @@ export const SEARCH_PLATFORM_INFO: Record<string, { name: string; keyless?: bool
   keenable: { name: 'Keenable', keyless: true },
   brave: { name: 'Brave Search' },
   outcrawl: { name: 'Outcrawl' },
+  tinyfish: { name: 'TinyFish' },
 };
 
 const platformName = (p: string): string => SEARCH_PLATFORM_INFO[p]?.name ?? p;

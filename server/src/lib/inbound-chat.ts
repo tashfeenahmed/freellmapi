@@ -54,6 +54,8 @@ export interface InboundChatRequest {
   messages: ChatMessage[];
   stream: boolean;
   maxTokens?: number;
+  /** Output cap when the client asks for none (after the token budget check). */
+  defaultMaxTokens?: number;
   temperature?: number;
   topP?: number;
   stop?: string | string[];
@@ -180,8 +182,9 @@ export async function runInboundChat(
     wire.sendError(res, 413, tokenBudgetMessage(budget.rejection), 'request_token_budget');
     return;
   }
+  const defaultMaxTokens = input.defaultMaxTokens ?? 1024;
   const maxTokens = input.maxTokens
-    ?? (budget.maxTokens != null ? Math.min(1024, budget.maxTokens) : 1024);
+    ?? (budget.maxTokens != null ? Math.min(defaultMaxTokens, budget.maxTokens) : defaultMaxTokens);
 
   let pin: ResolvedPin;
   try {

@@ -235,6 +235,14 @@ function initialRailOpen(key: string): boolean {
   return localStorage.getItem(key) !== 'false'
 }
 
+function systemDictationHintKey(models: TranscriptionModelRow[] | undefined) {
+  const desktop = window as Window & { __FREEAPI_DESKTOP__?: boolean; __FREEAPI_PLATFORM__?: string }
+  // Wait for the catalog. A keyed provider with disabled models still uses the model setup flow.
+  if (!desktop.__FREEAPI_DESKTOP__ || !models || models.some(m => m.modality === 'transcription' && m.keyCount > 0)) return
+  if (desktop.__FREEAPI_PLATFORM__ === 'darwin') return 'playground.dictationMacShortcut'
+  if (desktop.__FREEAPI_PLATFORM__ === 'win32') return 'playground.dictationWindowsShortcut'
+}
+
 export default function PlaygroundPage() {
   const { t } = useI18n()
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -334,6 +342,8 @@ export default function PlaygroundPage() {
   const webSearchUnavailableHint = searchReadinessHint(searchReadiness.data, searchReadiness.failed, searchReadiness.loading, t)
   const webSearchOn = webSearch && webSearchAvailable
   const transcriptionAvailable = hasTranscription(mediaModels)
+  const shortcutHintKey = systemDictationHintKey(mediaData?.models)
+  const dictationUnavailableHint = transcriptionAvailable ? undefined : t(shortcutHintKey ?? 'playground.dictationUnavailable')
   const [dictationChoice, setDictationChoice] = useState<string>(
     () => localStorage.getItem(DICTATION_MODEL_STORAGE_KEY) ?? DICTATION_AUTO,
   )
@@ -1281,7 +1291,10 @@ export default function PlaygroundPage() {
             onAttach={() => fileInputRef.current?.click()}
             labels={{ add: t('playground.addMenu'), attach: t('playground.attach'), send: t('playground.send'), sending: t('playground.sending') }}
             dictation={{
-              available: transcriptionAvailable,
+              onUnavailable: dictationUnavailableHint ? () => {
+                if (shortcutHintKey) inputRef.current?.focus()
+                toast.info(dictationUnavailableHint)
+              } : undefined,
               model: dictationModel,
               apiKey: keyData?.apiKey,
               onText: text => {
@@ -1325,7 +1338,7 @@ export default function PlaygroundPage() {
         dictationValue={dictationModel}
         dictationOptions={dictationOptions}
         onSelectDictation={pickDictationModel}
-        noTranscription={!transcriptionAvailable}
+        dictationUnavailableHint={dictationUnavailableHint}
         systemPrompt={systemPrompt}
         onSystemPromptChange={updateSystemPrompt}
         sampling={sampling}

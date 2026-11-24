@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initDb, getDb } from '../../db/index.js';
 import {
   providerDailyRequestCount,
@@ -8,6 +8,8 @@ import {
   clearCooldownsForKey,
   setCooldown,
   isOnCooldown,
+  canMakeRequest,
+  pacificMidnight,
 } from '../../services/ratelimit.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -151,5 +153,36 @@ describe('cooldown visibility and manual clear', () => {
   it('reports zero when a key has nothing to clear', () => {
     expect(clearCooldownsForKey(999_001)).toBe(0);
     expect(clearCooldownsForKey(Number.NaN)).toBe(0);
+  });
+});
+
+describe('per-model daily limits follow the provider\'s reset', () => {
+  const limits = { rpm: null, rpd: 20, tpm: null, tpd: null };
+  let keyId: number;
+
+  beforeEach(() => {
+    initDb(':memory:');
+    keyId = Math.floor(Math.random() * 1_000_000);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('gives Gemini its fresh allowance at midnight Pacific, not 24h after the last request', () => {
+    // 20 requests (gemini-2.5-flash's rpd) spent between 23:00 and 23:59 PT.
+    const midnightPT = pacificMidnight(Date.UTC(2026, 10, 20, 12), 0); // 2026-11-20 00:00 PST
+    for (let i = 0; i < 20; i++) seedUsage('google', 'gemini-2.5-flash', keyId, 'request', 0, midnightPT - HOUR + i * 60_000);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(midnightPT - 10 * 60_000); // 23:50 PT: still the same Google day
+    expect(canMakeRequest('google', 'gemini-2.5-flash', keyId, limits)).toBe(false);
+    vi.setSystemTime(midnightPT + 30 * 60_000); // 00:30 PT: Google has reset
+    expect(canMakeRequest('google', 'gemini-2.5-flash', keyId, limits)).toBe(true);
+  });
+
+  it('keeps the sliding 24h day for providers that do not document a wall-clock reset', () => {
+    const t = Date.UTC(2026, 10, 20, 12);
+    for (let i = 0; i < 20; i++) seedUsage('groq', 'llama-3.3-70b', keyId, 'request', 0, t - HOUR + i * 60_000);
+    vi.useFakeTimers();
+    vi.setSystemTime(t + 2 * HOUR);
+    expect(canMakeRequest('groq', 'llama-3.3-70b', keyId, limits)).toBe(false);
   });
 });

@@ -14,6 +14,7 @@ import { secondsUntilNextMonth } from './key-budget.js';
 import { noteBudgetAlerts } from './budget-alerts.js';
 import { getClientContext } from '../lib/client-context.js';
 import { reserveProviderCredential } from './provider-credential.js';
+import { speechFlowCredentials } from '../providers/speechflow.js';
 import { proxyFetch } from '../lib/proxy.js';
 import { bearerAuthHeader } from '../lib/credential.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
@@ -29,6 +30,8 @@ import { PLUGSKY_BASE_URL } from '../providers/plugsky.js';
 import { NOVAI_BASE_URL } from '../providers/novai.js';
 import { VarosityMediaError, varosityImage, varositySpeech, varosityVideo } from './media-varosity.js';
 import { RimeMediaError, rimeSpeech, rimeTranscription } from './media-rime.js';
+import { googleLiveTranscription } from './media-google-live.js';
+import { solariaTranscription } from './media-solaria.js';
 import { FreeTtsMediaError, freeTtsSpeech } from './media-freetts.js';
 import { VoiceGatewayMediaError, voiceGatewaySpeech, cartesiaTranscription } from './media-voice-gateways.js';
 import { cpuCanRunSharp } from '../lib/image-normalize.js';
@@ -36,7 +39,7 @@ import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neu
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia', 'silvr']);
+export const MEDIA_PLATFORMS = new Set(['aihorde', 'xkiro', 'nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia', 'silvr']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -44,12 +47,12 @@ export const MEDIA_PLATFORMS = new Set(['nvidia', 'pollinations', 'cloudflare', 
 export const VIDEO_PLATFORMS = new Set(['pollinations', 'huggingface', 'novai', 'varosity']);
 
 /** Platforms whose free media path needs no API key (anonymous). */
-const KEYLESS_CAPABLE = new Set(['pollinations']);
+const KEYLESS_CAPABLE = new Set(['pollinations','aihorde']);
 
 /** Platforms with a speech-to-text adapter below. catalog-sync gates the
  *  catalog's `transcriptionModels` entries on this, the way MEDIA_PLATFORMS
  *  gates the generative-media rows. */
-export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub', 'cartesia', 'silvr']);
+export const TRANSCRIPTION_PLATFORMS = new Set(['groq', 'cloudflare', 'typhoon', 'mistral', 'cohere', 'ovh', 'freeai', 'google', 'rime', 'electronhub', 'cartesia', 'silvr', 'speechflow']);
 
 // 'transcription' rows live in media_models like the other modalities; they
 // arrive via the catalog's dedicated `transcriptionModels` array (see
@@ -243,7 +246,7 @@ export function listMediaModels(modality: MediaModality): MediaModelRow[] {
  *  out here. */
 export function listAllMediaModels(): MediaModelRow[] {
   return getDb()
-    .prepare("SELECT * FROM media_models WHERE modality NOT IN ('search', 'decision') ORDER BY modality, priority, id")
+    .prepare("SELECT * FROM media_models WHERE modality NOT IN ('search', 'decision', 'translation', 'summarization') ORDER BY modality, priority, id")
     .all() as MediaModelRow[];
 }
 
@@ -279,7 +282,7 @@ async function mediaFetch(
     timeoutMs,
   );
   if (!r.ok) {
-    if (platform === 'silvr' || platform === 'electronhub') {
+    if (platform === 'xkiro' || platform === 'aihorde' || platform === 'silvr' || platform === 'electronhub' || platform === 'speechflow') {
       await r.body?.cancel();
       throw new MediaError(`${platform} ${modality} request failed (${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
     }
@@ -459,6 +462,9 @@ async function callImageProvider(
   const key = credential.key;
   const [w, h] = parseSize(p.size);
   switch (row.platform) {
+    case 'aihorde':
+    case 'xkiro':
+      return queuedImage(row.platform, row.model_id, key, p);
     case 'electronhub': {
       if (!key) throw new MediaError('ElectronHub API key required', 401);
       if (!['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0', 'flux-2-klein-base-4b'].includes(row.model_id)) throw new MediaError('Unknown ElectronHub image model', 400);
@@ -658,6 +664,45 @@ async function boundedMediaJson(response: Response, maximum: number): Promise<un
 /** CogView returns a signed UFile URL, sometimes labelled PNG while containing
  * JPEG bytes. Decode a bounded image and return normalized PNG base64 so SDKs
  * do not inherit that incorrect MIME type or an expiring upstream URL. */
+async function queuedImage(platform:'aihorde'|'xkiro',model:string,key:string|null,p:ImageParams){
+  const horde=platform==='aihorde',size=horde?'512x512':'1024x1024';
+  const allowed=horde?['Flat-2D Animerge','stable_diffusion','Deliberate','Dreamshaper','AbsoluteReality']:['sensenova/sensenova-u1.5-lite'];
+  if(!allowed.includes(model)||p.n!=null&&p.n!==1||p.size!=null&&p.size!==size)throw new MediaError(platform+' requires one '+size+' image on a supported route',400);
+  if(!horde&&!key)throw new MediaError('xKiro key required',401);
+  if(!cpuCanRunSharp())throw new MediaError('Image decoder unavailable',502);
+  const sharp=(await import('sharp')).default,base=horde?'https://aihorde.net/api/v2/generate/':'https://api.xkiro.com/v1/images/generations';
+  const headers:Record<string,string>=horde?{apikey:'0000000000','Client-Agent':'FreeLLMAPI:1:freellmapi.co'}:{Authorization:'Bearer '+key};
+  const deadline=Date.now()+120000, remaining=()=>{const t=deadline-Date.now();if(t<=0)throw new MediaError('Image generation timed out',504);return t;};
+  const json=async(path:string,body?:unknown,max=256000)=>await boundedMediaJson(await mediaFetch(base+path,platform,'image',{method:body?'POST':'GET',headers:{...headers,'Content-Type':'application/json'},redirect:'error',...(body?{body:JSON.stringify(body)}:{})},remaining()),max) as
+    {id?:string;model?:string;status?:string;faulted?:boolean;done?:boolean;generations?:{model?:string;censored?:boolean;img?:string}[];data?:{url?:string}[]};
+  const job=await json(horde?'async':'',horde?{prompt:p.prompt,models:[model],params:{width:512,height:512,steps:10,n:1},nsfw:false,censor_nsfw:true,r2:false,shared:false}:{prompt:p.prompt,model,n:1,size});
+  if(typeof job?.id!=='string'||!/^[a-zA-Z0-9-]{4,120}$/.test(job.id)||!horde&&job.model!==model)throw new MediaError('Invalid image job',502);
+  for(;;){
+    await new Promise(r=>setTimeout(r,Math.min(remaining(),horde?5000:3000)));
+    const info=await json((horde?'check/':'/')+job.id);
+    let bytes:Buffer;
+    if(horde){
+      if(info.faulted)throw new MediaError('Horde job failed',502);
+      if(!info.done)continue;
+      const g=(await json('status/'+job.id,undefined,16*1024*1024)).generations?.[0];
+      if(!g||g.censored||g.model!==model||typeof g.img!=='string'||!g.img.length||!/^[A-Za-z0-9+/]+=*$/.test(g.img))throw new MediaError('Horde returned no matching inline image',502);
+      bytes=Buffer.from(g.img,'base64');
+    }else{
+      if(['pending','processing','queued'].includes(info.status??''))continue;
+      if(info.status!=='succeeded'||info.model!==model||!info.data?.[0]?.url)throw new MediaError('xKiro image job did not produce the requested model',502);
+      const url=new URL(info.data[0].url);
+      if(url.origin!=='https://cdn.xkiro.com'||url.username||url.password||!(await assessProviderUrl(url.href)).allowed)throw new MediaError('Invalid image download origin',502);
+      const r=await mediaFetch(url.href,platform,'image',{redirect:'error'},remaining());
+      if(!r.body)throw new MediaError('Missing image body',502);
+      const reader=r.body.getReader(),chunks:Buffer[]=[];let n=0;
+      try{for(;;){const {done,value}=await reader.read();if(done)break;n+=value.length;if(n>16*1024*1024)throw new MediaError('Image exceeds size limit',502);chunks.push(Buffer.from(value));}}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+      bytes=Buffer.concat(chunks);
+    }
+    const normalized=await sharp(bytes,{limitInputPixels:16*1024*1024,failOn:'warning'}).png().toBuffer();
+    if(normalized.length>16*1024*1024)throw new MediaError('Image exceeds size limit',502);
+    return [{b64_json:normalized.toString('base64')}];
+  }
+}
 async function callNovaiImage(row: MediaModelRow, key: string | null, p: ImageParams): Promise<Array<{ b64_json: string }>> {
   if (!key) throw new MediaError('NovAI API key required', 401);
   if (row.model_id !== 'cogview-3-flash') throw new MediaError('NovAI images support only the tested free CogView 3 Flash route', 400);
@@ -1469,6 +1514,19 @@ export interface TranscriptionParams {
   responseFormat: string;
 }
 
+// Blob and fetch accept ArrayBuffer-backed views. Reuse the exact byte range
+// of ordinary (possibly pooled) Buffers and copy shared memory at this boundary.
+function transcriptionBytes(file: Buffer): Uint8Array<ArrayBuffer> {
+  const { buffer, byteOffset, byteLength } = file;
+  return buffer instanceof ArrayBuffer
+    ? new Uint8Array(buffer, byteOffset, byteLength)
+    : new Uint8Array(file);
+}
+
+function transcriptionBlob(p: TranscriptionParams): Blob {
+  return new Blob([transcriptionBytes(p.file)], { type: p.mimeType || 'application/octet-stream' });
+}
+
 export interface TranscriptionResult {
   platform: string;
   modelId: string;
@@ -1515,6 +1573,37 @@ function resolveTranscriptionChain(model: string | undefined, responseFormat: st
   return chain;
 }
 
+// This is one async ASR service, not a separate model for every language.
+async function speechFlowTranscription(model: string, key: string | null, p: TranscriptionParams) {
+  const headers = speechFlowCredentials(key ?? '');
+  if (!headers) throw new MediaError('SpeechFlow requires keyId:keySecret', 401);
+  if (model !== 'speechflow-asr' || !['text', 'json', 'verbose_json'].includes(p.responseFormat) || p.prompt || (p.temperature ?? 0) !== 0)
+    throw new MediaError('Unsupported SpeechFlow model or transcription options', 400);
+  const lang = (p.language ?? 'en').toLowerCase();
+  if (!/^[a-z]{2}$/.test(lang)) throw new MediaError('SpeechFlow requires a two-letter language code', 400);
+  const base = 'https://api.speechflow.io/asr/file/v1/';
+  const form = new FormData();
+  form.set('file', transcriptionBlob(p),
+    p.filename.replace(/[^a-z0-9._-]/gi, '_').slice(-128) || 'audio.wav');
+  const deadline = Date.now() + 120_000;
+  async function request(path: string, init: RequestInit) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new MediaError('SpeechFlow transcription timed out', 504);
+    const r = await mediaFetch(base + path, 'speechflow', 'transcription', { ...init, headers: headers!, redirect: 'error' }, Math.min(remaining, 30_000));
+    return await boundedMediaJson(r, 4 * 1024 * 1024) as { code?: number; taskId?: unknown; result?: unknown } | null;
+  }
+  const job = await request('create?lang=' + lang, { method: 'POST', body: form });
+  if (job?.code !== 10000 || typeof job.taskId !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(job.taskId))
+    throw new MediaError('SpeechFlow did not accept the transcription job', 502);
+  const query = 'query?' + new URLSearchParams({ taskId: job.taskId, resultType: '4' });
+  for (;;) {
+    const state = await request(query, { method: 'GET' });
+    if (state?.code === 11000 && typeof state.result === 'string') return { text: state.result, language: lang };
+    if (state?.code !== 11001) throw new MediaError('SpeechFlow returned an unsuccessful or malformed transcription', 502);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  }
+}
+
 async function callTranscriptionProvider(
   m: SttCandidate,
   credential: ProviderCredential,
@@ -1522,6 +1611,7 @@ async function callTranscriptionProvider(
 ): Promise<Omit<TranscriptionResult, 'platform' | 'modelId'>> {
   const key = credential.key;
   switch (m.platform) {
+    case 'speechflow': return speechFlowTranscription(m.modelId, key, p);
     case 'silvr': {
       if (!key) throw new MediaError('SilvR API key required', 401);
       if (!['whisper-large-v3-turbo', 'whisper-large-v3'].includes(m.modelId)) throw new MediaError('Unknown SilvR transcription model', 400);
@@ -1531,7 +1621,7 @@ async function callTranscriptionProvider(
       if (p.language) form.append('language', p.language);
       if (p.prompt) form.append('prompt', p.prompt);
       if (p.temperature !== undefined) form.append('temperature', String(p.temperature));
-      form.append('file', new Blob([new Uint8Array(p.file)], { type: p.mimeType || 'application/octet-stream' }), p.filename.replace(/[^a-z0-9._-]/gi, '_').slice(0, 128) || 'audio.wav');
+      form.append('file', transcriptionBlob(p), p.filename.replace(/[^a-z0-9._-]/gi, '_').slice(0, 128) || 'audio.wav');
       const r = await mediaFetch(`${SILVR_BASE_URL}/audio/transcriptions`, 'silvr', 'transcription', {
         method: 'POST', redirect: 'error', headers: bearerAuthHeader(key), body: form,
       });
@@ -1547,6 +1637,7 @@ async function callTranscriptionProvider(
     case 'cartesia':
       return nativeMediaResult(cartesiaTranscription(m.modelId, key, p));
     case 'google': {
+      if (m.modelId === 'gemini-3.5-transcribe-live') return nativeMediaResult(googleLiveTranscription(key, p));
       if (m.modelId !== 'gemini-3.5-transcribe') throw new MediaError('Unknown Google transcription model', 400);
       const r = await mediaFetch('https://generativelanguage.googleapis.com/v1beta/interactions', 'google', 'transcription', {
         method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key ?? '' },
@@ -1562,6 +1653,7 @@ async function callTranscriptionProvider(
     case 'cohere':
     case 'electronhub':
     case 'ovh': {
+      if (m.platform === 'ovh' && m.modelId === 'solaria-3') return nativeMediaResult(solariaTranscription(p));
       if (m.platform === 'electronhub' && !['voxtral-mini-2602', 'deepgram-nova-3'].includes(m.modelId)) throw new MediaError('Unknown ElectronHub transcription model', 400);
       if (m.platform === 'freeai' && m.modelId !== 'whisper') throw new MediaError('Unknown Free.ai transcription model', 400);
       if (m.platform === 'ovh' && !['whisper-large-v3', 'whisper-large-v3-turbo'].includes(m.modelId)) throw new MediaError('Unknown OVH transcription model', 400);
@@ -1578,7 +1670,7 @@ async function callTranscriptionProvider(
         if (p.temperature !== undefined) form.append('temperature', String(p.temperature));
       }
       if (m.platform === 'cohere' || p.language) form.append('language', p.language || 'en');
-      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('file', transcriptionBlob(p), p.filename);
       const r = await mediaFetch(url, m.platform, 'transcription', {
         method: 'POST', redirect: 'error', headers: m.platform === 'ovh' ? {} : bearerAuthHeader(key), body: form,
       });
@@ -1592,7 +1684,7 @@ async function callTranscriptionProvider(
       // Voxtral accepts multipart file/model, language and temperature, not
       // Whisper's prompt or response_format. Normalize JSON/text locally.
       const form = new FormData();
-      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('file', transcriptionBlob(p), p.filename);
       form.append('model', m.modelId);
       if (p.language) form.append('language', p.language);
       if (p.temperature !== undefined) form.append('temperature', String(p.temperature));
@@ -1609,7 +1701,7 @@ async function callTranscriptionProvider(
       // Do not forward Whisper-only options or claim native subtitle support.
       // The route derives text/JSON response formats from this normalized result.
       const form = new FormData();
-      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('file', transcriptionBlob(p), p.filename);
       form.append('model', m.modelId);
       const r = await mediaFetch(`${TYPHOON_BASE_URL}/audio/transcriptions`, 'typhoon', 'transcription', {
         method: 'POST',
@@ -1626,7 +1718,7 @@ async function callTranscriptionProvider(
       // only the base URL and the optional key differ.
       if (!credential.baseUrl) throw new MediaError('custom transcription provider is missing base_url', 500);
       const form = new FormData();
-      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('file', transcriptionBlob(p), p.filename);
       form.append('model', m.modelId);
       if (p.language) form.append('language', p.language);
       if (p.prompt) form.append('prompt', p.prompt);
@@ -1649,7 +1741,7 @@ async function callTranscriptionProvider(
       // Groq's OpenAI-compatible audio endpoint takes multipart form data.
       // Never set Content-Type by hand — FormData supplies the boundary.
       const form = new FormData();
-      form.append('file', new Blob([p.file], { type: p.mimeType || 'application/octet-stream' }), p.filename);
+      form.append('file', transcriptionBlob(p), p.filename);
       form.append('model', m.modelId);
       if (p.language) form.append('language', p.language);
       if (p.prompt) form.append('prompt', p.prompt);
@@ -1682,7 +1774,7 @@ async function callTranscriptionProvider(
         : {
             method: 'POST',
             headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
-            body: p.file,
+            body: transcriptionBytes(p.file),
           };
       // Billed per audio minute; ~1 MB a minute is a generous guess for the
       // compressed formats clients send (an uncompressed WAV overestimates).

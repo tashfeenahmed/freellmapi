@@ -18,7 +18,7 @@ import {
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import { ChevronDown, CircleAlert, Copy, ExternalLink, FlaskConical, Info, KeyRound, Layers, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Zap } from 'lucide-react'
-import type { ApiKey, ApiKeyModel } from '../../../../shared/types'
+import type { ApiKey, ApiKeyModel, Platform } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { toast } from '@/lib/toast'
@@ -78,7 +78,7 @@ const METRIC_LABEL_KEY = {
 // The Providers tab body: a filter toolbar over a list of collapsible provider
 // groups. Owns the keys/health/proxy queries and every per-key mutation so
 // KeysPage stays a thin shell. `onAddKey` opens the shared Add key dialog.
-export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
+export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => void }) {
   const { t, locale } = useI18n()
   const queryClient = useQueryClient()
 
@@ -138,6 +138,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       invalidateSearchQueries(queryClient)
       queryClient.invalidateQueries({ queryKey: ['health'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback'] })
       // Deleting the last key of a platform flips it back to unconfigured in
       // the checklist strip.
       queryClient.invalidateQueries({ queryKey: ['keys-providers'] })
@@ -383,30 +384,32 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
 
   const q = search.trim().toLowerCase()
 
-  function matchStatus(group: (typeof grouped)[number]): boolean {
-    const enabled = group.keys.some(k => k.enabled)
-    const hasIssue = group.keys.some(k => isIssue(statusOf(k)))
+  // Same idea as the search below: narrow the keys inside a group, rather
+  // than keeping every key once the group matches (#1907). "all" is a no-op.
+  function keyMatchesStatus(key: ApiKey): boolean {
     switch (statusFilter) {
-      case 'healthy': return enabled && !hasIssue
-      case 'issues': return hasIssue
-      case 'disabled': return !enabled
+      case 'healthy': return key.enabled && !isIssue(statusOf(key))
+      case 'issues': return isIssue(statusOf(key))
+      case 'disabled': return !key.enabled
       default: return true
     }
   }
 
   // Search narrows either whole groups (label match) or the keys within them
-  // (label / masked-key / endpoint-URL match); the status filter then trims
-  // the result set. The baseUrl term is #1056's lesson applied here: a custom
-  // row renders "api.unorouter.com" on screen, so searching that host must
-  // find the row the same way the fallback table's search does.
+  // (label / masked-key / endpoint-URL match); the status filter then narrows
+  // those keys the same way. The baseUrl term is #1056's lesson applied here:
+  // a custom row renders "api.unorouter.com" on screen, so searching that host
+  // must find the row the same way the fallback table's search does.
   const visibleGroups = grouped
     .map(group => {
-      if (!q) return group
-      if (group.label.toLowerCase().includes(q)) return group
-      const matchingKeys = group.keys.filter(k => keyMatchesQuery(k, q))
-      return { ...group, keys: matchingKeys }
+      let keys = group.keys
+      if (q && !group.label.toLowerCase().includes(q)) {
+        keys = keys.filter(k => keyMatchesQuery(k, q))
+      }
+      if (statusFilter !== 'all') keys = keys.filter(keyMatchesStatus)
+      return keys === group.keys ? group : { ...group, keys }
     })
-    .filter(group => group.keys.length > 0 && matchStatus(group))
+    .filter(group => group.keys.length > 0)
 
   function isGroupExpanded(group: (typeof grouped)[number]): boolean {
     if (q) return true // an active search auto-expands every matching group
@@ -432,7 +435,7 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
         icon={KeyRound}
         title={t('keys.noProviderKeys')}
         action={
-          <Button size="sm" onClick={onAddKey}>
+          <Button size="sm" onClick={() => onAddKey()}>
             <Plus className="size-3.5" />
             {t('keys.addKey')}
           </Button>
@@ -546,6 +549,23 @@ export function ProviderList({ onAddKey }: { onAddKey: () => void }) {
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (group.platform === 'custom') {
+                              const baseUrls = [...new Set(group.keys.map(k => k.baseUrl).filter((u): u is string => Boolean(u)))]
+                              if (baseUrls.length === 1) {
+                                setAddKeyBaseUrl(baseUrls[0])
+                                return
+                              }
+                              onAddKey()
+                              return
+                            }
+                            onAddKey(group.platform as Platform)
+                          }}
+                        >
+                          {t('keys.addAnotherKey')}
+                          <KeyRound className="ml-auto size-3.5" />
+                        </DropdownMenuItem>
                         {/* Test every model this provider serves, one real ping each
                             (custom endpoints test per key from the row instead). */}
                         {group.platform !== 'custom' && !group.search && (

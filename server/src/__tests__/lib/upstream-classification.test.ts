@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isUpstreamClassificationOutput } from '../../lib/error-classify.js';
+import { isUpstreamClassificationOutput, isInBandQuotaNotice } from '../../lib/error-classify.js';
 
 /**
  * #809: kilo's free relay sometimes answers with a bare "safe"/"unsafe" — an
@@ -51,5 +51,59 @@ describe('isUpstreamClassificationOutput (#809)', () => {
     expect(isUpstreamClassificationOutput(null, 'kilo')).toBe(false);
     expect(isUpstreamClassificationOutput(undefined, 'kilo')).toBe(false);
     expect(isUpstreamClassificationOutput(42, 'kilo')).toBe(false);
+  });
+});
+
+/**
+ * In-band relay quota notices: aihubmix `*-free` models answer HTTP 200 with a
+ * quota/abuse-prevention notice as the "completion" (0 output tokens). The
+ * surfaces must treat it like an empty completion and fail over — on every
+ * platform, since the relays sit behind platform 'custom'.
+ */
+describe('in-band relay quota notices', () => {
+  const NOTICE = 'Sorry, to prevent abuse of free resources, accounts that have not been recharged can only try 10 times. Please recharge to continue.';
+
+  it('flags the observed aihubmix notice on any platform', () => {
+    expect(isInBandQuotaNotice(NOTICE)).toBe(true);
+    for (const platform of ['custom', 'kilo', 'openrouter', undefined]) {
+      expect(isUpstreamClassificationOutput(NOTICE, platform)).toBe(true);
+    }
+  });
+
+  it('flags close variants (no "Sorry", leading whitespace, case)', () => {
+    expect(isInBandQuotaNotice('To prevent abuse of free resources, accounts that have not been recharged can only try 10 times')).toBe(true);
+    expect(isInBandQuotaNotice('\n\n  SORRY! Accounts that have not been recharged can only try 10 times per day.')).toBe(true);
+    expect(isInBandQuotaNotice('Sorry: to prevent abuse of free resources, please try later.')).toBe(true);
+  });
+
+  it('leaves ordinary answers alone', () => {
+    expect(isInBandQuotaNotice('pong')).toBe(false);
+    expect(isInBandQuotaNotice('Sorry, I cannot help with that request.')).toBe(false);
+    expect(isInBandQuotaNotice('Sorry for the confusion — here is the corrected code.')).toBe(false);
+    expect(isInBandQuotaNotice('Insufficient balance errors usually mean your account needs a top-up.')).toBe(false);
+    expect(isInBandQuotaNotice('Please recharge the battery before the test.')).toBe(false);
+  });
+
+  it('leaves an answer that quotes or discusses the notice alone (not anchored at the start)', () => {
+    expect(isInBandQuotaNotice('The relay replied: "Sorry, to prevent abuse of free resources, accounts that have not been recharged can only try 10 times".')).toBe(false);
+    expect(isInBandQuotaNotice('Some providers limit accounts that have not been recharged to prevent abuse of free resources.')).toBe(false);
+  });
+
+  it('leaves a long answer that happens to start with the phrase alone', () => {
+    const long = 'To prevent abuse of free resources, ' + 'rate limiting works by tracking requests per key. '.repeat(20);
+    expect(long.length).toBeGreaterThan(600);
+    expect(isInBandQuotaNotice(long)).toBe(false);
+  });
+
+  it('ignores empty and non-string content', () => {
+    expect(isInBandQuotaNotice('')).toBe(false);
+    expect(isInBandQuotaNotice('   ')).toBe(false);
+    expect(isInBandQuotaNotice(null)).toBe(false);
+    expect(isInBandQuotaNotice(42)).toBe(false);
+  });
+
+  it('keeps the #809 rule unchanged: "safe" still only fires on kilo', () => {
+    expect(isUpstreamClassificationOutput('safe', 'custom')).toBe(false);
+    expect(isUpstreamClassificationOutput('safe', 'kilo')).toBe(true);
   });
 });

@@ -10,12 +10,15 @@ import { LinkupProvider } from './linkup.js';
 import { ParallelProvider } from './parallel.js';
 import { KeenableProvider } from './keenable.js';
 import { OutcrawlProvider } from './outcrawl.js';
+import { TinyFishProvider } from './tinyfish.js';
+import { LlmKiwiProvider } from './llmkiwi.js';
 import { KeylessDecisionProvider } from './decision-only.js';
 import { CloudflareProvider } from './cloudflare.js';
 import { AIHordeProvider } from './aihorde.js';
 import { ModelScopeProvider } from './modelscope.js';
 import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
+import { PuterProvider } from './puter.js';
 import { SailProvider } from './sail.js';
 import { AclideProvider } from './aclide.js';
 import { SpekaProvider } from './speka.js';
@@ -42,6 +45,8 @@ import { SeptorProvider } from './septor.js';
 import { ClodProvider } from './clod.js';
 import { SpeechifyProvider } from './speechify.js';
 import { VarosityProvider } from './varosity.js';
+import { SpeechFlowProvider } from './speechflow.js';
+import { MeldportProvider } from './meldport.js';
 import { RimeProvider } from './rime.js';
 import { TypecastProvider, CartesiaProvider } from './voice-gateways.js';
 import { SilvrProvider } from './silvr.js';
@@ -72,6 +77,7 @@ function register(provider: BaseProvider) {
 register(new GoogleProvider({ timeoutMs: 60_000 }));
 register(new KeylessDecisionProvider('halx', 'HAL-X'));
 register(new KeylessDecisionProvider('aisense', 'AI SENSE'));
+register(new KeylessDecisionProvider('classifierdev', 'classifier.dev'));
 
 // Groq - OpenAI-compatible
 register(new OpenAICompatProvider({
@@ -94,6 +100,7 @@ register(new OpenAICompatProvider({
 // usage beyond that grant is pay-as-you-go. Live-tested 2026-09-01. Model rows
 // stay in Oracle so the existing Premium-now / Free-after-30-days gate applies.
 register(new SailProvider());
+register(new PuterProvider());
 register(new AclideProvider());
 register(new SpekaProvider());
 register(new KenariProvider());
@@ -134,6 +141,8 @@ register(new ClodProvider());
 register(new SpeechifyProvider());
 register(new VarosityProvider());
 register(new RimeProvider());
+register(new SpeechFlowProvider());
+register(new MeldportProvider());
 register(new TypecastProvider());
 register(new CartesiaProvider());
 register(new SilvrProvider());
@@ -191,6 +200,40 @@ register(new OpenAICompatProvider({
   platform: 'powertokens',
   name: 'PowerTokens',
   baseUrl: 'https://api.powertokens.ai/v1',
+}));
+
+// cheapllm.shop - OpenAI-compatible host for a single model,
+// deepseek-v4.1-flash-1017 (https://cheapllm.shop/v1). Free tier per
+// https://cheapllm.shop/docs#free-tier (checked 2026-11-10): free with no rate
+// limit during the beta, then a permanent free tier of at least 5,000 input +
+// 1,000 output tokens per rolling hour per account; email sign-up, no card.
+// When busy it queues and retries instead of answering 429, and the model
+// reasons before answering, so allow 180s. GET /v1/models is public without a
+// key but answers 401 when a bad key is sent, so the default validation probe
+// is meaningful and free. Model rows live in the hosted catalog.
+register(new OpenAICompatProvider({
+  platform: 'cheapllm',
+  name: 'cheapllm.shop',
+  baseUrl: 'https://cheapllm.shop/v1',
+  timeoutMs: 180_000,
+}));
+
+// LLM.kiwi - free plan serves `auto` and `hrllm` (see llmkiwi.ts for the key
+// check). Model rows live in the hosted catalog.
+register(new LlmKiwiProvider());
+
+// TokenReply - OpenAI-compatible relay (https://api.tokenreply.com/v1). Its one
+// roster mixes free, trial and paid models, so only live-verified free ids go
+// in the hosted catalog (no migration seed). Some free ids answer 403
+// access_denied unless the account has linked Discord. GET /v1/models answers
+// 401 with no key or a bad key, so the default validation probe is meaningful
+// and free. Several free routes are reasoning models (5-7s for a one-word
+// answer on 2026-11-23), so allow 60s.
+register(new OpenAICompatProvider({
+  platform: 'tokenreply',
+  name: 'TokenReply',
+  baseUrl: 'https://api.tokenreply.com/v1',
+  timeoutMs: 60_000,
 }));
 
 // AMD Radeon Cloud TokenFactory — the shared Model API is OpenAI-compatible
@@ -275,6 +318,7 @@ register(new ParallelProvider());
 // Keyless: public endpoint by default, the keyed endpoint with a real key.
 register(new KeenableProvider());
 register(new OutcrawlProvider());
+register(new TinyFishProvider());
 
 // Cloudflare Workers AI - OpenAI-compatible endpoint (key = "account_id:token")
 register(new CloudflareProvider());
@@ -483,10 +527,9 @@ register(new OpenAICompatProvider({
 }));
 
 // AINative Studio — OpenAI-compatible aggregator (api.ainative.studio/api/v1).
-// Advertises a recurring ~10M tokens/month free allocation (no card), though
-// its own pages disagree on scale; treat the quota as unverified until a real
-// account confirms it. Bearer auth works (X-API-Key also accepted). Catalog
-// rows live in the catalog (premium → age into free).
+// No free tier: its pricing page lists paid plans only (#2019), so the setup
+// checklist stops suggesting it to new users. Bearer auth works (X-API-Key
+// also accepted). Catalog rows live in the catalog (premium → age into free).
 register(new OpenAICompatProvider({
   platform: 'ainative',
   name: 'AINative Studio',

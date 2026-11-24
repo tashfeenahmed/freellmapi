@@ -37,6 +37,11 @@ contextBridge.exposeInMainWorld('__FREEAPI_SESSION__', () => ipcRenderer.invoke(
 // only work on macOS and Windows; on Linux setLoginItemSettings is a no-op, so
 // the bridge is not exposed there and the dashboard hides the switch.
 if (process.platform === 'darwin' || process.platform === 'win32') {
+  contextBridge.exposeInMainWorld('__FREEAPI_AGENT_SETUP__', {
+    details: (id: string) => ipcRenderer.invoke('freeapi:agent-details', id),
+    connect: (id: string) => ipcRenderer.invoke('freeapi:agent-connect', id),
+    launch: (id: string) => ipcRenderer.invoke('freeapi:agent-launch', id),
+  });
   contextBridge.exposeInMainWorld('__FREEAPI_LOGIN_ITEM__', {
     get: () => ipcRenderer.invoke('freeapi:get-login-item'),
     set: (open: boolean) => ipcRenderer.invoke('freeapi:set-login-item', open),

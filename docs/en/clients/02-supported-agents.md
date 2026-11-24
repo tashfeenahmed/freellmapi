@@ -77,6 +77,7 @@ Agents page in the dashboard shows the same commands with your key filled in.
 | Pi | `setup-pi` | `/v1` |
 | Reasonix | `setup-reasonix` | `/v1` |
 | ZCode | `setup-zcode` | `/v1` |
+| Zero | `setup-zero` | `/v1` |
 | Zed, JetBrains AI | [Ollama emulation](01-agent-clients.md#ollama-clients) | Ollama `/api` |
 | Cursor | `setup-cursor` prints the guide | public `https://…/v1` |
 | Anything else | `setup-generic` prints a ready block | `/v1` |

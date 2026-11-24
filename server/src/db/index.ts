@@ -79,7 +79,17 @@ export function connectDb(
   }
 
   db = factory(resolvedPath);
-  if (!isMemory) db.pragma('journal_mode = WAL');
+  if (!isMemory) {
+    const walResult = db.pragma('journal_mode = WAL') as unknown;
+    const journalMode = Array.isArray(walResult)
+      ? (walResult[0] as { journal_mode?: unknown } | undefined)?.journal_mode
+      : walResult;
+    // Safe with WAL (no corruption risk; only the last commits can be lost on
+    // power failure) and avoids an fsync per commit on the hot path. Skipped
+    // when WAL did not take effect (some network mounts), where NORMAL with a
+    // rollback journal carries a small corruption risk.
+    if (String(journalMode).toLowerCase() === 'wal') db.pragma('synchronous = NORMAL');
+  }
   db.pragma('foreign_keys = ON');
   // The dashboard and the proxy hot path write concurrently; without a busy
   // timeout the loser of a write race gets SQLITE_BUSY immediately and the
@@ -199,6 +209,9 @@ export function initDb(
   opts?: { ensureDir?: boolean; factory?: DbFactory },
 ): Db {
   const db = connectDb(dbPath, opts);
+  // No tables yet means this is a brand-new install (#1870: no-key providers
+  // are switched on by default for new installs only).
+  const freshDatabase = !db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'").get();
 
   if (process.env.NODE_ENV !== 'development') {
     runMigrationsSync(db, 'up');
@@ -218,6 +231,10 @@ export function initDb(
   }
 
   if (!isEncryptionKeyInitialized()) initEncryptionKey(db);
+  // Recorded once; later boots keep the first answer. Read by
+  // services/keyless-defaults.ts ('pending' = new install, not yet applied).
+  db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
+    .run('keyless_defaults', freshDatabase ? 'pending' : 'skip');
 
   keyStoreDecryptable = probeStoredSecrets(db);
   if (keyStoreDecryptable === false) {

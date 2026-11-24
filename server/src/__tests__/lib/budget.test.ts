@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseBudget, monthlyBudgetScore } from '../../lib/budget.js';
+import { parseBudget, monthlyBudgetScore, effectiveMonthlyBudget, normalizeBudgetInput } from '../../lib/budget.js';
 
 describe('parseBudget', () => {
   it('parses token-count labels to their upper bound', () => {
@@ -90,5 +90,47 @@ describe('monthlyBudgetScore', () => {
   it('keeps unlimited labels above every parsed budget', () => {
     expect(score('unlimited')).toBe(Infinity);
     expect(score('∞')).toBe(Infinity);
+  });
+});
+
+// #2030: custom endpoints have no catalog label; their budget comes from the
+// operator's own figure or a daily cap.
+describe('effectiveMonthlyBudget', () => {
+  it('prefers a parseable label over tpd_limit', () => {
+    expect(effectiveMonthlyBudget({ monthly_token_budget: '~30M', tpd_limit: 1_000 })).toBe(30_000_000);
+  });
+
+  it('falls back to tpd_limit x 30 when the label has no token figure', () => {
+    expect(effectiveMonthlyBudget({ monthly_token_budget: '', tpd_limit: 100_000 })).toBe(3_000_000);
+    expect(effectiveMonthlyBudget({ monthly_token_budget: 'free · 40 RPM', tpd_limit: 100_000 })).toBe(3_000_000);
+  });
+
+  it('is 0 with neither', () => {
+    expect(effectiveMonthlyBudget({ monthly_token_budget: '', tpd_limit: null })).toBe(0);
+    expect(effectiveMonthlyBudget({})).toBe(0);
+  });
+});
+
+describe('normalizeBudgetInput', () => {
+  it('keeps blank as blank and valid labels as typed', () => {
+    expect(normalizeBudgetInput('  ')).toBe('');
+    expect(normalizeBudgetInput(undefined)).toBe('');
+    expect(normalizeBudgetInput(' ~30M ')).toBe('~30M');
+    expect(normalizeBudgetInput('500K/day')).toBe('500K/day');
+  });
+
+  it('rewrites plain digit counts to a unit label parseBudget reads back', () => {
+    expect(normalizeBudgetInput('30000000')).toBe('30M');
+    expect(normalizeBudgetInput('30,000,000')).toBe('30M');
+    expect(normalizeBudgetInput('1500000')).toBe('1.5M');
+    expect(normalizeBudgetInput('250000')).toBe('250K');
+    expect(parseBudget(normalizeBudgetInput('500')!)).toBe(500);
+  });
+
+  it('rejects text that is not a token budget', () => {
+    expect(normalizeBudgetInput('40 RPM')).toBeNull();
+    expect(normalizeBudgetInput('lots')).toBeNull();
+    expect(normalizeBudgetInput('0')).toBeNull();
+    expect(normalizeBudgetInput('14.4K rpd')).toBeNull();
   });
 });

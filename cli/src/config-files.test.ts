@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parse } from 'jsonc-parser';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { applyGeneratedFile, applyGeneratedFiles, renderFile } from './config-files.js';
 
 const temporary: string[] = [];
@@ -565,6 +565,41 @@ describe('safe config writes', () => {
     expect(fs.readFileSync(result.backupPath!, 'utf8')).toBe('user_setting = true\n');
     expect(fs.readFileSync(target, 'utf8')).toContain('user_setting = true');
     expect(fs.readFileSync(target, 'utf8')).toContain('model = "auto"');
+  });
+
+  it('merges Cordis profile overlays by id and keeps other providers and comments', () => {
+    const file = { format: 'yaml-entries' as const, path: 'cordis.patch.yml',
+      value: { 'llm-pi-ai': { providers: { freellmapi: { apiKeyEnv: 'FREELLMAPI_API_KEY' } } } } };
+    const existing = '# user overlay\n- id: llm-pi-ai\n  config:\n    providers:\n      existing: {apiKeyEnv: KEEP}\n- id: hmr\n  disabled: true\n';
+    const rendered = renderFile(file, existing);
+    expect(rendered).toContain('# user overlay');
+    expect(rendered).toContain('KEEP');
+    expect(rendered).toContain('disabled: true');
+    expect(rendered).toContain('FREELLMAPI_API_KEY');
+    expect(renderFile(file, rendered)).toBe(rendered);
+    expect(() => renderFile(file, 'other: mapping')).toThrow('Expected a YAML patch sequence');
+  });
+
+  it('restores earlier files if a later replacement fails, and a retry succeeds', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'freellmapi-cli-'));
+    temporary.push(directory);
+    const files = ['existing', 'new', 'locked'].map(name => ({
+      path: path.join(directory, name), format: 'env' as const, sensitive: true, content: 'KEY=new\n',
+    }));
+    fs.writeFileSync(files[0].path, 'KEY=old\n');
+    const renameSync = fs.renameSync;
+    const rename = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (to === files[2].path) throw new Error('file locked');
+      renameSync(from, to);
+    });
+    try {
+      expect(() => applyGeneratedFiles(files, false)).toThrow('file locked');
+    } finally { rename.mockRestore(); }
+    expect(fs.readFileSync(files[0].path, 'utf8')).toBe('KEY=old\n');
+    expect(fs.existsSync(files[1].path)).toBe(false);
+    expect(fs.existsSync(files[2].path)).toBe(false);
+    expect(fs.readdirSync(directory).some(file => file.endsWith('.tmp'))).toBe(false);
+    expect(applyGeneratedFiles(files, false).every(file => file.changed)).toBe(true);
   });
 
   it('does not write in dry-run mode', () => {

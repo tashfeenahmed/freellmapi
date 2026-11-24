@@ -54,11 +54,12 @@ npx freellmapi setup-dsh --url http://localhost:3001 --api-key <统一密钥>
 | **Pi** | `setup-pi` | `http://localhost:3001/v1` | OpenAI Chat（`api: openai-completions`） |
 | **Reasonix** | `setup-reasonix` | `http://localhost:3001/v1` | OpenAI Chat（`kind = "openai"`） |
 | **ZCode** | `setup-zcode` | `http://localhost:3001/v1` | OpenAI Chat（`openai-chat-completions`） |
+| **Zero** | `setup-zero` | `http://localhost:3001/v1` | OpenAI Chat（`openai-compatible`） |
 | **QwenPaw** | 手动配置 | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` 打印指引 | 公共 `https://…/v1` | OpenAI Chat |
 | **其他** | `setup-generic` 打印现成配置块 | `http://localhost:3001/v1` | OpenAI Chat |
 
-根路径与 `/v1` 的区别很重要：Claude Code 期望服务器根路径，因为它会追加 Anthropic Messages 路径。本表中兼容 OpenAI 的客户端——包括 Cline、Aider、Goose、Codex、Continue、OpenCode、Qwen、Roo、Kilo、Crush、Pi、Reasonix、QwenPaw 和 DeepSeek Harness——期望它们配置的 base URL 包含 `/v1`。
+根路径与 `/v1` 的区别很重要：Claude Code 期望服务器根路径，因为它会追加 Anthropic Messages 路径。本表中兼容 OpenAI 的客户端——包括 Cline、Aider、Goose、Codex、Continue、OpenCode、Qwen、Roo、Kilo、Crush、Pi、Reasonix、ZCode、Zero、QwenPaw 和 DeepSeek Harness——期望它们配置的 base URL 包含 `/v1`。
 
 ### DeepSeek Harness (`dsh`)
 
@@ -130,6 +131,18 @@ npx freellmapi setup-zcode --url http://localhost:3001 --api-key <统一密钥>
 ```
 
 运行前请退出 ZCode 桌面端，以免它把内存中的注册表写回该文件。可在模型选择器（或 CLI 的 `/model`）中选择其他 `freellmapi/<model>`。`--profile <name>` 改为添加第二个 `freellmapi-<name>` provider。ZCode 的每个请求都带有自己的 `x-zcode-app-version` 和 `x-title: Z Code@…` 请求头，Agents 页面的"最近出现"徽章据此识别。旧的 `~/.zcode/v2/config.json` 和 `~/.zcode/cli/config.json` 只在迁移时读取一次，修改它们不会生效。
+
+### Zero（`zero`）
+
+[Zero](https://github.com/Twigpine/zero) 是一款用 Go 编写的本地终端编程智能体，支持持久化会话与权限控制。它读取 `~/.config/zero/config.json`（macOS/Linux 尊重 `$XDG_CONFIG_HOME`，Windows 为 `%APPDATA%\zero\config.json`）。`setup-zero` 会在 `providers` 中添加 `freellmapi` 条目（`provider: "openai-compatible"`、网关的 `/v1` 作为 `baseURL` 及所选模型）并将 `activeProvider` 设为 `"freellmapi"`。其他 provider 保持原样，重复运行只替换 `freellmapi` 条目。文件以 `0600` 权限写入，Zero 启动时会自动把内联密钥迁移至其加密凭据存储。
+
+```bash
+npx freellmapi setup-zero --url http://localhost:3001 --api-key <统一密钥>
+npm install -g @twigpine/zero
+zero exec "Say hello"
+```
+
+`--profile <name>` 改为添加第二个 `freellmapi-<name>` provider 而不改动 `activeProvider`，可在 Zero 中通过 `/provider` 切换。Zero 在每次模型请求中都会发送 `User-Agent: zero/<version>`，Agents 页面的"最近出现"徽章据此识别。
 
 ### QwenPaw
 

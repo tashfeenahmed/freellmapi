@@ -180,7 +180,7 @@ print(resp.choices[0].message.content)
 
 ## Web search (`POST /v1/search`)
 
-`POST /v1/search` runs a query through the enabled search engines (for example Tavily, Exa, Brave Search or Outcrawl) and returns `{ query, results, provider, engine }`. `GET /v1/search/engines` lists them and whether each is usable.
+`POST /v1/search` runs a query through the enabled search engines (for example Tavily, Exa, Brave Search, Outcrawl or TinyFish) and returns `{ query, results, provider, engine }`. `GET /v1/search/engines` lists them and whether each is usable.
 
 **Custom search relays (#1777).** You can point search at your own relay instead of a catalog engine: in the dashboard, open **Keys → Add key → Custom provider** and pick **Web search**, or register it with `POST /api/media/custom` and `modality: "search"`, giving the relay's `baseUrl`, a `model` id, and an optional `apiKey` (omit it for a keyless local relay). The relay speaks the Tavily wire shape — `POST {base_url}/search` with `{ query, max_results }` — and returns `{ results: [{ title, url, content, score? }] }`. Registered relays are tried before every catalog engine, so a working relay always answers first; a down relay fails over to the catalog engines the same way any engine failure does.
 
@@ -376,11 +376,15 @@ caller's `system` turn, exactly as on `/v1/chat/completions`.
 
 Claude model names map to your free pool on the **Keys → Anthropic** tab: each family (`default`, `opus`, `sonnet`, `haiku`) routes to `auto` (the router picks a free model) or a model you pin. `POST /v1/messages/count_tokens` and a content-negotiated `GET /v1/models` (Anthropic shape when `anthropic-version` is sent) are implemented too. Streaming, system prompts, tool use, and image input all translate across the same router as the OpenAI endpoints.
 
-**Claude Code auto-mode classifier compatibility (related to #1589).** Upstream-supplied `safeguard_results` are preserved unchanged in the JSON response and streaming `message_delta`. When an upstream sends none, the field stays absent; FreeLLMAPI never fabricates classifier verdicts.
+**Claude Code auto mode (#1589, #2011).** In auto mode, Claude Code asks the server to review tool calls: it sends a `safeguards` request field (type `dangerous_tool_use`) with an `anthropic-beta` value, and reads `safeguard_results` from the reply. Anthropic's server runs that review. FreeLLMAPI routes to non-Anthropic models, so the review cannot run here, and FreeLLMAPI does not invent verdicts.
 
-The client's `safeguards` body field and `anthropic-beta` header are accepted as internal request metadata, but **neither is forwarded to the current OpenAI-compatible upstreams**. Those APIs may reject unsupported fields. There is no native Anthropic upstream adapter here, so this response-metadata support does **not** establish eligibility for Anthropic's no-charge server-side classifier. An eligible native gateway must forward the request field and header together, as described in the [official gateway requirements](https://code.claude.com/docs/en/auto-mode-classifier-billing#make-the-session-eligible).
+What the gateway does:
 
-For a gateway that cannot provide server-side checks, Anthropic documents a temporary setting to use Claude Code's own classifier requests without repeatedly asking for server-side eligibility. Set it **before** starting Claude Code:
+- It accepts `safeguards` and `anthropic-beta`, and does not forward them to the OpenAI-compatible upstreams (they reject unknown fields).
+- When a provider returns its own `safeguard_results`, they go back unchanged: top level in a JSON reply, `message_delta.delta` in a stream.
+- When Claude Code asked for the review and no provider answered, the reply carries the protocol's explicit "not supported here" status, `[{"type":"dangerous_tool_use","status":{"type":"unsupported"}}]`. This is not a verdict. Claude Code then checks actions with its own classifier requests, which also come through FreeLLMAPI to your free pool.
+
+Claude Code still shows the "isn't eligible" notice in that case, and says that a later release removes the fallback. To keep auto mode working unattended, start Claude Code with Anthropic's documented setting for a gateway that cannot run the server-side review:
 
 ```bash
 export CLAUDE_CODE_AUTO_MODE_SERVER=0
@@ -392,7 +396,7 @@ On Windows PowerShell:
 $env:CLAUDE_CODE_AUTO_MODE_SERVER = "0"
 ```
 
-This does **not** disable auto-mode safety checks or permissions. Claude Code still makes its own classifier requests, which consume your configured provider's usage/allowance; it does not make those requests free.
+`freellmapi setup-claude` writes this into the generated `settings.json`, and `freellmapi launch` sets it unless your shell already sets it. With it, Claude Code does not ask the server, does not show the notice, and checks each action with its own classifier requests. Auto mode safety checks and permissions stay on. Those classifier requests go to FreeLLMAPI and use your free providers' allowance; they are not sent to Anthropic. Anthropic documents the variable as temporary ([auto mode classifier billing](https://code.claude.com/docs/en/auto-mode-classifier-billing#make-the-session-eligible)).
 
 **Claude Code** — point it at your server and start it:
 
@@ -400,6 +404,7 @@ This does **not** disable auto-mode safety checks or permissions. Claude Code st
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:3001
 export ANTHROPIC_AUTH_TOKEN=freellmapi-your-unified-key   # NOT ANTHROPIC_API_KEY
+export CLAUDE_CODE_AUTO_MODE_SERVER=0   # auto mode: see the note above
 claude
 ```
 
@@ -407,6 +412,7 @@ claude
 ```powershell
 $env:ANTHROPIC_BASE_URL="http://localhost:3001"
 $env:ANTHROPIC_AUTH_TOKEN="freellmapi-your-unified-key"
+$env:CLAUDE_CODE_AUTO_MODE_SERVER="0"
 claude
 ```
 

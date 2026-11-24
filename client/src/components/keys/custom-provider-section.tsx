@@ -66,6 +66,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
   const [apiKey, setApiKey] = useState('')
   // Endpoint group (#1176); blank = the default Custom group.
   const [groupLabel, setGroupLabel] = useState('')
+  const [monthlyTokenBudget, setMonthlyTokenBudget] = useState('')
   // Chat models default tools on (modern OpenAI-compatible servers all emit tool
   // calls) and vision off; declare them here or flip them later per model. (#470)
   const [supportsTools, setSupportsTools] = useState(true)
@@ -114,6 +115,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
       setDisplayName('')
       setFamily('')
       setEmbeddingInputType(EMBEDDING_INPUT_TYPE_UNSET)
+      setMonthlyTokenBudget('')
       setSupportsTools(true)
       setSupportsVision(false)
       if (onAdded) {
@@ -145,6 +147,7 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
           displayName: !multiple ? (displayName || undefined) : undefined,
           apiKey: apiKey || undefined,
           groupLabel: groupLabel.trim() || undefined,
+          monthlyTokenBudget: monthlyTokenBudget.trim() || undefined,
           supportsTools,
           supportsVision,
         },
@@ -397,6 +400,18 @@ export function CustomProviderSection({ onAdded }: { onAdded?: () => void } = {}
         </div>
         {customType === 'chat' && (
           <GroupLabelField value={groupLabel} onChange={setGroupLabel} className="w-[150px]" showHint={false} />
+        )}
+        {customType === 'chat' && (
+          <div className="space-y-1.5">
+            <Label className="text-xs" htmlFor="custom-monthly-token-budget">{t('models.monthlyTokenBudget')}</Label>
+            <Input
+              id="custom-monthly-token-budget"
+              value={monthlyTokenBudget}
+              onChange={e => setMonthlyTokenBudget(e.target.value)}
+              placeholder="~30M"
+              className="w-[140px] font-mono text-xs"
+            />
+          </div>
         )}
         <Button type="submit" size="sm" disabled={addCustom.isPending}>
           {addCustom.isPending ? t('keys.addingCustom') : addLabel}

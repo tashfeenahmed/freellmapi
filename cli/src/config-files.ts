@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import {
   applyEdits,
@@ -6,7 +7,7 @@ import {
   parse,
   type ParseError,
 } from 'jsonc-parser';
-import { Document, isMap, parseDocument } from 'yaml';
+import { Document, isMap, isSeq, parseDocument } from 'yaml';
 import type { GeneratedFile, JsonArrayMerge } from './types.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -77,19 +78,23 @@ function mergeJson(existing: string, value: Record<string, unknown>, arrays: Rec
 // a settings.yaml shared with other providers (DeepSeek Harness keeps every
 // route under one `llm-pi-ai` key) must not lose its siblings just because
 // ours changed.
-function mergeYamlDocument(existing: string, value: Record<string, unknown>): string {
+function mergeYamlDocument(existing: string, value: Record<string, unknown>, entries = false): string {
+  // Cordis patch files hold an ordered list of {id, config} overlays. Keep
+  // unrelated entries (including insert/remove operations) in their order.
+  const freshValue = entries ? Object.entries(value).map(([id, config]) => ({ id, config })) : value;
   if (!existing.trim()) {
-    const fresh = new Document(JSON.parse(JSON.stringify(value)));
+    const fresh = new Document(JSON.parse(JSON.stringify(freshValue)));
     return fresh.toString({ lineWidth: 0 });
   }
-  const doc = parseDocument(existing);
+  const doc: Document = parseDocument(existing);
   if (doc.errors.length) {
     throw new Error(`Existing YAML cannot be parsed safely: ${doc.errors[0].message}`);
   }
-  if (doc.contents !== null && !isMap(doc.contents)) {
-    throw new Error('Existing YAML is not a mapping at the top level');
+  if (doc.contents === null) doc.contents = doc.createNode(entries ? [] : {});
+  if (entries ? !isSeq(doc.contents) : !isMap(doc.contents)) {
+    throw new Error(entries ? 'Expected a YAML patch sequence' : 'Existing YAML is not a mapping at the top level');
   }
-  const applyPatch = (patch: Record<string, unknown>, parentPath: string[] = []) => {
+  const applyPatch = (patch: Record<string, unknown>, parentPath: (string | number)[] = []) => {
     for (const [key, next] of Object.entries(patch)) {
       const propertyPath = [...parentPath, key];
       if (next === undefined) {
@@ -104,7 +109,15 @@ function mergeYamlDocument(existing: string, value: Record<string, unknown>): st
       doc.setIn(propertyPath, next);
     }
   };
-  applyPatch(value);
+  if (entries && isSeq(doc.contents)) {
+    for (const [id, config] of Object.entries(value)) {
+      const index = doc.contents.items.map(item => isMap(item) ? item.get('id') : undefined).lastIndexOf(id);
+      if (index < 0) doc.add(JSON.parse(JSON.stringify({ id, config })));
+      else applyPatch({ config }, [index]);
+    }
+  } else {
+    applyPatch(value);
+  }
   const rendered = doc.toString({ lineWidth: 0 });
   return rendered.endsWith('\n') ? rendered : `${rendered}\n`;
 }
@@ -288,7 +301,7 @@ function splitTomlSections(generated: string): TomlSections {
 // with the `[array.sub]` tables that belong to it — so the user's other entries
 // in that array stay put.
 function mergeToml(existing: string, generated: string): string {
-  if (!existing.trim()) return generated;
+  if (!existing.trim() || existing === generated) return generated;
   const { root: generatedRoot, tables: generatedTables } = splitTomlSections(generated);
   const rootKeys = new Set(generatedRoot
     .map(tomlRootKey)
@@ -361,6 +374,7 @@ function mergeEnv(existing: string, generated: string): string {
 export function renderFile(file: GeneratedFile, existing = ''): string {
   if (file.format === 'json') return mergeJson(existing, file.value ?? {}, file.arrays);
   if (file.format === 'env') return mergeEnv(existing, file.content ?? '');
+  if (file.format === 'yaml-entries') return mergeYamlDocument(existing, file.value ?? {}, true);
   if (file.format === 'yaml') {
     return file.value
       ? mergeYamlDocument(existing, file.value)
@@ -400,32 +414,62 @@ function planGeneratedFile(file: GeneratedFile): PlannedWrite {
   };
 }
 
-function commitPlannedWrite(plan: PlannedWrite): ApplyResult {
-  const { file, exists, ...result } = plan;
-  if (!plan.changed) return result;
-  fs.mkdirSync(path.dirname(file.path), { recursive: true, mode: 0o700 });
-  let backupPath: string | undefined;
-  if (exists) {
-    backupPath = `${file.path}.backup-${timestamp()}`;
-    fs.copyFileSync(file.path, backupPath);
-  }
-  const temporary = `${file.path}.freellmapi-${process.pid}.tmp`;
-  fs.writeFileSync(temporary, plan.rendered, { mode: file.sensitive ? 0o600 : 0o644 });
-  fs.renameSync(temporary, file.path);
-  if (file.sensitive) fs.chmodSync(file.path, 0o600);
-  return { ...result, backupPath };
+interface StagedWrite {
+  plan: PlannedWrite;
+  destination: string;
+  temporary: string;
+  backup?: string;
 }
 
-// Two-phase apply: every target file is read and merged BEFORE the first
-// write, so a merge failure on any file aborts the whole batch without
-// leaving earlier files modified.
-export function applyGeneratedFiles(
-  files: GeneratedFile[],
-  dryRun: boolean,
-): ApplyResult[] {
+// Stage every file before replacing any. A locked destination on Windows can
+// still fail at rename time, so restore earlier writes in reverse order.
+export function applyGeneratedFiles(files: GeneratedFile[], dryRun: boolean): ApplyResult[] {
   const plans = files.map(planGeneratedFile);
-  if (dryRun) return plans.map(({ file: _file, exists: _exists, ...result }) => result);
-  return plans.map(commitPlannedWrite);
+  const staged: StagedWrite[] = [];
+  const committed: StagedWrite[] = [];
+  try {
+    for (const plan of plans) {
+      if (dryRun || !plan.changed) continue;
+      // Preserve symlinked dotfiles and the permission mode of existing files.
+      const destination = plan.exists ? fs.realpathSync(plan.path) : plan.path;
+      const mode = plan.file.sensitive ? 0o600 : plan.exists ? fs.statSync(destination).mode & 0o777 : 0o644;
+      fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
+      const temporary = destination + '.freellmapi-' + randomUUID() + '.tmp';
+      const write: StagedWrite = { plan, destination, temporary };
+      staged.push(write);
+      fs.writeFileSync(temporary, plan.rendered, { flag: 'wx', mode });
+      if (plan.exists) {
+        const backup = plan.path + '.backup-' + timestamp() + '-' + randomUUID().slice(0, 8);
+        fs.copyFileSync(destination, backup, fs.constants.COPYFILE_EXCL);
+        write.backup = backup;
+        if (plan.file.sensitive) fs.chmodSync(backup, 0o600);
+      }
+    }
+    for (const write of staged) {
+      const { plan, destination } = write;
+      if (plan.exists ? fs.readFileSync(destination, 'utf8') !== plan.previous : fs.existsSync(destination)) {
+        throw new Error('Configuration changed during setup: ' + plan.path);
+      }
+      fs.renameSync(write.temporary, destination);
+      committed.push(write);
+      plan.backupPath = write.backup;
+    }
+    return plans.map(({ file: _file, exists: _exists, ...result }) => result);
+  } catch (error) {
+    for (const { plan, destination, temporary, backup } of committed.reverse()) {
+      // Leave a concurrent external edit intact, along with the recovery backup.
+      if (fs.readFileSync(destination, 'utf8') !== plan.rendered) continue;
+      if (backup) {
+        fs.copyFileSync(backup, temporary);
+        fs.renameSync(temporary, destination);
+      } else {
+        fs.unlinkSync(destination);
+      }
+    }
+    throw error;
+  } finally {
+    for (const { temporary } of staged) fs.rmSync(temporary, { force: true });
+  }
 }
 
 export function applyGeneratedFile(file: GeneratedFile, dryRun: boolean): ApplyResult {

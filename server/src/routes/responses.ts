@@ -38,7 +38,7 @@ import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
-import { isClientAbortError, newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
+import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { maybeServeResponsesWebSearch, webSearchCallToText } from '../lib/responses-web-search.js';
@@ -958,7 +958,9 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // Fallback-v2 hedging: the loop aborts this controller (via abortInFlight)
   // when the wall-clock retry budget expires mid-attempt, canceling the
   // in-flight upstream instead of waiting for a stalled attempt to time out.
-  const hedgeAbort = new AbortController();
+  // `let`: abortInFlight aborts only the in-flight attempt and replaces the
+  // controller, so a silent-window failover gets a fresh signal (#1960).
+  let hedgeAbort = new AbortController();
   res.on('close', () => {
     if (!res.writableEnded) {
       clientGone = true;
@@ -1217,7 +1219,8 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     attemptLog,
     logIdentity: { surface: 'responses', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
-    abortInFlight: () => hedgeAbort.abort(newHedgeAbortError()),
+    abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
+    streaming: stream === true,
     route: () => {
       // Task-type routing (#1127): same header/derivation as /chat/completions.
       const taskType = resolveTaskType(req, tools, messages);
@@ -1229,7 +1232,9 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     },
     dispatch: async (route, attempt, ctx) => {
       const contextBudget = routeOutputBudget(route, estimatedInputTokens);
-      const routeOpts = contextBudget != null ? { ...dispatchOpts, contextBudget } : dispatchOpts;
+      // Signal composed per attempt: hedgeAbort is replaced after each abort.
+      const attemptOpts = { ...dispatchOpts, signal: AbortSignal.any([clientAbort.signal, hedgeAbort.signal]) };
+      const routeOpts = contextBudget != null ? { ...attemptOpts, contextBudget } : attemptOpts;
       traceRouteEvent('Responses', {
         event: attempt === 0 ? 'start' : 'next',
         requestId: requestGroupId,
@@ -1445,6 +1450,16 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           // Resolve the dialect hold window now that the full text is known.
           // Held text was never emitted, so a dead dialect turn can still fail
           // over on the same SSE stream (nothing has been committed yet).
+          // #809 / quota notices: a turn whose whole (still-held, never
+          // emitted) text is an upstream classification word or a relay quota
+          // notice is a dead turn — fail over like an empty completion.
+          if (heldText.length > 0 && toolAcc.size === 0 && msgItemId === null
+            && isUpstreamClassificationOutput(heldText, route.platform)) {
+            throw Object.assign(
+              new Error(`empty completion from ${route.displayName} (upstream notice)`),
+              upstreamFinish === 'length' ? { skipBench: true } : {},
+            );
+          }
           if (heldText.length > 0) {
             const rescue = (wantsTools && (dialectMode === 'dialect' || containsDialectMarker(heldText)))
               ? rescueInlineToolCalls(heldText, new Set((tools ?? []).map(t => t.function.name)))
@@ -1657,6 +1672,14 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       if (!text && toolCalls.length === 0) {
         throw Object.assign(
           new Error(`empty completion from ${route.displayName}`),
+          result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
+        );
+      }
+      // #809 / quota notices: an upstream classification word or a relay
+      // quota notice in place of the reply is a dead turn — fail over.
+      if (toolCalls.length === 0 && isUpstreamClassificationOutput(text, route.platform)) {
+        throw Object.assign(
+          new Error(`empty completion from ${route.displayName} (upstream notice)`),
           result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
         );
       }

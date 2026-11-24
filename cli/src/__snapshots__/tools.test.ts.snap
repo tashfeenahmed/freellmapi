@@ -66,6 +66,7 @@ exports[`tool generators > setup-claude has stable golden output 1`] = `
           "ANTHROPIC_DEFAULT_SONNET_MODEL": "fast-coder",
           "ANTHROPIC_MODEL": "fast-coder",
           "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "131072",
+          "CLAUDE_CODE_AUTO_MODE_SERVER": "0",
           "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY": "1",
         },
       },
@@ -337,11 +338,46 @@ exports[`tool generators > setup-dsh has stable golden output 1`] = `
       "path": "/home/tester/.dsh/.env",
       "sensitive": true,
     },
+    {
+      "format": "yaml-entries",
+      "path": "/home/tester/.dsh/cordis.patch.yml",
+      "value": {
+        "agent-default-model": {
+          "model": "fast-coder",
+          "provider": "freellmapi",
+          "reasoningEffort": undefined,
+        },
+        "llm-pi-ai": {
+          "providers": {
+            "freellmapi": {
+              "api": "openai-completions",
+              "apiKeyEnv": "FREELLMAPI_API_KEY",
+              "baseURL": "http://localhost:3000/v1",
+              "displayName": "FreeLLMAPI",
+              "models": [
+                {
+                  "contextWindow": 131072,
+                  "id": "fast-coder",
+                  "maxTokens": 8192,
+                  "name": "Fast Coder",
+                },
+                {
+                  "contextWindow": 262144,
+                  "id": "reasoning-model",
+                  "maxTokens": 8192,
+                  "name": "Reasoning Model",
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
   ],
   "notes": [
     "Start DeepSeek Harness with: npx @deepseek-ai/dsh web — freellmapi/fast-coder is the default model.",
     "One-shot check: npx @deepseek-ai/dsh --profile headless "Say hello"",
-    "Settings are hot-reloaded, so a running dsh picks this up on its next request.",
+    "New sessions use the selected model. Restart a running profile if hot reload is disabled.",
     "Models are declared text-only; give a vision model \`input: [text, image]\` under freellmapi.models in settings.yaml to send it images.",
   ],
 }
@@ -1018,6 +1054,43 @@ exports[`tool generators > setup-zcode has stable golden output 1`] = `
     "Quit ZCode Desktop before running this so it does not save its in-memory registry over the file.",
     "freellmapi/fast-coder is now the default model; pick another under freellmapi in the model picker (or /model in the CLI). Other providers are kept.",
     "The API key lives in the provider file (written 0600): ZCode has no env lookup for custom providers.",
+  ],
+}
+`;
+
+exports[`tool generators > setup-zero has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "arrays": {
+        "providers": {
+          "ownedBy": {
+            "name": "freellmapi",
+          },
+        },
+      },
+      "format": "json",
+      "path": "/home/tester/.config/zero/config.json",
+      "sensitive": true,
+      "value": {
+        "activeProvider": "freellmapi",
+        "providers": [
+          {
+            "apiKey": "freellmapi-test-key",
+            "baseURL": "http://localhost:3000/v1",
+            "description": "FreeLLMAPI",
+            "model": "fast-coder",
+            "name": "freellmapi",
+            "provider": "openai-compatible",
+          },
+        ],
+      },
+    },
+  ],
+  "notes": [
+    "Install Zero with: npm install -g @twigpine/zero",
+    "freellmapi (fast-coder) is now the active provider; other providers are kept.",
+    "Zero reads ~/.config/zero/config.json (%APPDATA%\\zero\\config.json on Windows); inline keys are written 0600 and migrated to Zero's credential store on startup.",
   ],
 }
 `;

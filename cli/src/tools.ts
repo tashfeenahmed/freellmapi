@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { clientNotes, detectChatGptClient } from './detect.js';
 import type {
   CatalogModel,
@@ -70,6 +71,12 @@ function claude(ctx: GenerateContext): Generation {
           ANTHROPIC_DEFAULT_HAIKU_MODEL: model.id,
           CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(contextWindow(model)),
           CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: '1',
+          // #2011: the routed models are not Anthropic's, so auto mode's
+          // server-side review cannot run behind this gateway. Anthropic's
+          // documented setting for that case: Claude Code checks actions with
+          // its own classifier requests (sent here, to the free pool) and
+          // skips the "isn't eligible" notice.
+          CLAUDE_CODE_AUTO_MODE_SERVER: '0',
         },
       },
     }],
@@ -302,6 +309,11 @@ function opencode(ctx: GenerateContext): Generation {
 }
 
 function goose(ctx: GenerateContext): Generation {
+  const dir = process.env.GOOSE_PATH_ROOT && path.isAbsolute(process.env.GOOSE_PATH_ROOT)
+    ? path.join(process.env.GOOSE_PATH_ROOT, 'config')
+    : process.platform === 'win32'
+      ? path.join(process.env.APPDATA || path.join(ctx.homeDir, 'AppData', 'Roaming'), 'Block', 'goose', 'config')
+      : path.join(ctx.homeDir, '.config', 'goose');
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   // GOOSE_MODEL names the default, so it belongs in the provider's list too;
   // `auto` is filtered out of the plain roster and goes back at the front.
@@ -314,9 +326,7 @@ function goose(ctx: GenerateContext): Generation {
     files: [
       {
         path: path.join(
-          ctx.homeDir,
-          '.config',
-          'goose',
+          dir,
           'custom_providers',
           'freellmapi.json',
         ),
@@ -336,7 +346,7 @@ function goose(ctx: GenerateContext): Generation {
         },
       },
       {
-        path: path.join(ctx.homeDir, '.config', 'goose', 'config.yaml'),
+        path: path.join(dir, 'config.yaml'),
         format: 'yaml',
         content: [
           '# freellmapi:start',
@@ -594,50 +604,53 @@ function dsh(ctx: GenerateContext): Generation {
       contextWindow: contextWindow(entry),
       maxTokens: outputLimit(entry),
     }));
-  return {
-    files: [
-      {
-        path: path.join(home, 'settings.yaml'),
-        format: 'yaml',
-        value: {
-          'llm-pi-ai': {
-            providers: {
-              [route]: {
-                displayName: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
-                apiKeyEnv: 'FREELLMAPI_API_KEY',
-                api: 'openai-completions',
-                baseURL: v1Url(ctx.url),
-                models: entries,
-              },
-            },
-          },
-          // The default model is only claimed for the default profile; a
-          // named route is an extra option in the picker, not a takeover.
-          // A previous default's `reasoningEffort` must go with it: DSH
-          // refuses a request naming a level the selected model cannot
-          // take, and a hand-declared model declares none.
-          ...(ctx.profile === 'default'
-            ? {
-              'agent-default-model': {
-                provider: route,
-                model: model.id,
-                reasoningEffort: undefined,
-              },
-            }
-            : {}),
+  const settings = {
+    'llm-pi-ai': {
+      providers: {
+        [route]: {
+          displayName: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
+          apiKeyEnv: 'FREELLMAPI_API_KEY',
+          api: 'openai-completions',
+          baseURL: v1Url(ctx.url),
+          models: entries,
         },
       },
+    },
+    // The default model is only claimed for the default profile; a
+    // named route is an extra option in the picker, not a takeover.
+    // A previous default's `reasoningEffort` must go with it: DSH
+    // refuses a request naming a level the selected model cannot
+    // take, and a hand-declared model declares none.
+    ...(ctx.profile === 'default'
+      ? {
+        'agent-default-model': {
+          provider: route,
+          model: model.id,
+          reasoningEffort: undefined,
+        },
+      }
+      : {}),
+  };
+  // Current DSH applies this home-level Cordis patch to every profile before
+  // its first request. Older releases read settings.yaml. Once DSH migrates
+  // that file, recreating it would re-import it over the user's next profile.
+  const legacy = path.join(home, 'settings.yaml');
+  const includeLegacy = existsSync(legacy) || !existsSync(legacy + '.imported');
+  return {
+    files: [
+      ...(includeLegacy ? [{ path: legacy, format: 'yaml' as const, value: settings }] : []),
       {
         path: path.join(home, '.env'),
         format: 'env',
         sensitive: true,
         content: `FREELLMAPI_API_KEY=${ctx.apiKey}\n`,
       },
+      { path: path.join(home, 'cordis.patch.yml'), format: 'yaml-entries', value: settings },
     ],
     notes: [
       `Start DeepSeek Harness with: npx @deepseek-ai/dsh web — ${route}/${model.id} is ${ctx.profile === 'default' ? 'the default model' : 'in the model picker'}.`,
       'One-shot check: npx @deepseek-ai/dsh --profile headless "Say hello"',
-      'Settings are hot-reloaded, so a running dsh picks this up on its next request.',
+      'New sessions use the selected model. Restart a running profile if hot reload is disabled.',
       `Models are declared text-only; give a vision model \`input: [text, image]\` under ${route}.models in settings.yaml to send it images.`,
     ],
   };
@@ -808,7 +821,9 @@ function openclaw(ctx: GenerateContext): Generation {
 // default model alone.
 function hermes(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
-  const home = process.env.HERMES_HOME?.trim() || path.join(ctx.homeDir, '.hermes');
+  const home = process.env.HERMES_HOME?.trim() || (process.platform === 'win32'
+    ? path.join(process.env.LOCALAPPDATA || path.join(ctx.homeDir, 'AppData', 'Local'), 'hermes')
+    : path.join(ctx.homeDir, '.hermes'));
   const provider = `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
   // Hermes only identifies itself to hosts it knows; a custom endpoint gets the
   // bare openai-python user agent. `default_headers` is its documented way to
@@ -1088,6 +1103,55 @@ function zcode(ctx: GenerateContext): Generation {
   };
 }
 
+// Zero (Twigpine/zero, `@twigpine/zero`). On macOS and Linux Zero deliberately
+// stores user config under `$XDG_CONFIG_HOME/zero/config.json` (falling back to
+// `~/.config/zero/config.json`); on Windows it uses Go's `os.UserConfigDir()`
+// (`%APPDATA%\zero\config.json`). Inline `apiKey` values are accepted directly
+// and migrated into Zero's encrypted credential store on startup; the writer
+// keeps the file at 0600 until then.
+function zeroConfigFile(homeDir: string): string {
+  const configDir = process.platform === 'win32'
+    ? (process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'))
+    : (process.env.XDG_CONFIG_HOME?.trim() || path.join(homeDir, '.config'));
+  return path.join(configDir, 'zero', 'config.json');
+}
+
+function zero(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models, ctx.requestedModelId);
+  const provider = ctx.profile === 'default'
+    ? 'freellmapi'
+    : `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+  const value: Record<string, unknown> = {
+    ...(ctx.profile === 'default' ? { activeProvider: provider } : {}),
+    providers: [{
+      name: provider,
+      provider: 'openai-compatible',
+      baseURL: v1Url(ctx.url),
+      apiKey: ctx.apiKey,
+      model: model.id,
+      description: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
+    }],
+  };
+  return {
+    files: [{
+      path: zeroConfigFile(ctx.homeDir),
+      format: 'json',
+      sensitive: true,
+      arrays: {
+        providers: { ownedBy: { name: provider } },
+      },
+      value,
+    }],
+    notes: [
+      'Install Zero with: npm install -g @twigpine/zero',
+      ctx.profile === 'default'
+        ? `${provider} (${model.id}) is now the active provider; other providers are kept.`
+        : `Added ${provider} (${model.id}); pick it with /provider in Zero. Existing providers and activeProvider are kept.`,
+      'Zero reads ~/.config/zero/config.json (%APPDATA%\\zero\\config.json on Windows); inline keys are written 0600 and migrated to Zero\'s credential store on startup.',
+    ],
+  };
+}
+
 function cursor(_ctx: GenerateContext): Generation {
   return {
     files: [],
@@ -1167,6 +1231,7 @@ const metadata = [
   ['pi', 'Pi', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-pi', 'https://pi.dev/docs/latest/models', pi],
   ['reasonix', 'Reasonix', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-reasonix', 'https://github.com/esengine/DeepSeek-Reasonix/blob/studio/docs/CLI.md#configure-providers', reasonix],
   ['zcode', 'ZCode', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-zcode', 'https://zcode.z.ai/en/docs/configuration', zcode],
+  ['zero', 'Zero', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-zero', 'https://github.com/Twigpine/zero', zero],
   ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', cursor],
   ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', generic],
 ] as const;
