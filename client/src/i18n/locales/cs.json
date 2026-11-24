@@ -1234,7 +1234,8 @@
       "hermes": "Samozdokonalující se agent od Nous Research s trvalou pamětí a dovednostmi, v terminálu nebo v chatovacích aplikacích.",
       "pi": "Minimalistický terminálový agent, který si přizpůsobíte vlastními rozšířeními, dovednostmi a šablonami promptů.",
       "reasonix": "Terminálový agent pro programování stavěný pro DeepSeek, postavený na cachování prefixů, aby dlouhé relace zůstaly levné.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Lokální terminálový agent pro programování s trvalými relacemi, oprávněními a podporou jakéhokoli poskytovatele kompatibilního s OpenAI."
     }
   },
   "update": {

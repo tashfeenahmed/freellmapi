@@ -1234,7 +1234,8 @@
       "hermes": "Nous Research کا خود کو بہتر بنانے والا ایجنٹ، مستقل میموری اور مہارتوں کے ساتھ، ٹرمینل میں یا چیٹ ایپس پر۔",
       "pi": "ایک سادہ ٹرمینل ایجنٹ، جسے آپ اپنی ایکسٹینشنز، مہارتوں اور پرامپٹ ٹیمپلیٹس سے ڈھالتے ہیں۔",
       "reasonix": "DeepSeek کے لیے بنایا گیا ٹرمینل کوڈنگ ایجنٹ، جو پریفکس کیشنگ کے گرد بنا ہے تاکہ لمبے سیشن بھی سستے رہیں۔",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "پائیدار سیشنز، اجازتوں اور کسی بھی OpenAI مطابقت پذیر فراہم کنندہ کے ساتھ ایک مقامی ٹرمینل کوڈنگ ایجنٹ۔"
     }
   },
   "update": {

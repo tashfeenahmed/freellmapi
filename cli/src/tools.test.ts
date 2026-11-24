@@ -77,7 +77,8 @@ function asPosix(p: string): string {
   return p.replaceAll('\\', '/')
     .replace('C:/Users/tester/AppData/Local/hermes', '/home/tester/.hermes')
     .replace('C:/Users/tester/AppData/Roaming/Block/goose/config', '/home/tester/.config/goose')
-    .replace('C:/Users/tester/AppData/Roaming/reasonix', '/home/tester/.reasonix');
+    .replace('C:/Users/tester/AppData/Roaming/reasonix', '/home/tester/.reasonix')
+    .replace('C:/Users/tester/AppData/Roaming/zero', '/home/tester/.config/zero');
 }
 
 // Snapshots embed the generated file paths verbatim; normalize them so the
@@ -722,6 +723,53 @@ describe('tool generators', () => {
     const [provider] = value.config.providerConfigRules.providerRules;
     expect(provider.providerId).toBe('freellmapi-work-box');
     expect(provider.providerName).toBe('FreeLLMAPI (Work Box)');
+  });
+
+  it('writes Zero as an openai-compatible provider in ~/.config/zero/config.json', () => {
+    const [config] = tools.find(tool => tool.id === 'zero')!.generate(context).files;
+    expect(asPosix(config.path)).toBe('/home/tester/.config/zero/config.json');
+    expect(config.format).toBe('json');
+    expect(config.sensitive).toBe(true);
+    const value = config.value as {
+      activeProvider?: string;
+      providers: { name: string; provider: string; baseURL: string; apiKey: string; model: string; description: string }[];
+    };
+    expect(value.activeProvider).toBe('freellmapi');
+    expect(value.providers).toEqual([{
+      name: 'freellmapi',
+      provider: 'openai-compatible',
+      baseURL: 'http://localhost:3000/v1',
+      apiKey: 'freellmapi-test-key',
+      model: 'fast-coder',
+      description: 'FreeLLMAPI',
+    }]);
+    expect(config.arrays?.providers).toEqual({ ownedBy: { name: 'freellmapi' } });
+
+    const existing = JSON.stringify({
+      activeProvider: 'personal',
+      providers: [
+        { name: 'personal', provider: 'openai', model: 'gpt-4o' },
+        { name: 'freellmapi', provider: 'openai-compatible', baseURL: 'http://old/v1', apiKey: 'old', model: 'old' },
+      ],
+    }, null, 2);
+    const merged = JSON.parse(renderFile(config, existing));
+    expect(merged.activeProvider).toBe('freellmapi');
+    expect(merged.providers).toHaveLength(2);
+    expect(merged.providers[0]).toEqual({ name: 'personal', provider: 'openai', model: 'gpt-4o' });
+    expect(merged.providers[1].baseURL).toBe('http://localhost:3000/v1');
+    expect(renderFile(config, renderFile(config, existing))).toBe(renderFile(config, existing));
+  });
+
+  it('follows XDG_CONFIG_HOME and keeps activeProvider untouched for named Zero profiles', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', '/srv/xdg');
+    const [config] = tools.find(tool => tool.id === 'zero')!.generate({ ...context, profile: 'Work Box' }).files;
+    if (process.platform !== 'win32') {
+      expect(asPosix(config.path)).toBe('/srv/xdg/zero/config.json');
+    }
+    const value = config.value as { activeProvider?: string; providers: { name: string; description: string }[] };
+    expect(value.activeProvider).toBeUndefined();
+    expect(value.providers[0].name).toBe('freellmapi-work-box');
+    expect(value.providers[0].description).toBe('FreeLLMAPI (Work Box)');
   });
 
   it('writes AtomCode account and model tables with a root default_model', () => {

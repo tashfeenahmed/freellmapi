@@ -1234,7 +1234,8 @@
       "hermes": "Nous Research-এর স্ব-উন্নয়নশীল এজেন্ট, স্থায়ী মেমোরি ও দক্ষতাসহ, টার্মিনালে বা চ্যাট অ্যাপে।",
       "pi": "একটি ন্যূনতম টার্মিনাল এজেন্ট, যা আপনি নিজের এক্সটেনশন, দক্ষতা ও প্রম্পট টেমপ্লেট দিয়ে গড়ে নেন।",
       "reasonix": "DeepSeek-এর জন্য তৈরি টার্মিনাল কোডিং এজেন্ট, প্রিফিক্স ক্যাশিং ঘিরে গড়া যাতে দীর্ঘ সেশনও সস্তা থাকে।",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "স্থায়ী সেশন, অনুমতি এবং যেকোনো OpenAI-সামঞ্জস্যপূর্ণ প্রোভাইডারসহ একটি লোকাল টার্মিনাল কোডিং এজেন্ট।"
     }
   },
   "update": {

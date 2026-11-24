@@ -1234,7 +1234,8 @@
       "hermes": "Tác nhân tự cải thiện của Nous Research với bộ nhớ lâu dài và kỹ năng, trong dòng lệnh hoặc trên các ứng dụng chat.",
       "pi": "Một tác nhân dòng lệnh tối giản mà bạn định hình bằng tiện ích mở rộng, kỹ năng và mẫu prompt của riêng mình.",
       "reasonix": "Tác tử lập trình trên terminal dành riêng cho DeepSeek, xây dựng quanh bộ nhớ đệm tiền tố để các phiên dài vẫn rẻ.",
-      "zcode": "Tác nhân lập trình của Z.ai cho các mô hình GLM, kết nối mọi endpoint tương thích OpenAI qua sổ đăng ký nhà cung cấp."
+      "zcode": "Tác nhân lập trình của Z.ai cho các mô hình GLM, kết nối mọi endpoint tương thích OpenAI qua sổ đăng ký nhà cung cấp.",
+      "zero": "Tác tử lập trình trên terminal cục bộ với phiên bền vững, kiểm soát quyền và hỗ trợ mọi nhà cung cấp tương thích OpenAI."
     }
   },
   "update": {

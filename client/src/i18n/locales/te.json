@@ -1234,7 +1234,8 @@
       "hermes": "Nous Research యొక్క స్వీయ-మెరుగుదల ఏజెంట్, శాశ్వత మెమరీ మరియు నైపుణ్యాలతో, టెర్మినల్‌లో లేదా చాట్ యాప్‌లలో.",
       "pi": "మీ సొంత ఎక్స్‌టెన్షన్‌లు, నైపుణ్యాలు, ప్రాంప్ట్ టెంప్లేట్‌లతో మీరు తీర్చిదిద్దే కనీస టెర్మినల్ ఏజెంట్.",
       "reasonix": "DeepSeek కోసం రూపొందించిన టెర్మినల్ కోడింగ్ ఏజెంట్; దీర్ఘ సెషన్లు కూడా చౌకగా ఉండేలా ప్రిఫిక్స్ క్యాషింగ్ చుట్టూ నిర్మించబడింది.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "స్థిరమైన సెషన్‌లు, అనుమతులు మరియు ఏదైనా OpenAI-అనుకూల ప్రొవైడర్‌తో కూడిన లోకల్ టెర్మినల్ కోడింగ్ ఏజెంట్."
     }
   },
   "update": {

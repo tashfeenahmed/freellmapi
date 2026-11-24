@@ -414,7 +414,8 @@ function Navbar() {
 
 // Neutral placeholder while a lazily loaded route chunk arrives.
 function RouteFallback() {
-  return <div className="min-h-[40vh]" role="status" aria-busy="true" aria-label="Loading" />
+  const { t } = useI18n()
+  return <div className="min-h-[40vh]" role="status" aria-busy="true" aria-label={t('common.loading')} />
 }
 
 // Keyed by pathname so navigating away from a crashed page resets the boundary.

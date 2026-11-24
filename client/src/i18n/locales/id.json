@@ -1234,7 +1234,8 @@
       "hermes": "Agen dari Nous Research yang terus memperbaiki diri, dengan memori persisten dan keterampilan, di terminal atau di aplikasi chat.",
       "pi": "Agen terminal minimalis yang Anda bentuk dengan ekstensi, keterampilan, dan templat prompt Anda sendiri.",
       "reasonix": "Agen coding terminal yang dibuat khusus untuk DeepSeek, dibangun di sekitar prefix caching agar sesi panjang tetap murah.",
-      "zcode": "Agen kode Z.ai untuk model GLM-nya, terhubung ke endpoint apa pun yang kompatibel dengan OpenAI melalui registri penyedia."
+      "zcode": "Agen kode Z.ai untuk model GLM-nya, terhubung ke endpoint apa pun yang kompatibel dengan OpenAI melalui registri penyedia.",
+      "zero": "Agen coding terminal lokal dengan sesi persisten, kontrol izin, dan penyedia apa pun yang kompatibel dengan OpenAI."
     }
   },
   "update": {

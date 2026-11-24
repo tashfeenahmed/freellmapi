@@ -1234,7 +1234,8 @@
       "hermes": "El agente de Nous Research que se mejora a sí mismo, con memoria persistente y habilidades, en la terminal o en apps de chat.",
       "pi": "Un agente de terminal minimalista que moldeas con tus propias extensiones, habilidades y plantillas de prompts.",
       "reasonix": "Un agente de programación para la terminal nativo de DeepSeek, diseñado en torno a la caché de prefijos para que las sesiones largas sigan siendo baratas.",
-      "zcode": "El agente de código de Z.ai para sus modelos GLM, compatible con cualquier endpoint OpenAI mediante un registro de proveedores."
+      "zcode": "El agente de código de Z.ai para sus modelos GLM, compatible con cualquier endpoint OpenAI mediante un registro de proveedores.",
+      "zero": "Un agente de programación para terminal local con sesiones persistentes, permisos y cualquier proveedor compatible con OpenAI."
     }
   },
   "update": {

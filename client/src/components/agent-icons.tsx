@@ -321,6 +321,17 @@ const brands: Record<string, Brand> = {
       />
     ),
   },
+  // Zero (Twigpine/zero): a crisp slashed terminal zero in monochrome so it
+  // reads cleanly on both light and dark tiles.
+  zero: {
+    tint: '[--mk:#18181B] dark:[--mk:#F4F4F5]',
+    art: (
+      <g fill="none" stroke="var(--mk, currentColor)" strokeWidth={2.3} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5.5" y="3.5" width="13" height="17" rx="6.5" />
+        <path d="M15.8 7.2 8.2 16.8" />
+      </g>
+    ),
+  },
   // Any other OpenAI-compatible client: our own terminal glyph, not a brand
   // mark, so it keeps the page foreground colour on both tiles.
   generic: {
