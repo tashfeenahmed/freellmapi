@@ -1234,7 +1234,8 @@
       "hermes": "Save tobulinantis Nous Research agentas su nuolatine atmintimi ir įgūdžiais, terminale arba pokalbių programose.",
       "pi": "Minimalistinis terminalo agentas, kurį pritaikote savais plėtiniais, įgūdžiais ir užklausų šablonais.",
       "reasonix": "DeepSeek sukurtas terminalo programavimo agentas, paremtas prefiksų talpykla, kad ilgos sesijos liktų pigios.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Vietinis terminalo programavimo agentas su išliekančiomis sesijomis, leidimais ir bet kurio su OpenAI suderinamo tiekėjo palaikymu."
     }
   },
   "update": {

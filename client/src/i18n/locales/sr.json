@@ -1234,7 +1234,8 @@
       "hermes": "Агент компаније Nous Research који сам себе усавршава, са трајном меморијом и вештинама, у терминалу или у чет апликацијама.",
       "pi": "Минималистички терминалски агент који обликујете сопственим проширењима, вештинама и шаблонима упита.",
       "reasonix": "Терминалски агент за програмирање направљен за DeepSeek, око кеширања префикса, како би дуге сесије остале јефтине.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Локални терминалски агент за програмирање са трајним сесијама, дозволама и подршком за било ког провајдера компатибилног са OpenAI."
     }
   },
   "update": {

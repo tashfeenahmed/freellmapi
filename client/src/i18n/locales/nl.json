@@ -1234,7 +1234,8 @@
       "hermes": "De zelfverbeterende agent van Nous Research met blijvend geheugen en skills, in de terminal of in chat-apps.",
       "pi": "Een minimalistische terminal-agent die je vormgeeft met je eigen extensies, skills en promptsjablonen.",
       "reasonix": "Een terminal-codeeragent gebouwd voor DeepSeek, rond prefix-caching, zodat lange sessies goedkoop blijven.",
-      "zcode": "De codeeragent van Z.ai voor zijn GLM-modellen, verbindt met elke OpenAI-compatibele endpoint via een providerregister."
+      "zcode": "De codeeragent van Z.ai voor zijn GLM-modellen, verbindt met elke OpenAI-compatibele endpoint via een providerregister.",
+      "zero": "Een lokale terminal-codeeragent met blijvende sessies, machtigingen en elke OpenAI-compatibele provider."
     }
   },
   "update": {

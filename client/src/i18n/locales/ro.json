@@ -1234,7 +1234,8 @@
       "hermes": "Agentul auto-perfecționabil de la Nous Research, cu memorie persistentă și abilități, în terminal sau în aplicațiile de chat.",
       "pi": "Un agent de terminal minimalist pe care îl modelezi cu propriile extensii, abilități și șabloane de prompturi.",
       "reasonix": "Un agent de programare pentru terminal, nativ DeepSeek, construit în jurul cache-ului de prefix, ca sesiunile lungi să rămână ieftine.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Un agent local de programare în terminal cu sesiuni persistente, permisiuni și orice furnizor compatibil OpenAI."
     }
   },
   "update": {

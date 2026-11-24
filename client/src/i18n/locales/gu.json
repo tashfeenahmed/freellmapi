@@ -1234,7 +1234,8 @@
       "hermes": "Nous Research નો સ્વ-સુધારણા કરતો એજન્ટ, કાયમી મેમરી અને કૌશલ્યો સાથે, ટર્મિનલમાં કે ચેટ એપ્સ પર.",
       "pi": "એક ન્યૂનતમ ટર્મિનલ એજન્ટ, જેને તમે તમારા પોતાના એક્સ્ટેન્શન, કૌશલ્યો અને પ્રોમ્પ્ટ ટેમ્પ્લેટથી ઘડો છો.",
       "reasonix": "DeepSeek માટે બનેલો ટર્મિનલ કોડિંગ એજન્ટ, પ્રિફિક્સ કેશિંગની આસપાસ રચાયેલો જેથી લાંબા સેશન સસ્તા રહે.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "સ્થાયી સત્રો, પરવાનગીઓ અને કોઈપણ OpenAI-સુસંગત પ્રદાતા સાથેનો સ્થાનિક ટર્મિનલ કોડિંગ એજન્ટ."
     }
   },
   "update": {

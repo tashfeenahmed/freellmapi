@@ -1234,7 +1234,8 @@
       "hermes": "Nous Research ၏ မိမိကိုယ်ကို တိုးတက်အောင်လုပ်နိုင်သော အေးဂျင့်၊ တည်မြဲသည့်မှတ်ဉာဏ်နှင့် ကျွမ်းကျင်မှုများပါဝင်ပြီး terminal တွင်ဖြစ်စေ chat အက်ပ်များတွင်ဖြစ်စေ အသုံးပြုနိုင်သည်။",
       "pi": "သင့်ကိုယ်ပိုင် extension များ၊ ကျွမ်းကျင်မှုများနှင့် prompt template များဖြင့် ပုံဖော်နိုင်သော အနည်းဆုံး terminal အေးဂျင့်။",
       "reasonix": "DeepSeek အတွက် တည်ဆောက်ထားသော terminal coding agent ဖြစ်ပြီး ရှည်လျားသော session များ စျေးသက်သာစေရန် prefix caching ကို အခြေခံထားသည်။",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "တည်မြဲသော စက်ရှင်များ၊ ခွင့်ပြုချက်များနှင့် OpenAI နှင့် ကိုက်ညီသော မည်သည့်ဝန်ဆောင်မှုပေးသူမဆို သုံးနိုင်သည့် ဒေသတွင်း တာမီနယ် ကုဒ်ရေးအေးဂျင့်။"
     }
   },
   "update": {

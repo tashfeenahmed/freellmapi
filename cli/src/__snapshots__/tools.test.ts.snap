@@ -1057,3 +1057,40 @@ exports[`tool generators > setup-zcode has stable golden output 1`] = `
   ],
 }
 `;
+
+exports[`tool generators > setup-zero has stable golden output 1`] = `
+{
+  "files": [
+    {
+      "arrays": {
+        "providers": {
+          "ownedBy": {
+            "name": "freellmapi",
+          },
+        },
+      },
+      "format": "json",
+      "path": "/home/tester/.config/zero/config.json",
+      "sensitive": true,
+      "value": {
+        "activeProvider": "freellmapi",
+        "providers": [
+          {
+            "apiKey": "freellmapi-test-key",
+            "baseURL": "http://localhost:3000/v1",
+            "description": "FreeLLMAPI",
+            "model": "fast-coder",
+            "name": "freellmapi",
+            "provider": "openai-compatible",
+          },
+        ],
+      },
+    },
+  ],
+  "notes": [
+    "Install Zero with: npm install -g @twigpine/zero",
+    "freellmapi (fast-coder) is now the active provider; other providers are kept.",
+    "Zero reads ~/.config/zero/config.json (%APPDATA%\\zero\\config.json on Windows); inline keys are written 0600 and migrated to Zero's credential store on startup.",
+  ],
+}
+`;

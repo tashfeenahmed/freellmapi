@@ -1234,7 +1234,8 @@
       "hermes": "Nous Research चा स्वतःत सुधारणा करणारा एजंट, कायमस्वरूपी मेमरी आणि कौशल्यांसह, टर्मिनलमध्ये किंवा चॅट अ‍ॅप्सवर.",
       "pi": "एक किमान टर्मिनल एजंट, जो तुम्ही तुमच्या स्वतःच्या एक्सटेन्शन, कौशल्ये आणि प्रॉम्प्ट टेम्पलेट्सने घडवता.",
       "reasonix": "DeepSeek साठी बनवलेला टर्मिनल कोडिंग एजंट, प्रीफिक्स कॅशिंगभोवती रचलेला जेणेकरून दीर्घ सेशनही स्वस्त राहतील.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "कायमस्वरूपी सत्रे, परवानग्या आणि कोणत्याही OpenAI-सुसंगत प्रदात्यासह स्थानिक टर्मिनल कोडिंग एजंट."
     }
   },
   "update": {

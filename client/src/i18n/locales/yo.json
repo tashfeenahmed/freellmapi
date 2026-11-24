@@ -1234,7 +1234,8 @@
       "hermes": "Aṣojú Nous Research tí ó ń mú ara rẹ̀ dára síi, pẹ̀lú ìrántí tí ó wà pẹ́ àti àwọn ọgbọ́n, nínú terminal tàbí lórí àwọn ìṣàfilọ́lẹ̀ ìfọ̀rọ̀wérọ̀.",
       "pi": "Aṣojú terminal kékeré tí o ń ṣe àtúnṣe rẹ̀ pẹ̀lú àwọn àfikún, ọgbọ́n àti àwọn àpẹẹrẹ ìtọ́sọ́nà tìrẹ.",
       "reasonix": "Aṣojú kíkọ kóòdù lórí terminal tí a kọ́ fún DeepSeek, tí a gbé ka prefix caching kí àwọn ìgbà pípẹ́ lè máa jẹ́ olówó pọ́ọ́kú.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Aṣojú kíkọ kóòdù lórí terminal abẹ́lé pẹ̀lú ìgbà pípẹ́, àṣẹ, àti olùpèsè èyíkéyìí tó bá OpenAI mu."
     }
   },
   "update": {

@@ -1234,7 +1234,8 @@
       "hermes": "Ang self-improving na agent ng Nous Research na may persistent na memorya at mga skill, sa terminal o sa mga chat app.",
       "pi": "Isang minimal na terminal agent na hinuhubog mo gamit ang sarili mong mga extension, skill at prompt template.",
       "reasonix": "Isang terminal coding agent na ginawa para sa DeepSeek, nakabatay sa prefix caching para manatiling mura ang mahahabang session.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Isang lokal na terminal coding agent na may matibay na session, mga pahintulot, at anumang provider na tugma sa OpenAI."
     }
   },
   "update": {

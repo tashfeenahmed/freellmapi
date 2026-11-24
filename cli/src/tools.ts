@@ -1103,6 +1103,55 @@ function zcode(ctx: GenerateContext): Generation {
   };
 }
 
+// Zero (Twigpine/zero, `@twigpine/zero`). On macOS and Linux Zero deliberately
+// stores user config under `$XDG_CONFIG_HOME/zero/config.json` (falling back to
+// `~/.config/zero/config.json`); on Windows it uses Go's `os.UserConfigDir()`
+// (`%APPDATA%\zero\config.json`). Inline `apiKey` values are accepted directly
+// and migrated into Zero's encrypted credential store on startup; the writer
+// keeps the file at 0600 until then.
+function zeroConfigFile(homeDir: string): string {
+  const configDir = process.platform === 'win32'
+    ? (process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'))
+    : (process.env.XDG_CONFIG_HOME?.trim() || path.join(homeDir, '.config'));
+  return path.join(configDir, 'zero', 'config.json');
+}
+
+function zero(ctx: GenerateContext): Generation {
+  const model = primaryModel(ctx.models, ctx.requestedModelId);
+  const provider = ctx.profile === 'default'
+    ? 'freellmapi'
+    : `freellmapi-${ctx.profile.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+  const value: Record<string, unknown> = {
+    ...(ctx.profile === 'default' ? { activeProvider: provider } : {}),
+    providers: [{
+      name: provider,
+      provider: 'openai-compatible',
+      baseURL: v1Url(ctx.url),
+      apiKey: ctx.apiKey,
+      model: model.id,
+      description: ctx.profile === 'default' ? 'FreeLLMAPI' : `FreeLLMAPI (${ctx.profile})`,
+    }],
+  };
+  return {
+    files: [{
+      path: zeroConfigFile(ctx.homeDir),
+      format: 'json',
+      sensitive: true,
+      arrays: {
+        providers: { ownedBy: { name: provider } },
+      },
+      value,
+    }],
+    notes: [
+      'Install Zero with: npm install -g @twigpine/zero',
+      ctx.profile === 'default'
+        ? `${provider} (${model.id}) is now the active provider; other providers are kept.`
+        : `Added ${provider} (${model.id}); pick it with /provider in Zero. Existing providers and activeProvider are kept.`,
+      'Zero reads ~/.config/zero/config.json (%APPDATA%\\zero\\config.json on Windows); inline keys are written 0600 and migrated to Zero\'s credential store on startup.',
+    ],
+  };
+}
+
 function cursor(_ctx: GenerateContext): Generation {
   return {
     files: [],
@@ -1182,6 +1231,7 @@ const metadata = [
   ['pi', 'Pi', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-pi', 'https://pi.dev/docs/latest/models', pi],
   ['reasonix', 'Reasonix', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-reasonix', 'https://github.com/esengine/DeepSeek-Reasonix/blob/studio/docs/CLI.md#configure-providers', reasonix],
   ['zcode', 'ZCode', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-zcode', 'https://zcode.z.ai/en/docs/configuration', zcode],
+  ['zero', 'Zero', 'code', 'file', 'OpenAI Chat', '/v1', 'setup-zero', 'https://github.com/Twigpine/zero', zero],
   ['cursor', 'Cursor', 'code', 'guide', 'OpenAI Chat', '/v1', 'setup-cursor', 'https://docs.cursor.com', cursor],
   ['generic', 'Generic OpenAI client', 'agent', 'guide', 'OpenAI Chat', '/v1', 'setup-generic', 'https://github.com/tashfeenahmed/freellmapi', generic],
 ] as const;

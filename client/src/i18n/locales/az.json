@@ -1234,7 +1234,8 @@
       "hermes": "Nous Research-in özünü təkmilləşdirən agenti; daimi yaddaş və bacarıqlarla, terminalda və ya söhbət tətbiqlərində.",
       "pi": "Öz genişləndirmələriniz, bacarıqlarınız və sorğu şablonlarınızla formalaşdırdığınız minimal terminal agenti.",
       "reasonix": "DeepSeek üçün yaradılmış terminal kodlaşdırma agenti; uzun sessiyalar ucuz qalsın deyə prefiks keşi üzərində qurulub.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Davamlı sessiyalar, icazələr və istənilən OpenAI uyğun provayderlə işləyən yerli terminal kodlaşdırma agenti."
     }
   },
   "update": {

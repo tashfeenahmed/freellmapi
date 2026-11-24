@@ -1234,7 +1234,8 @@
       "hermes": "ភ្នាក់ងាររបស់ Nous Research ដែលកែលម្អខ្លួនឯង មានអង្គចងចាំអចិន្ត្រៃយ៍ និងជំនាញ នៅក្នុង terminal ឬលើកម្មវិធីជជែក។",
       "pi": "ភ្នាក់ងារ terminal តូចចង្អៀត ដែលអ្នករៀបចំដោយផ្នែកបន្ថែម ជំនាញ និងគំរូ prompt ផ្ទាល់ខ្លួន។",
       "reasonix": "ភ្នាក់ងារសរសេរកូដលើ terminal ដែលបង្កើតឡើងសម្រាប់ DeepSeek ផ្អែកលើ prefix caching ដើម្បីឱ្យវគ្គវែងៗនៅតែថោក។",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "ភ្នាក់ងារសរសេរកូដលើស្ថានីយក្នុងមូលដ្ឋាន ដែលមានវគ្គប្រើប្រាស់ស្ថិតស្ថេរ ការគ្រប់គ្រងសិទ្ធិ និងគាំទ្រអ្នកផ្តល់សេវាដែលត្រូវគ្នានឹង OpenAI ណាមួយ។"
     }
   },
   "update": {
