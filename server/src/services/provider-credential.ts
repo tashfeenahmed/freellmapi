@@ -3,7 +3,7 @@ import { decrypt } from '../lib/crypto.js';
 import { reserveMonthlyBudget } from './key-budget.js';
 import { cloudflareNeuronsAvailable } from './cloudflare-neurons.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
-import { getActiveCooldownsForKeys, isOnCooldown } from './ratelimit.js';
+import { getActiveCooldownsForKeys, isOnCooldown, canUseProviderMinute } from './ratelimit.js';
 import { RetryHintTracker } from '../lib/retry-hint.js';
 
 export interface ReservedProviderCredential {
@@ -22,16 +22,45 @@ interface KeyRow {
   model_scope_json: string | null;
 }
 
+/** Extra gates a caller can switch on for its own surface. */
+export interface ProviderCredentialOptions {
+  /**
+   * Apply the provider-ACCOUNT-wide per-minute request cap
+   * (canUseProviderMinute) while choosing a key.
+   *
+   * The chat router always applies it (services/router.ts): NVIDIA NIM meters
+   * ~40 requests/minute across the WHOLE account, so every model on that
+   * account draws from one bucket and a model row with a NULL rpm_limit would
+   * otherwise sail past it. Embeddings traffic shares the same account, so it
+   * has to honour the same cap — otherwise an embedding family keeps
+   * dispatching until the provider answers 429.
+   *
+   * Off by default: only surfaces whose traffic really shares the provider
+   * account budget with chat opt in.
+   */
+  providerMinuteCap?: boolean;
+}
+
 /** Select and reserve a credential for the independent embeddings/media routers.
  * Bound custom models use only keys from their endpoint; ordinary providers may
- * use any healthy key with room in its budget. Callers release after logging.
- */
+ * use any healthy key with room in its budget. Callers release after logging. */
 export function reserveProviderCredential(
   row: { platform: string; key_id: number | null; model_id?: string },
   estimatedTokens: number,
   skip: (keyId: number) => boolean = () => false,
-): { credential: ReservedProviderCredential | null; budgetBlocked: boolean; cooldownBlocked: boolean; cooldownRetryAfterMs?: number } {
-  if (row.platform === 'custom' && row.key_id == null) return { credential: null, budgetBlocked: false, cooldownBlocked: false };
+  options: ProviderCredentialOptions = {},
+): {
+  credential: ReservedProviderCredential | null;
+  budgetBlocked: boolean;
+  cooldownBlocked: boolean;
+  cooldownRetryAfterMs?: number;
+  /** True when at least one candidate key was skipped because the provider
+   *  account had spent its shared per-minute request budget. */
+  providerMinuteBlocked: boolean;
+} {
+  if (row.platform === 'custom' && row.key_id == null) {
+    return { credential: null, budgetBlocked: false, cooldownBlocked: false, providerMinuteBlocked: false };
+  }
   const bound = row.key_id != null;
   const customEndpoint = row.platform === 'custom' && bound;
   const keys = getDb().prepare(`
@@ -43,6 +72,7 @@ export function reserveProviderCredential(
   `).all(...(customEndpoint ? [row.key_id, row.key_id] : [bound ? row.key_id : row.platform])) as KeyRow[];
   let budgetBlocked = false;
   let cooldownBlocked = false;
+  let providerMinuteBlocked = false;
   const cooldownHints = new RetryHintTracker();
   const cooldowns = customEndpoint && row.model_id
     ? getActiveCooldownsForKeys(keys.map(key => key.id))
@@ -54,6 +84,14 @@ export function reserveProviderCredential(
       cooldownBlocked = true;
       const cooldown = cooldowns?.get(keyRow.id)?.find(c => c.platform === row.platform && c.modelId === row.model_id);
       cooldownHints.record(429, cooldown?.remainingMs);
+      continue;
+    }
+    // The account-wide minute budget is shared with every other model on the
+    // provider account, so it is checked per KEY (the account is the key) and
+    // before the monthly budget reservation: a key that has spent the
+    // provider's minute budget must not be reserved at all.
+    if (options.providerMinuteCap && !canUseProviderMinute(row.platform, keyRow.id)) {
+      providerMinuteBlocked = true;
       continue;
     }
     let key: string;
@@ -75,7 +113,14 @@ export function reserveProviderCredential(
       budgetBlocked,
       cooldownBlocked,
       cooldownRetryAfterMs: cooldownHints.retryAfterMs(),
+      providerMinuteBlocked,
     };
   }
-  return { credential: null, budgetBlocked, cooldownBlocked, cooldownRetryAfterMs: cooldownHints.retryAfterMs() };
+  return {
+    credential: null,
+    budgetBlocked,
+    cooldownBlocked,
+    cooldownRetryAfterMs: cooldownHints.retryAfterMs(),
+    providerMinuteBlocked,
+  };
 }
