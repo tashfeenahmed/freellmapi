@@ -32,7 +32,8 @@ export async function tanodEmbed(model: string, inputs: string[], dims: number) 
     throw error('Tanod needs a supported 384-dimension model and 1–64 short texts', 400);
   }
   const j = await call('embed', { model, texts: inputs, input_type: 'none', encoding: 'float', normalize: true }, 'embedding');
-  if (j?.model?.source !== sources[model] || j.model.alias !== model || j.dimensions !== 384 ||
+  // Tanod always identifies the backing model by source; alias is optional in its schema.
+  if (j?.model?.source !== sources[model] || (j.model.alias !== undefined && j.model.alias !== model) || j.dimensions !== 384 ||
       !Array.isArray(j.data) || j.data.length !== inputs.length) throw error('Unexpected Tanod embedding model or shape');
   const vectors = j.data.map((d: {index: number; embedding: number[]}, i: number) => {
     if (d?.index !== i || !Array.isArray(d.embedding) || d.embedding.length !== 384 ||

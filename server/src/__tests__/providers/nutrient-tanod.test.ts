@@ -26,6 +26,14 @@ describe('Nutrient and Tanod catalog support', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch).toHaveBeenCalledWith('https://tanod.dev/v1/embed',expect.objectContaining({redirect:'error',headers:{'Content-Type':'application/json','X-Tanod-Free':'1'}}));
   });
+  it('accepts Tanod’s canonical source without its optional alias, but rejects a conflicting alias',async()=>{
+    const source='intfloat/multilingual-e5-small', embedding=Array.from({length:384},(_,i)=>Number(i===0));
+    const ok={model:{source},dimensions:384,data:[{index:0,embedding}],usage:{tokens:1}};
+    vi.stubGlobal('fetch',vi.fn(async()=>Response.json(ok)));
+    await expect(tanodEmbed('multilingual',['hello'],384)).resolves.toEqual({vectors:[embedding],inputTokens:1});
+    vi.stubGlobal('fetch',vi.fn(async()=>Response.json({...ok,model:{source,alias:'small-en'}})));
+    await expect(tanodEmbed('multilingual',['hello'],384)).rejects.toThrow(/Unexpected Tanod embedding model/);
+  });
   it('rejects incompatible vectors, translations and duplicate labels',async()=>{
     vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:{source:'wrong'},data:[],engine:'other',text:'hello'})));
     await expect(tanodEmbed('multilingual',['a'],384)).rejects.toThrow(/Unexpected/);
