@@ -3,6 +3,7 @@ import { BEATAPI_BASE_URL } from '../providers/beatapi.js';
 import { APINEX_BASE_URL } from '../providers/apinex.js';
 import { BLOCKRUN_BASE_URL } from '../providers/blockrun.js';
 import { SILVR_BASE_URL } from '../providers/silvr.js';
+import { tanodLabels, tanodStatus } from '../providers/tanod.js';
 import { parseRetryAfterMs, parseStatedRetryMs } from '../providers/base.js';
 import { RetryHintTracker } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
@@ -170,9 +171,9 @@ async function upstream(url: string, platform: string, init: RequestInit, signal
     FETCH_TIMEOUT_MS,
   );
   if (!res.ok) {
-    if (platform === 'silvr') {
+    if (platform === 'silvr' || platform === 'nutrient') {
       await res.body?.cancel();
-      throw new DecisionError(`SilvR decision request failed (${res.status})`, res.status, undefined, parseRetryAfterMs(res.headers.get('retry-after')));
+      throw new DecisionError(`${platform === 'silvr' ? 'SilvR' : 'Nutrient'} decision request failed (${res.status})`, res.status, undefined, parseRetryAfterMs(res.headers.get('retry-after')));
     }
     const text = await res.text().catch(() => '');
     // Same rule as the chat path (providers/base.ts buildUpstreamError): a
@@ -216,6 +217,30 @@ function cloudflareKey(key: string): { accountId: string; token: string } {
 }
 
 const ADAPTERS: Record<string, Adapter> = {
+  nutrient: async (cred, modelId, body, signal) => {
+    if (!['nutrient-document-decision','nutrient-systemone'].includes(modelId)) throw new DecisionError('Unsupported Nutrient decision model', 400);
+    const json = await upstream('https://api.nutrient.io/ai/v1/systemone', 'nutrient', {
+      method: 'POST', redirect: 'error', headers: {Authorization: 'Bearer ' + cred.key, 'Content-Type': 'application/json'},
+      body: JSON.stringify({model:modelId, state:body.state, questions:body.questions}),
+    }, signal);
+    return checkedDecisionResult(json, 'nutrient', modelId, body);
+  },
+  tanod: async (_cred, modelId, body, signal) => {
+    const entries = Object.entries(body.questions);
+    if (modelId !== 'nli-deberta-v3-xsmall' || typeof body.state !== 'string' || entries.length !== 1) throw new DecisionError('Tanod takes one English choice question about text', 400);
+    const [id,q] = entries[0]!;
+    if (q.type !== 'choice' || !q.criteria || typeof q.criteria !== 'object' || Array.isArray(q.criteria) || typeof q.instructions !== 'string') throw new DecisionError('Tanod requires named choice criteria', 400);
+    const criteria = Object.entries(q.criteria);
+    if (criteria.some(([,v]) => v != null && typeof v !== 'string')) throw new DecisionError('Tanod criteria must be text labels', 400);
+    const labels=criteria.map(([k,v])=>v ? k+': '+v : k);
+    try {
+      const scores=await tanodLabels(body.state, labels, q.instructions, signal);
+      const ranked=criteria.map(([k],i)=>[k,scores.get(labels[i]!)!] as const).sort((a,b)=>b[1]-a[1]);
+      const total=ranked.reduce((sum,[,score])=>sum+score,0);
+      if(total<=0) throw new DecisionError('Tanod returned no label evidence',502);
+      return {answers:{[id]:{type:'choice', choice:ranked[0]![0], confidence:ranked[0]![1], probabilities:Object.fromEntries(ranked.map(([k,v])=>[k,v/total]))}},usage:{input_tokens:0,output_tokens:0}};
+    } catch(e) { throw new DecisionError(e instanceof Error ? e.message : 'Tanod failed', tanodStatus(e)); }
+  },
   // The tested SilvR route uses named predicate questions, not System One's
   // state/object schema. Do not silently simulate untested choice/score types.
   silvr: async (cred, modelId, body, signal) => {

@@ -19,6 +19,7 @@ import { ModelScopeProvider } from './modelscope.js';
 import { PollinationsProvider } from './pollinations.js';
 import { ZhipuProvider } from './zhipu.js';
 import { PuterProvider } from './puter.js';
+import { NutrientProvider } from './nutrient.js';
 import { SailProvider } from './sail.js';
 import { AclideProvider } from './aclide.js';
 import { SpekaProvider } from './speka.js';
@@ -78,6 +79,8 @@ register(new GoogleProvider({ timeoutMs: 60_000 }));
 register(new KeylessDecisionProvider('halx', 'HAL-X'));
 register(new KeylessDecisionProvider('aisense', 'AI SENSE'));
 register(new KeylessDecisionProvider('classifierdev', 'classifier.dev'));
+register(new KeylessDecisionProvider('tanod', 'Tanod'));
+register(new NutrientProvider());
 
 // Groq - OpenAI-compatible
 register(new OpenAICompatProvider({
