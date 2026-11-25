@@ -40,7 +40,8 @@ dashboard (or the tray popover in the desktop app).
 | `launch` | Run Claude Code with credentials injected into the child process |
 | `launch-codex` | Run Codex the same way |
 | `list` | Print the supported tools and their base URLs |
-| `keys` | Add, list, remove, or test provider keys (`keys --help`) |
+| `keys` | Add, list, remove, test, enable, or disable provider keys (`keys --help`) |
+| `models` | List models of any kind, enable or disable them (`models --help`) |
 | `status` | Gateway reachability, version, keys per platform, enabled models per kind |
 | `usage` | Request totals and per-provider split |
 | `requests` | Recent request log |
@@ -76,6 +77,8 @@ npx freellmapi keys list
 npx freellmapi keys test groq                # check every stored Groq key
 npx freellmapi keys test groq --id 7         # check one key
 npx freellmapi keys remove groq --id 7
+npx freellmapi keys disable groq             # every Groq key
+npx freellmapi keys enable groq --id 7       # one key
 ```
 
 `keys list` prints each key's ID, platform, enabled chat model count,
@@ -93,11 +96,32 @@ failure). Successful commands exit with code 0; argument, authentication, and
 request errors exit with code 1. Validation uses the gateway's usual health
 checks, including its policy of disabling a key after repeated confirmed failures.
 
+`keys enable` and `keys disable` switch one key with `--id`, or every key of the
+platform without it (`PATCH /api/keys/platform/:platform`).
+
 Keyless providers skip the prompt. Custom endpoints need a URL and model
 registration, so create them in the dashboard; existing custom keys can be
 listed, tested, and removed here. Requests accept `--url` / `FREELLMAPI_URL` and
 `--timeout MS` (30,000 ms per request by default). `--dry-run` is not supported for
 `keys`; it is rejected before any request.
+
+## Models
+
+Dashboard-token commands to see and switch models. `--kind` picks the catalogue:
+`chat` (default), `media`, `embedding`, `search` (search engines), or `decision`.
+IDs are the numeric IDs shown by `models list`.
+
+```bash
+npx freellmapi models list --platform groq --disabled
+npx freellmapi models list --kind embedding --json
+npx freellmapi models enable 42 43
+npx freellmapi models disable 5 --kind media
+```
+
+`list` accepts `--platform a,b`, `--enabled` or `--disabled`, and `--json`. `enable`
+and `disable` check every ID against the list first and change nothing when one is
+unknown. Enabling a chat model also turns its routing switch back on. Output never
+includes provider keys or the dashboard token.
 
 ## Status, usage and request log
 

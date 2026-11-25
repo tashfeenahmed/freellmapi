@@ -122,8 +122,8 @@ describe('status command', () => {
   it('keeps --json out of other commands and parses the report flags', async () => {
     expect(parseArgs(['requests', '--json', '--status=error', '--limit', '5']).options)
       .toMatchObject({ json: true, requestStatus: 'error', limit: '5' });
-    await expect(main(['list', '--json'])).rejects.toThrow('only supported by status, usage, and requests');
-    await expect(main(['keys', 'list', '--json'])).rejects.toThrow('only supported by status, usage, and requests');
+    await expect(main(['list', '--json'])).rejects.toThrow('--json is only supported by models, status');
+    await expect(main(['keys', 'list', '--json'])).rejects.toThrow('--json is only supported by models, status');
     expect(calls).toEqual([]);
   });
 

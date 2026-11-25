@@ -72,6 +72,16 @@ npx freellmapi requests --status error --limit 50
 
 `usage` 与 `requests` 需要仪表盘会话令牌，通过 `cli/src/dashboard.ts` 与 `keys` 共用。提供商密钥和令牌均不会被打印。
 
+## 模型与密钥开关
+
+```bash
+npx freellmapi models list --kind media --disabled
+npx freellmapi models enable 42 43
+npx freellmapi keys disable groq --id 7
+```
+
+`models`（`cli/src/dashboard-models.ts`）通过各类别的仪表盘路由列出并切换模型：`/api/models`、`/api/media`、`/api/embeddings`、`/api/search/engines`、`/api/decisions/models`。`--kind chat|media|embedding|search|decision`（默认 `chat`）；`list` 还支持 `--platform a,b`、`--enabled|--disabled`、`--json`。embedding 的切换合并为一次 `PUT /api/embeddings`，并保留各行的 priority。`keys enable|disable <platform> [--id N]` 使用 `PATCH /api/keys/:id`；不带 `--id` 时使用 `PATCH /api/keys/platform/:platform`。两者都需要仪表盘会话令牌。
+
 ## 通用参数
 
 | 参数 | 作用 |

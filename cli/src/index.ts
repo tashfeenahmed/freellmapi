@@ -13,6 +13,7 @@ import { resolveLaunchModel, type ResolvedModel } from './models.js';
 import { DOCTOR_TOOLS, diagnose, exitCodeFor, formatReport, type ToolReport } from './doctor.js';
 import { keysHelp, runKeys, type KeyCommandOptions } from './keys.js';
 import { runStatus, statusHelp } from './status.js';
+import { modelsHelp, runModels } from './dashboard-models.js';
 import { analyticsHelp, runRequests, runUsage } from './analytics.js';
 import type { CatalogModel, GenerateContext } from './types.js';
 
@@ -25,11 +26,15 @@ interface CliOptions extends KeyCommandOptions {
   top?: string;
   limit?: string;
   requestStatus?: string;
+  kind?: string;
+  platform?: string;
+  enabledFilter?: boolean;
 }
 
 // Commands that authenticate with the dashboard session token.
-const DASHBOARD_COMMANDS = ['keys', 'status', 'usage', 'requests'];
-const REPORT_FLAGS = ['--json', '--range', '--top', '--limit', '--status'];
+const DASHBOARD_COMMANDS = ['keys', 'models', 'status', 'usage', 'requests'];
+const REPORT_FLAGS = ['--range', '--top', '--limit', '--status'];
+const MODEL_FLAGS = ['--kind', '--platform', '--enabled', '--disabled'];
 
 function rootUrl(url: string): string {
   return url.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
@@ -91,6 +96,14 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
       options.json = true;
       continue;
     }
+    if (arg === '--enabled' || arg === '--disabled') {
+      const wanted = arg === '--enabled';
+      if (options.enabledFilter !== undefined && options.enabledFilter !== wanted) {
+        throw new Error('--enabled and --disabled cannot be combined');
+      }
+      options.enabledFilter = wanted;
+      continue;
+    }
     const equals = arg.indexOf('=');
     const flag = equals < 0 ? arg : arg.slice(0, equals);
     const inline = equals < 0 ? undefined : arg.slice(equals + 1);
@@ -99,6 +112,7 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
       flag === '--url' || flag === '--api-key' || flag === '--profile'
       || flag === '--model' || flag === '--timeout'
       || flag === '--token' || flag === '--key' || flag === '--id'
+      || flag === '--kind' || flag === '--platform'
       || flag === '--range' || flag === '--top' || flag === '--limit' || flag === '--status'
     ) {
       if (inline === undefined) index += 1;
@@ -111,6 +125,8 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
       else if (flag === '--timeout') options.timeoutMs = parseTimeout(value);
       else if (flag === '--token') options.token = value;
       else if (flag === '--key') options.key = value;
+      else if (flag === '--kind') options.kind = value;
+      else if (flag === '--platform') options.platform = value;
       else if (flag === '--range') options.range = value;
       else if (flag === '--top') options.top = value;
       else if (flag === '--limit') options.limit = value;
@@ -295,13 +311,14 @@ function help(): string {
     '  launch            Run Claude Code with credentials injected into the child environment',
     '  launch-codex      Run Codex CLI with provider overrides and injected credentials',
     '  list              List supported coding agents',
-    '  keys              Add, list, remove, or test provider keys (keys --help)',
+    '  keys              Add, list, remove, test, enable, or disable provider keys (keys --help)',
+    '  models            List models of any kind, enable or disable them (models --help)',
     '  status            Gateway reachability, version, keys per platform, enabled models per kind',
     '  usage             Request totals and per-provider split (--range, --top, --json)',
     '  requests          Recent request log (--range, --status, --limit, --json)',
     '',
     'Environment:',
-    '  FREELLMAPI_URL, FREELLMAPI_API_KEY, FREELLMAPI_DASHBOARD_TOKEN (keys, status, usage, requests)',
+    '  FREELLMAPI_URL, FREELLMAPI_API_KEY, FREELLMAPI_DASHBOARD_TOKEN (keys, models, status, usage, requests)',
   ].join('\n');
 }
 
@@ -488,6 +505,7 @@ async function runDoctor(options: CliOptions): Promise<number> {
 
 function commandHelp(command: string | undefined): string {
   if (command === 'keys') return keysHelp();
+  if (command === 'models') return modelsHelp();
   if (command === 'status') return statusHelp();
   if (command === 'usage' || command === 'requests') return analyticsHelp(command);
   return help();
@@ -505,16 +523,21 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       throw new Error(`${flag} is only supported by keys`);
     }
     if (!DASHBOARD_COMMANDS.includes(command) && flag === '--token') {
-      throw new Error('--token is only supported by keys, status, usage, and requests');
+      throw new Error('--token is only supported by keys, models, status, usage, and requests');
+    }
+    if (flag === '--json' && !['models', 'status', 'usage', 'requests'].includes(command)) {
+      throw new Error('--json is only supported by models, status, usage, and requests');
     }
     if (!['status', 'usage', 'requests'].includes(command) && REPORT_FLAGS.includes(flag)) {
       throw new Error(`${flag} is only supported by status, usage, and requests`);
     }
+    if (command !== 'models' && MODEL_FLAGS.includes(flag)) throw new Error(`${flag} is only supported by models`);
     if (DASHBOARD_COMMANDS.includes(command) && ['--api-key', '--profile', '--model'].includes(flag)) {
       throw new Error(`${flag} is not supported by ${command}; use ${command} --help for available options`);
     }
   }
   if (command === 'keys') return runKeys(options, () => promptForKey(true));
+  if (command === 'models') return runModels(options);
   if (command === 'status') return runStatus(options);
   if (command === 'usage') return runUsage(options);
   if (command === 'requests') return runRequests(options);

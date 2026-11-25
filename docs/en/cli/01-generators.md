@@ -72,6 +72,16 @@ Read-only views of a running gateway, backed by `/livez` and `/api/analytics/{su
 
 `usage` and `requests` need the dashboard session token, shared with `keys` through `cli/src/dashboard.ts`. Provider keys and the token are never printed.
 
+## Models and key switches
+
+```bash
+npx freellmapi models list --kind media --disabled
+npx freellmapi models enable 42 43
+npx freellmapi keys disable groq --id 7
+```
+
+`models` (`cli/src/dashboard-models.ts`) lists and toggles models through the dashboard route of each kind: `/api/models`, `/api/media`, `/api/embeddings`, `/api/search/engines`, `/api/decisions/models`. `--kind chat|media|embedding|search|decision` (default `chat`); `list` also takes `--platform a,b`, `--enabled|--disabled`, `--json`. Embedding toggles go in one `PUT /api/embeddings` that keeps each row's priority. `keys enable|disable <platform> [--id N]` uses `PATCH /api/keys/:id`, or `PATCH /api/keys/platform/:platform` without `--id`. Both need the dashboard session token.
+
 ## Common flags
 
 | Flag | Effect |
