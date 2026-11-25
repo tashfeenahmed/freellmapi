@@ -1,3 +1,4 @@
+import { startDiagnostics } from './diagnostics.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, dialog, ipcMain, clipboard, nativeTheme, net, screen, shell, type Tray } from 'electron';
@@ -264,6 +265,7 @@ if (!app.requestSingleInstanceLock()) {
   }
 
   app.whenReady().then(async () => {
+    startDiagnostics();
     applyDockVisibility(loadConfig().showInDock ?? true);
 
     const cfg = loadConfig();

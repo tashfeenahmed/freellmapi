@@ -2,6 +2,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Tray, Menu, app, nativeImage } from 'electron';
 import { togglePopover } from './popover.js';
+import { loadConfig, saveConfig } from './config.js';
+import { trackOpen } from './diagnostics.js';
 import { openDashboard } from './window.js';
 import { openLogsFolder, openBackupsFolder } from './logger.js';
 import { dt, type NativeLocale } from './i18n.js';
@@ -62,6 +64,8 @@ export function buildTray(
         : []),
       { type: 'separator' },
       // Toggling relaunches the app (the bind host is fixed at server start).
+      { label: 'Share usage counts and error reports', type: 'checkbox', checked: loadConfig().diagnostics === true,
+        click: item => { saveConfig({ ...loadConfig(), diagnostics: item.checked }); if (item.checked) trackOpen(); } },
       { label: dt(locale, 'lanAccess'), type: 'checkbox', checked: lanOn, click: () => onToggleLanAccess() },
       // The Dock icon is the "yes, it is running" signal the tray cannot always
       // give: macOS 26 lets the user hide menu-bar icons, and a notched display

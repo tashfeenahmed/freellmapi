@@ -4,6 +4,7 @@ import { app } from 'electron';
 import type { GpuRecoveryState } from './gpu-recovery.js';
 
 export interface DesktopConfig {
+  diagnostics?: boolean;
   port?: number;
   theme?: 'dark' | 'light' | 'system';
   // BCP-47 locale mirrored from the dashboard (en, zh-CN, fr, es, pt-BR).
