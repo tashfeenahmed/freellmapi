@@ -41,6 +41,9 @@ dashboard (or the tray popover in the desktop app).
 | `launch-codex` | Run Codex the same way |
 | `list` | Print the supported tools and their base URLs |
 | `keys` | Add, list, remove, or test provider keys (`keys --help`) |
+| `status` | Gateway reachability, version, keys per platform, enabled models per kind |
+| `usage` | Request totals and per-provider split |
+| `requests` | Recent request log |
 
 ## Options
 
@@ -95,6 +98,28 @@ registration, so create them in the dashboard; existing custom keys can be
 listed, tested, and removed here. Requests accept `--url` / `FREELLMAPI_URL` and
 `--timeout MS` (30,000 ms per request by default). `--dry-run` is not supported for
 `keys`; it is rejected before any request.
+
+## Status, usage and request log
+
+Read-only commands for checking on a running gateway. `usage` and `requests`
+authenticate like `keys` (the dashboard session token above); `status` works
+without a token and adds keys and model counts when one is set. All three print
+a table by default and JSON with `--json`.
+
+```bash
+npx freellmapi status
+npx freellmapi usage --range 30d --top 5
+npx freellmapi requests --status error --limit 50
+```
+
+| Command | Flags | Output |
+| --- | --- | --- |
+| `status` | | Reachability and version from `/livez`. With a token: keys per platform (total, enabled, healthy) and enabled/total models for chat, media, embedding, search, and decision. Exits 1 if the gateway is unreachable or unavailable. |
+| `usage` | `--range 24h\|7d\|30d\|all` (default `7d`), `--top N` (default 10) | Requests, success rate, tokens, and latency for the range, then one row per provider or custom endpoint, busiest first. |
+| `requests` | `--range` (default `24h`), `--status success\|error\|canceled`, `--limit N` (default 20, at most 500) | Newest requests first: time, status, type, model, latency, tokens, and a one-line error. |
+
+Output never includes provider keys, masked keys, or the dashboard token.
+`--url`, `--token`, and `--timeout` behave as for `keys`; `--dry-run` is rejected.
 
 ## Safety
 

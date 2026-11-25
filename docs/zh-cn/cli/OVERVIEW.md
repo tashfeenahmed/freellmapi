@@ -14,7 +14,7 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| [01-generators.md](01-generators.md) | 全部 `setup-*` 生成器（claude/codex/cline/continue/aider/opencode/goose/qwen/roo/kilo/crush/cursor/dsh/mimo/atomcode/generic）、目标文件、合并行为、`--model` 解析以及 `launch`/`launch-codex`/`doctor` 命令。 |
+| [01-generators.md](01-generators.md) | 全部 `setup-*` 生成器（claude/codex/cline/continue/aider/opencode/goose/qwen/roo/kilo/crush/cursor/dsh/mimo/atomcode/generic）、目标文件、合并行为、`--model` 解析以及 `launch`/`launch-codex`/`doctor`/`status`/`usage`/`requests` 命令。 |
 | [02-config-files.md](02-config-files.md) | 配置文件层：`tools.json` 注册表、`config-files.ts` 合并策略（JSON/TOML/YAML）、`0600` 权限、带时间戳备份、`--dry-run` 以及如何新增生成器。 |
 | [CHANGELOG.md](CHANGELOG.md) | 本域文档修订历史。 |
 

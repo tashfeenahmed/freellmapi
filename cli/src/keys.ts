@@ -1,3 +1,5 @@
+import { dashboardClient } from './dashboard.js';
+
 export interface KeyCommandOptions {
   url: string;
   args: string[];
@@ -44,15 +46,6 @@ export function keysHelp(): string {
   ].join('\n');
 }
 
-function gatewayRoot(value: string): string {
-  let url: URL;
-  try { url = new URL(value.trim()); } catch { throw new Error('--url must be an HTTP(S) gateway URL'); }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
-    throw new Error('--url must be an HTTP(S) URL without credentials, a query, or a fragment');
-  }
-  return url.href.replace(/\/+$/, '').replace(/\/v1$/i, '');
-}
-
 function modelCount(key: KeyRow, models: ModelRow[]): number {
   const customIds = new Set(key.models?.filter(m => m.kind === 'chat').map(m => m.id));
   return models.filter(model => model.enabled && model.platform === key.platform
@@ -83,37 +76,7 @@ export async function runKeys(
   }
   const platform = rawPlatform?.toLowerCase();
   if (platform && !/^[a-z][a-z0-9_-]*$/.test(platform)) throw new Error('Invalid provider platform identifier');
-  const token = options.token?.trim();
-  if (!token) throw new Error('Set FREELLMAPI_DASHBOARD_TOKEN or pass --token with a dashboard session token');
-  const root = gatewayRoot(options.url);
-  const timeout = options.timeoutMs ?? 30_000;
-  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2_147_483_647) {
-    throw new Error('--timeout must be a positive integer of at most 2147483647 milliseconds');
-  }
-
-  async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-    let response: Response;
-    try {
-      response = await fetch(`${root}${path}`, {
-        method,
-        headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(timeout),
-        redirect: 'error',
-        cache: 'no-store',
-      });
-    } catch {
-      throw new Error('Could not complete the dashboard request. Check --url, connectivity, and --timeout.');
-    }
-    // Provider error bodies may contain credentials. Only report the HTTP
-    // status, never echo arbitrary response bodies or transport errors.
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('Dashboard authentication failed. Supply a current dashboard session token with --token or FREELLMAPI_DASHBOARD_TOKEN.');
-    }
-    if (!response.ok) throw new Error(`Dashboard request failed (HTTP ${response.status})`);
-    if (response.status === 204) return undefined as T;
-    try { return await response.json() as T; } catch { throw new Error('The gateway returned an invalid JSON response'); }
-  }
+  const { request } = dashboardClient(options);
 
   async function listKeys(): Promise<KeyRow[]> {
     const rows = await request<KeyRow[]>('/api/keys');
