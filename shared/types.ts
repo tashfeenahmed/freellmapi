@@ -191,6 +191,8 @@ export type Platform =
   | 'halx'
   | 'aisense'
   | 'classifierdev'
+  | 'tanod'
+  | 'nutrient'
   | 'brave'
   | 'outcrawl'
   | 'tinyfish'

@@ -4,6 +4,10 @@ import { BaseProvider, providerHttpError, type CompletionOptions } from './base.
 
 // Wire IDs only. No route is discovered or enabled without the signed catalog.
 const pinned: Record<string,string> = {
+  "deepseek-v4-flash-0731": "alibaba:deepseek/deepseek-v4-flash-0731",
+  "qwen3.8-omni-flash": "alibaba:qwen/qwen3.8-omni-flash",
+  "kimi-k2.6": "moonshotai:moonshotai/kimi-k2.6",
+  "gemini-4-hydrogen": "google:google/gemini-4-hydrogen",
   "qwen4-max": "alibaba:qwen/qwen4-max",
   "qwen3.8-max": "alibaba:qwen/qwen3.8-max",
   "qwen3.7-max": "alibaba:qwen/qwen3.7-max",

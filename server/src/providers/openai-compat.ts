@@ -411,6 +411,7 @@ export class OpenAICompatProvider extends BaseProvider {
   ): { max_tokens: number } | { max_completion_tokens: number } | Record<string, never> {
     const maxTokens = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
     if (maxTokens === undefined) return {};
+    if (this.platform === 'nutrient') return { max_completion_tokens: maxTokens };
     if (forceMaxCompletionTokens || (this.platform === 'custom' && usesMaxCompletionTokens(modelId))) {
       return { max_completion_tokens: maxTokens };
     }

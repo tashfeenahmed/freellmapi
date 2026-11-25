@@ -32,6 +32,7 @@ import { JAMAI_BASE_URL, jamaiHeaders } from '../providers/jamai.js';
 import { FREEINFERENCE_BASE_URL } from '../providers/freeinference.js';
 import { FREEAI_BASE_URL } from '../providers/freeai.js';
 import { SILVR_BASE_URL } from '../providers/silvr.js';
+import { tanodEmbed, tanodStatus } from '../providers/tanod.js';
 
 export interface EmbeddingModelRow {
   id: number;
@@ -180,6 +181,7 @@ const FETCH_TIMEOUT_MS = 30_000;
 
 /** Provider adapters that can safely receive catalog-managed embedding rows. */
 export const EMBEDDING_PLATFORMS = new Set([
+  'tanod',
   'freeinference',
   'jamai',
   'google',
@@ -503,6 +505,9 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
 async function callProvider(row: EmbeddingModelRow, credential: ProviderCredential, inputs: string[], dimensions?: number): Promise<ProviderCallResult> {
   const { key } = credential;
   switch (row.platform) {
+    case 'tanod':
+      try { return await tanodEmbed(row.model_id, inputs, dimensions ?? row.dimensions); }
+      catch(e) { throw new EmbeddingsError(e instanceof Error ? e.message : 'Tanod failed', tanodStatus(e)); }
     case 'freeinference':
       return freeInferenceEmbed(row, key, inputs, dimensions);
     case 'custom': {
