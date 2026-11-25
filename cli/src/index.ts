@@ -108,11 +108,23 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
   return { command, options };
 }
 
+async function readStdin(): Promise<string> {
+  let text = '';
+  for await (const chunk of process.stdin) text += String(chunk);
+  return text.trim();
+}
+
+// A provider key may come from FREELLMAPI_PROVIDER_KEY or piped stdin, so scripts
+// never put it in argv.
 async function promptForKey(provider = false): Promise<string> {
+  if (provider) {
+    const supplied = process.env.FREELLMAPI_PROVIDER_KEY?.trim() || (process.stdin.isTTY ? '' : await readStdin());
+    if (supplied) return supplied;
+  }
   if (!process.stdin.isTTY) {
     throw new Error(
       provider
-        ? 'No provider key supplied. Pass --key or use an interactive terminal for hidden input.'
+        ? 'No provider key supplied. Pass --key, set FREELLMAPI_PROVIDER_KEY, pipe it on stdin, or use an interactive terminal for hidden input.'
         : 'No API key supplied. Pass --api-key or set FREELLMAPI_API_KEY.',
     );
   }

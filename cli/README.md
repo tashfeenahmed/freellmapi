@@ -69,6 +69,7 @@ export FREELLMAPI_DASHBOARD_TOKEN='<dashboard-session-token>'
 
 npx freellmapi keys add groq                 # hidden provider-key prompt
 npx freellmapi keys add groq --key '<key>'   # non-interactive alternative
+FREELLMAPI_PROVIDER_KEY=<key> npx freellmapi keys add groq   # or piped stdin; keeps the key out of argv
 npx freellmapi keys list
 npx freellmapi keys test groq                # check every stored Groq key
 npx freellmapi keys test groq --id 7         # check one key

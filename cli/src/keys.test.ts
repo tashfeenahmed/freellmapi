@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { main, parseArgs } from './index.js';
 
@@ -108,16 +109,36 @@ describe('provider key commands', () => {
     expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'kilo', key: '' });
   });
 
+  async function withStdin(text: string, run: () => Promise<void>): Promise<void> {
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'stdin');
+    Object.defineProperty(process, 'stdin', { configurable: true, value: Object.assign(Readable.from(text ? [text] : []), { isTTY: false }) });
+    try { await run(); } finally { if (descriptor) Object.defineProperty(process, 'stdin', descriptor); }
+  }
+
   it('rejects a missing provider key in a non-interactive terminal without adding one', async () => {
-    const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
-    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: false });
-    try {
+    await withStdin('', async () => {
       await expect(main(['keys', 'add', 'groq'])).rejects.toThrow('Pass --key');
-      expect(calls.some(c => c.init.method === 'POST')).toBe(false);
-    } finally {
-      if (descriptor) Object.defineProperty(process.stdin, 'isTTY', descriptor);
-      else Reflect.deleteProperty(process.stdin, 'isTTY');
-    }
+    });
+    expect(calls.some(c => c.init.method === 'POST')).toBe(false);
+  });
+
+  it('reads the provider key from piped stdin', async () => {
+    await withStdin(`${secret}
+`, async () => {
+      expect(await main(['keys', 'add', 'groq'])).toBe(0);
+    });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+    expect(output).not.toContain(secret);
+  });
+
+  it('prefers FREELLMAPI_PROVIDER_KEY over stdin and never reads it as a flag', async () => {
+    vi.stubEnv('FREELLMAPI_PROVIDER_KEY', ` ${secret}
+`);
+    await withStdin('ignored', async () => {
+      expect(await main(['keys', 'add', 'groq'])).toBe(0);
+    });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+    expect(output).not.toContain(secret);
   });
 
   it('does not treat a failed health probe as success when the stored status is healthy', async () => {
