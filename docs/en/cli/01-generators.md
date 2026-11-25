@@ -78,9 +78,24 @@ Read-only views of a running gateway, backed by `/livez` and `/api/analytics/{su
 npx freellmapi models list --kind media --disabled
 npx freellmapi models enable 42 43
 npx freellmapi keys disable groq --id 7
+npx freellmapi models add new-models.json --dry-run
 ```
 
 `models` (`cli/src/dashboard-models.ts`) lists and toggles models through the dashboard route of each kind: `/api/models`, `/api/media`, `/api/embeddings`, `/api/search/engines`, `/api/decisions/models`. `--kind chat|media|embedding|search|decision` (default `chat`); `list` also takes `--platform a,b`, `--enabled|--disabled`, `--json`. Embedding toggles go in one `PUT /api/embeddings` that keeps each row's priority. `keys enable|disable <platform> [--id N]` uses `PATCH /api/keys/:id`, or `PATCH /api/keys/platform/:platform` without `--id`. Both need the dashboard session token.
+
+`models add <file.json> [--dry-run]` registers chat models from a JSON array through `POST /api/models` (fields as in `createModelSchema`: `platform` and `modelId` required; `displayName`, `contextWindow`, `rpmLimit`, `rpdLimit`, `tpmLimit`, `tpdLimit`, `monthlyTokenBudget`, `supportsVision`, `supportsTools`, `keyId`, `endpointScope` optional). All rows are validated before the first request; the result is one `added`, `present` or `failed` line per row, confirmed by reading `/api/models` back, with exit 1 on any failure. `--dry-run` sends no POST.
+
+## Settings and test sample
+
+```bash
+npx freellmapi settings get output-limit
+npx freellmapi settings set output-limit '{"mode":"auto"}'
+npx freellmapi test-sample --platform groq -n 2 --seed 7
+```
+
+`settings get [name]` and `settings set <name> <json>` (`cli/src/dashboard-settings.ts`) wrap `GET/PUT /api/settings/<name>` for a fixed list of non-secret router settings: `agent-compatibility`, `anthropic-map`, `compression`, `enable-mcp`, `fusion`, `gemini-map`, `guardrails`, `headroom`, `min-context-window`, `min-reliability-floor`, `output-limit`, `provider-moment-attribution`, `system-date`, `task-weight-share`, `unify`, `update-check`. `set` validates the body against a local copy of each PUT schema and sends it unchanged, so the body is the JSON shown by `settings --help` (for `fusion`, `anthropic-map` and `gemini-map` the config or map itself, not the wrapper `GET` returns). `--dry-run` validates only. `api-key`, `url-tokens` and `proxy` are not exposed.
+
+`test-sample (--platform a,b | --all) [-n 2] [--pace SECONDS] [--seed N]` (`cli/src/test-sample.ts`) tests at most `-n` random enabled chat models per platform through `POST /api/models/:id/test`, one at a time with `--pace` seconds between calls (default 2). A 429 from the server's five-second per-model throttle is retried once. It prints model, result, latency and a one-line error, and exits 1 if any test failed; the printed seed reproduces the sample. Tests spend real free-tier quota.
 
 ## Common flags
 

@@ -41,7 +41,9 @@ dashboard (or the tray popover in the desktop app).
 | `launch-codex` | Run Codex the same way |
 | `list` | Print the supported tools and their base URLs |
 | `keys` | Add, list, remove, test, enable, or disable provider keys (`keys --help`) |
-| `models` | List models of any kind, enable or disable them (`models --help`) |
+| `models` | List models of any kind, enable or disable them, add chat models from a file (`models --help`) |
+| `settings` | Read or change router settings (`settings --help`) |
+| `test-sample` | Live-test a random sample of enabled chat models |
 | `status` | Gateway reachability, version, keys per platform, enabled models per kind |
 | `usage` | Request totals and per-provider split |
 | `requests` | Recent request log |
@@ -116,12 +118,58 @@ npx freellmapi models list --platform groq --disabled
 npx freellmapi models list --kind embedding --json
 npx freellmapi models enable 42 43
 npx freellmapi models disable 5 --kind media
+npx freellmapi models add new-models.json --dry-run
 ```
 
 `list` accepts `--platform a,b`, `--enabled` or `--disabled`, and `--json`. `enable`
 and `disable` check every ID against the list first and change nothing when one is
 unknown. Enabling a chat model also turns its routing switch back on. Output never
 includes provider keys or the dashboard token.
+
+`add <file.json>` registers chat models from a JSON array of objects, for example
+`[{"platform":"groq","modelId":"my-model","contextWindow":131072}]`. Fields are
+those of `POST /api/models`: `platform` and `modelId` are required;
+`displayName`, `contextWindow`, `rpmLimit`, `rpdLimit`, `tpmLimit`, `tpdLimit`,
+`monthlyTokenBudget`, `supportsVision`, `supportsTools`, `keyId`, and
+`endpointScope` are optional. Every row is checked before the first request. It
+then prints one line per row (`added`, `present`, or `failed`), reads
+`/api/models` back to confirm, and exits 1 if any row failed. `--dry-run` reads
+the list and prints what would be added without sending a POST.
+
+## Settings
+
+```bash
+npx freellmapi settings get
+npx freellmapi settings get output-limit
+npx freellmapi settings set output-limit '{"mode":"auto"}'
+npx freellmapi settings set guardrails '{"maxConsecutiveUpstreamFails":3}' --dry-run
+```
+
+`get` prints one setting, or all of them as one JSON object. `set` checks the
+JSON locally, sends it as the body of `PUT /api/settings/<name>`, and prints the
+stored result; `--dry-run` stops after the check. The names are `agent-compatibility`,
+`anthropic-map`, `compression`, `enable-mcp`, `fusion`, `gemini-map`, `guardrails`,
+`headroom`, `min-context-window`, `min-reliability-floor`, `output-limit`,
+`provider-moment-attribution`, `system-date`, `task-weight-share`, `unify`, and
+`update-check`; `settings --help` shows an example body for each. The PUT body of
+`fusion`, `anthropic-map`, and `gemini-map` is the config or map itself, while their
+GET output wraps it (`{config, maxK}`, `{map}`). `api-key`, `url-tokens`, and
+`proxy` are not exposed.
+
+## Test sample
+
+```bash
+npx freellmapi test-sample --platform groq,cerebras -n 2 --seed 7
+npx freellmapi test-sample --all --pace 5
+```
+
+Picks at most `-n` (default 2) enabled chat models per platform and tests them
+one at a time through `POST /api/models/:id/test`, pausing `--pace` seconds
+(default 2) between calls. The server allows one test per model every five
+seconds, so a 429 is retried once after that window. The table lists model,
+result, latency, and a one-line error; the exit code is 1 if any test failed.
+The seed is printed, and `--seed N` repeats the same sample. `--dry-run` prints the
+sample without testing. Tests send a real request upstream and use free-tier quota.
 
 ## Status, usage and request log
 

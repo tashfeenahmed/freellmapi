@@ -4,6 +4,13 @@ export interface DashboardOptions {
   timeoutMs?: number;
 }
 
+/** Non-2xx reply; callers branch on `status` (409 already exists, 429 throttled). */
+export class DashboardHttpError extends Error {
+  constructor(public readonly status: number) {
+    super(`Dashboard request failed (HTTP ${status})`);
+  }
+}
+
 export interface DashboardClient {
   root: string;
   /** Authenticated JSON request. Throws on transport, auth, HTTP, and JSON errors. */
@@ -66,7 +73,7 @@ export function dashboardClient(options: DashboardOptions, requireToken = true):
     if (response.status === 401 || response.status === 403) {
       throw new Error('Dashboard authentication failed. Supply a current dashboard session token with --token or FREELLMAPI_DASHBOARD_TOKEN.');
     }
-    if (!response.ok) throw new Error(`Dashboard request failed (HTTP ${response.status})`);
+    if (!response.ok) throw new DashboardHttpError(response.status);
     if (response.status === 204) return undefined as T;
     try { return await response.json() as T; } catch { throw new Error('The gateway returned an invalid JSON response'); }
   }
