@@ -24,11 +24,6 @@ function bridge(): DesktopUpdaterBridge | null {
   return (window as { __FREEAPI_UPDATER__?: DesktopUpdaterBridge }).__FREEAPI_UPDATER__ ?? null
 }
 
-/** True when this page runs in a desktop build with the updater bridge. */
-export function hasDesktopUpdater(): boolean {
-  return bridge() !== null
-}
-
 /** Starts a desktop update check; the new state arrives through the hook. */
 export function checkDesktopUpdates(): Promise<DesktopUpdateState> | null {
   return bridge()?.check() ?? null
