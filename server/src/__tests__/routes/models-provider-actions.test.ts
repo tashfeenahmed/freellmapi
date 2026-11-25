@@ -321,8 +321,35 @@ describe('Model Provider Actions API', () => {
         'test-key-groq-secret',
         [{ role: 'user', content: 'ping' }],
         modelId,
-        { max_tokens: 256, timeoutMs: 15000 },
+        { max_tokens: 256, timeoutMs: 45_000 },
       );
+    });
+
+    it('uses PROVIDER_TIMEOUT_<PLATFORM> as the model test timeout', async () => {
+      const db = getDb();
+      const modelId = `timeout-override-${Date.now()}`;
+      const modelDbId = (await post(app, '/api/models', { platform: 'groq', modelId })).body.id;
+      const enc = encrypt('test-key-groq-timeout');
+      db.prepare(`
+        INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, enabled, status)
+        VALUES ('groq', 'Timeout Groq Key', ?, ?, ?, 1, 'healthy')
+      `).run(enc.encrypted, enc.iv, enc.authTag);
+      const chatSpy = vi.spyOn(getProvider('groq')!, 'chatCompletion').mockResolvedValueOnce({
+        id: 'timeout-completion-id',
+        choices: [{ message: { role: 'assistant', content: 'pong' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      } as any);
+
+      const previous = process.env.PROVIDER_TIMEOUT_GROQ;
+      process.env.PROVIDER_TIMEOUT_GROQ = '60000';
+      try {
+        const testRes = await post(app, `/api/models/${modelDbId}/test`);
+        expect(testRes.body.success).toBe(true);
+        expect(chatSpy.mock.calls[0][3]).toMatchObject({ timeoutMs: 60_000 });
+      } finally {
+        if (previous === undefined) delete process.env.PROVIDER_TIMEOUT_GROQ;
+        else process.env.PROVIDER_TIMEOUT_GROQ = previous;
+      }
     });
 
     it('counts a reasoning-only reply as a live model', async () => {

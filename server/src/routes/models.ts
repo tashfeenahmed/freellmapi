@@ -26,12 +26,15 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { recordRequest, recordTokens } from '../services/ratelimit.js';
 import { recordMonthlyUsage } from '../services/key-budget.js';
 import { contentToString } from '../lib/content.js';
+import { providerTimeoutMs } from '../lib/provider-timeout.js';
 
 export const modelsRouter = Router();
 
 // Throttle map for model test endpoint: modelDbId -> lastTestTimestamp
 const modelTestCooldowns = new Map<number, number>();
 const MODEL_TEST_THROTTLE_MS = 5000;
+// Fits ~30 s free providers; PROVIDER_TIMEOUT_<PLATFORM> overrides it like the gateway budget.
+const MODEL_TEST_TIMEOUT_MS = 45_000;
 
 
 const modelUpdateSchema = z.object({
@@ -436,7 +439,7 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
   try {
     const response = await withKeyProxy(route.proxyUrl, () => route.provider.chatCompletion(
       route.apiKey, [{ role: 'user', content: 'ping' }], route.modelId,
-      { max_tokens: outputLimit, timeoutMs: 15_000 },
+      { max_tokens: outputLimit, timeoutMs: providerTimeoutMs(route.platform, MODEL_TEST_TIMEOUT_MS) },
     ));
     const latencyMs = Date.now() - startTime;
     const message = response.choices?.[0]?.message;
