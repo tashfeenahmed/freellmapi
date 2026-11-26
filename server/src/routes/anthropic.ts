@@ -14,6 +14,7 @@ import { getDb, getSetting } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
 import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { contentToString, estimateInputTokens } from '../lib/content.js';
+import { checkVisionCapacity } from '../lib/vision-gate.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
@@ -577,6 +578,15 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   // RAW wire body, and normalization mutates urls in place keeping the blocks
   // (and any cache_control on them) intact — neither is disturbed.
   await normalizeMessageImages(messages);
+  // Same up-front vision gate as /v1/chat/completions and /v1/responses: an
+  // image anywhere in the conversation (Claude Code re-sends screenshots in
+  // history on every follow-up turn) needs a routable vision model, else a
+  // clear 422 instead of a 429 "All models exhausted" (#2061, #2062).
+  const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'anthropic messages') : null;
+  if (noVisionMessage) {
+    res.status(422).json({ type: 'error', error: { type: 'invalid_request_error', message: noVisionMessage, code: 'no_vision_model' } });
+    return;
+  }
   const systemHasCacheControl = Array.isArray(body.system)
     && body.system.some(block => block && typeof block === 'object' && 'cache_control' in block);
   const messageHasCacheControl = body.messages.some(message =>
