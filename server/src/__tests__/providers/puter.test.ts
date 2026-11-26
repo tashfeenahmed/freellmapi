@@ -8,6 +8,14 @@ const model='gemini-3.8-flash', messages=[{role:'user' as const,content:'Hi'}];
 describe('native Puter wire protocol',()=>{
   afterEach(()=>vi.unstubAllGlobals());
   it.each([
+    ['qwen3-vl-plus', 'alibaba:qwen/qwen3-vl-plus'],
+    ['glm-5.3-flashx', 'z-ai:z-ai/glm-5.3-flashx'],
+    ['qwen-plus', 'alibaba:qwen/qwen-plus'],
+    ['gemini-3.1-flash-lite', 'google:google/gemini-3.1-flash-lite'],
+    ['deepseek-v4-pro-0813', 'alibaba:deepseek/deepseek-v4-pro-0813'],
+    ['minimax-m3.1-flash', 'minimax:minimax/minimax-m3.1-flash'],
+    ['qwen3.5-omni-flash', 'alibaba:qwen/qwen3.5-omni-flash'],
+    ['gemini-3.5-flash', 'google:google/gemini-3.5-flash'],
     ['deepseek-v4-flash-0731', 'alibaba:deepseek/deepseek-v4-flash-0731'],
     ['qwen3.8-omni-flash', 'alibaba:qwen/qwen3.8-omni-flash'],
     ['kimi-k2.6', 'moonshotai:moonshotai/kimi-k2.6'],
