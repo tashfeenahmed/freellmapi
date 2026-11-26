@@ -9,12 +9,13 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
+import { routeRequest, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt } from '../lib/system-prompt.js';
 import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
 import { contentToString, estimateInputTokens, messageHasImage } from '../lib/content.js';
+import { checkVisionCapacity } from '../lib/vision-gate.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
@@ -804,10 +805,11 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // a vision-capable peer (#118, #125). A rough per-image token cost keeps
   // budget routing from being skewed by content the text heuristic can't see.
   const hasImage = messageHasImage(messages);
-  if (hasImage && !hasEnabledVisionModel()) {
+  const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'responses', requestGroupId) : null;
+  if (noVisionMessage) {
     res.status(422).json({
       error: {
-        message: 'This request includes an image, but no vision-capable model is enabled. Enable a vision model (e.g. Gemini 2.5 Flash, Llama 4 Scout) in the Fallback Chain.',
+        message: noVisionMessage,
         type: 'invalid_request_error',
         code: 'no_vision_model',
       },

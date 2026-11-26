@@ -20,6 +20,7 @@ import { benchCloudflareAccount } from '../services/cloudflare-daily-quota.js';
 import type { RouteResult } from '../services/router.js';
 import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled } from '../services/router.js';
 import { safeHeaderValue } from './header-value.js';
+import { logVisionBlocked } from './vision-gate.js';
 import {
   recordRequest,
   recordTokens,
@@ -1245,19 +1246,28 @@ function formatClassBreakdown(attempts: readonly AttemptRecord[]): string {
 //     expiry as retryAtMs.
 //   - anything else (capability filters like vision/tools, mixed reasons) →
 //     the router's status (429) with a generic routing_exhausted code.
-type RoutingDiagClass = 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'other';
+type RoutingDiagClass = 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'no_vision' | 'other';
 
 function classifyRoutingDiagLine(line: string): RoutingDiagClass {
   const l = line.toLowerCase();
+  // First: a model id may itself contain 'rpm'/'tpm'-like substrings.
+  if (l.endsWith(': no vision support')) return 'no_vision';
   // "< estimated" first: the tpm_limit-too-small line also contains 'tpm',
   // which would otherwise misread as a transient window.
   if (l.includes('< estimated')) return 'too_large';
   const monthlyReasons = l.match(/key\(s\) — (.*)$/)?.[1];
   if (monthlyReasons?.split(', ').every(reason => /^monthly-budget-cap:\d+$/.test(reason))) return 'monthly_budget';
+  // A model with one key that cannot serve it (scope, other endpoint) and one
+  // that is only cooling down still has capacity that recovers by itself:
+  // time-bound, not config. Without this, "custom-key-mismatch:1, cooldown:1"
+  // read as config, and an image request whose only vision model was
+  // rate-limited came back as no_vision_model (#2061).
+  if (monthlyReasons?.split(', ').some(reason => TIME_BOUND_REASON.test(reason) && !reason.startsWith('monthly-budget-cap'))) return 'time_bound';
   if (/no provider registered|no enabled\+healthy key|no usable key|decrypt-error|no-resolved-provider|custom-key-mismatch/.test(l)) return 'config';
-  if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency|monthly-budget-cap/.test(l)) return 'time_bound';
+  if (TIME_BOUND_REASON.test(l)) return 'time_bound';
   return 'other';
 }
+const TIME_BOUND_REASON = /cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency|monthly-budget-cap/;
 
 /**
  * Suffix for an exhaustion that ended because routing ran dry AFTER at least
@@ -1310,6 +1320,27 @@ export function routingExhaustionBody(routeErr: any): ExhaustionBody {
       message: diag.length === 0
         ? `No models are enabled/configured to serve this request. Add provider API keys and enable models in the dashboard. ${message}`
         : `No candidate model has a configured, usable provider key. Add provider API keys in the dashboard. ${message}`,
+    };
+  }
+
+  // An image request (in the latest turn or in re-sent history) whose chain
+  // holds no vision model that could be routed to: every candidate was either
+  // text-only or had no usable key. Nothing will recover by waiting, so this is
+  // the 422 the up-front gate gives, not a 429 (#2061). Reached when the gate
+  // passed on catalog-wide capacity but THIS request's chain (a profile, a
+  // model group, a tier alias) has no servable vision model, and on surfaces
+  // without a gate of their own.
+  if (classes.includes('no_vision') && classes.every(c => c === 'no_vision' || c === 'config')) {
+    const skipped = classes.filter(c => c === 'no_vision').length;
+    return {
+      kind: 'bad_request',
+      status: 422,
+      type: 'invalid_request_error',
+      code: 'no_vision_model',
+      message: 'This request includes an image (in the latest message or in earlier conversation history), '
+        + `but no vision-capable model in its routing chain can serve it (${skipped} text-only model${skipped === 1 ? '' : 's'} skipped). `
+        + 'Enable a vision model with a usable API key in the Fallback Chain (or in the profile or model group the request routes to), '
+        + 'or remove the image from the conversation.',
     };
   }
 
@@ -1613,6 +1644,16 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       // record of why the pool was empty. With prior attempts the trail in the
       // exhaustion body already explains the failure.
       if (!lastError) logRoutingExhaustion(routeErr, hooks.logIdentity);
+      if (exhaustion.code === 'no_vision_model') {
+        logVisionBlocked({
+          surface: hooks.logIdentity?.surface ?? 'unidentified surface',
+          stage: 'routing',
+          requestId: hooks.logIdentity?.requestId,
+          candidates: Array.isArray((routeErr as { diagnostics?: unknown })?.diagnostics)
+            ? (routeErr as { diagnostics: unknown[] }).diagnostics.length
+            : undefined,
+        });
+      }
       hooks.onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
       return;
     }

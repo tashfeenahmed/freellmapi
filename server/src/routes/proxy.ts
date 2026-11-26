@@ -4,7 +4,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ChatToolCall, TokenUsage } from '@freellmapi/shared/types.js';
-import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, resolveRoutingChain, resolveModelGroupCandidates, resolveStickyPreference, hasEnabledVisionModel, hasEnabledToolsModel, routingReserveTokens, failureAttributionFor } from '../services/router.js';
+import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, resolveRoutingChain, resolveModelGroupCandidates, resolveStickyPreference, hasEnabledToolsModel, routingReserveTokens, failureAttributionFor } from '../services/router.js';
 import { secondsUntilNextMonth, nextMonthResetAt } from '../services/key-budget.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { runRerank, RerankError, rerankRetryAfterSec } from '../services/rerank.js';
@@ -17,6 +17,7 @@ import { getDb } from '../db/index.js';
 import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
 import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { contentToString, estimateInputTokens, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../lib/content.js';
+import { checkVisionCapacity } from '../lib/vision-gate.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
@@ -2097,11 +2098,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // or surfacing the generic "all models exhausted" error (#118, #125). Add a
   // rough per-image token cost so budget routing isn't skewed by content the
   // heuristic above (text-only) can't see.
+  // The gate scans EVERY message, so an image re-sent in history on a
+  // follow-up turn is caught too, and it counts only vision models that have a
+  // usable key: "enabled" alone let a keyless default install through to a
+  // misleading 429 (#2061, #2062).
   const hasImage = messageHasImage(messages);
-  if (hasImage && !hasEnabledVisionModel()) {
+  const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'chat completions', requestGroupId) : null;
+  if (noVisionMessage) {
     res.status(422).json({
       error: {
-        message: 'This request includes an image, but no vision-capable model is enabled. Enable a vision model (e.g. Gemini 2.5 Flash, Llama 4 Scout) in the Fallback Chain.',
+        message: noVisionMessage,
         type: 'invalid_request_error',
         code: 'no_vision_model',
       },

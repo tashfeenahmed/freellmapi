@@ -353,13 +353,58 @@ describe('routingExhaustionBody (router gave up before any upstream was tried)',
     expect(body.type).toBe('invalid_request_error');
   });
 
-  it('capability-filtered candidates keep the router status with a routing_exhausted code', () => {
+  it('vision models all rate-limited (text-only ones skipped) → 429 rate_limit_exceeded, not a capability error', () => {
+    const body = routingExhaustionBody({
+      message: 'All vision-capable models are rate-limited or unavailable for this image request.',
+      status: 429,
+      diagnostics: [
+        'fake/text-only: no vision support',
+        'groq/llama-3.3-70b: 1 key(s) — cooldown:1',
+      ],
+    });
+    expect(body.status).toBe(429);
+    expect(body.code).toBe('rate_limit_exceeded');
+    expect(body.message).toMatch(/vision-capable models are rate-limited/);
+  });
+
+  it('a key mismatch next to a cooling-down key is time-bound, so a rate-limited vision model stays a 429 (#2061)', () => {
+    const body = routingExhaustionBody({
+      message: 'All vision-capable models are rate-limited or unavailable for this image request.',
+      status: 429,
+      diagnostics: [
+        'custom/fake-vision: 2 key(s) — custom-key-mismatch:1, cooldown:1',
+        'custom/fake-text: no vision support',
+      ],
+    });
+    expect(body.status).toBe(429);
+    expect(body.code).toBe('rate_limit_exceeded');
+  });
+
+  it('image request whose chain has no routable vision model → 422 no_vision_model (#2061)', () => {
+    const body = routingExhaustionBody({
+      message: 'All vision-capable models are rate-limited or unavailable for this image request.',
+      status: 429,
+      diagnostics: [
+        'custom/fake-text: no vision support',
+        'groq/llama-3.3-70b: no vision support',
+        'custom/fake-vision: 1 key(s) — custom-key-mismatch:1',
+        '40 model(s) skipped: no enabled+healthy key for platform (google, zhipu)',
+      ],
+    });
+    expect(body.status).toBe(422);
+    expect(body.kind).toBe('bad_request');
+    expect(body.type).toBe('invalid_request_error');
+    expect(body.code).toBe('no_vision_model');
+    expect(body.message).toMatch(/2 text-only models skipped/);
+  });
+
+  it('a vision-filtered chain where another candidate failed for an unknown reason keeps routing_exhausted', () => {
     const body = routingExhaustionBody({
       message: 'All models exhausted.',
       status: 429,
       diagnostics: [
         'fake/text-only: no vision support',
-        'groq/llama-3.3-70b: 1 key(s) — cooldown:1',
+        'odd/model: provider-specific gate',
       ],
     });
     expect(body.status).toBe(429);
