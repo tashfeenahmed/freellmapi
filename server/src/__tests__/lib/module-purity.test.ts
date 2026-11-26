@@ -31,6 +31,7 @@ const LIB = path.resolve(here, '../../lib');
 // is a module being declared not-pure, which is a decision worth making out
 // loud in a diff.
 const PURE_MODULES = [
+  'block-cause.ts',
   'budget.ts',
   // Shared by the provider, media and embeddings request paths (#1331).
   'credential.ts',

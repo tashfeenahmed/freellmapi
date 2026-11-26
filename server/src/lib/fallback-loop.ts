@@ -21,6 +21,8 @@ import type { RouteResult } from '../services/router.js';
 import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled } from '../services/router.js';
 import { safeHeaderValue } from './header-value.js';
 import { logVisionBlocked } from './vision-gate.js';
+import { blockCause } from './block-cause.js';
+import type { BaseBlockCause, BlockCause } from './block-cause.js';
 import {
   recordRequest,
   recordTokens,
@@ -986,6 +988,10 @@ export interface ExhaustionBody {
   // becomes available again (soonest cooldown expiry). Rendered in the error
   // body and as a Retry-After header (seconds, ceil) by setExhaustionHeaders.
   retryAtMs?: number;
+  // Blocking cause for 429/422 responses. Additive only: existing clients keep
+  // reading the unchanged `code` and `type`.
+  cause?: BlockCause;
+  causeDetail?: BaseBlockCause;
 }
 
 /**
@@ -993,13 +999,15 @@ export interface ExhaustionBody {
  * OpenAI-shaped surface so the wire shape (message/type/code/retryAtMs) cannot
  * drift between them.
  */
-export function exhaustionErrorPayload(body: ExhaustionBody): { message: string; type: string; code?: string; retryAtMs?: number } {
-  const payload: { message: string; type: string; code?: string; retryAtMs?: number } = {
+export function exhaustionErrorPayload(body: ExhaustionBody): { message: string; type: string; code?: string; retryAtMs?: number; cause?: BlockCause; cause_detail?: BaseBlockCause } {
+  const payload: { message: string; type: string; code?: string; retryAtMs?: number; cause?: BlockCause; cause_detail?: BaseBlockCause } = {
     message: body.message,
     type: body.type,
   };
   if (body.code) payload.code = body.code;
   if (body.retryAtMs != null) payload.retryAtMs = body.retryAtMs;
+  if (body.cause) payload.cause = body.cause;
+  if (body.causeDetail) payload.cause_detail = body.causeDetail;
   return payload;
 }
 
@@ -1014,6 +1022,10 @@ export function setExhaustionHeaders(
   body: ExhaustionBody,
   now = Date.now(),
 ): void {
+  // These must be stamped before the early return: a route with no concrete
+  // retry time still has a distinct blocking cause to report.
+  if (body.cause) res.setHeader('X-Block-Cause', body.cause);
+  if (body.causeDetail) res.setHeader('X-Block-Cause-Detail', body.causeDetail);
   if (body.retryAtMs == null) return;
   res.setHeader('Retry-After', String(Math.max(0, Math.ceil((body.retryAtMs - now) / 1000))));
 }
@@ -1433,6 +1445,9 @@ export interface ExhaustionInfo {
 }
 
 export interface FallbackHooks {
+  // True when the request carries an image. Drives the vision-specific block
+  // causes; the rule comes from this flag, never from diagnostic text.
+  requireVision?: boolean;
   // Defaults to FALLBACK_MAX_RETRIES.
   maxRetries?: number;
   // Base wall-clock retry budget override, mostly for tests. Defaults to
@@ -1585,6 +1600,24 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
   };
   let lastError: any = null;
 
+  const annotateBlock = (body: ExhaustionBody, diag?: readonly string[]): ExhaustionBody => {
+    const result = blockCause({
+      status: body.status,
+      requireVision: hooks.requireVision === true,
+      diag,
+      attempts,
+    });
+    if (result) {
+      body.cause = result.cause;
+      if (result.detail) body.causeDetail = result.detail;
+    }
+    return body;
+  };
+  const onExhausted = (body: ExhaustionBody, info: ExhaustionInfo): void =>
+    hooks.onExhausted(annotateBlock(body), info);
+  const onRoutingExhausted = (lastErr: any, routeErr: any, body: ExhaustionBody, info: ExhaustionInfo): void =>
+    hooks.onRoutingExhausted(lastErr, routeErr, annotateBlock(body, routeErr?.diagnostics), info);
+
   // Circuit-breaker guardrail (default off): the Nth consecutive upstream
   // failure aborts the chain with a 503 instead of grinding the remaining
   // candidates of a pool that is failing across the board. Auth failures count
@@ -1601,7 +1634,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       console.log(`[FallbackLoop] breaker tripped after client disconnect — stopping without rendering (${attempts.length} failed attempt(s))`);
       return true;
     }
-    hooks.onExhausted(
+    onExhausted(
       exhaustedRetryError(lastError, maxRetries, { attempts, breakerFails: breaker.consecutive }),
       { attempts, timedOut: false },
     );
@@ -1624,7 +1657,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       // With no candidate to supply an endpoint-specific allowance, retain
       // the original timeout diagnosis when the base budget is already spent.
       if (attempt > 1 && baseBudgetMs > 0 && Date.now() - startedAt >= baseBudgetMs) {
-        hooks.onExhausted(
+        onExhausted(
           exhaustedRetryError(lastError, maxRetries, { attempts, timedOut: true, budgetMs: baseBudgetMs }),
           { attempts, timedOut: true },
         );
@@ -1654,7 +1687,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
             : undefined,
         });
       }
-      hooks.onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
+      onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
       return;
     }
 
@@ -1675,7 +1708,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     // Attempt 0 and the first retry remain exempt (#751). Routing reserves a
     // lease, so even a candidate rejected here must pass through finally.
     if (attempt > 1 && budgetMs > 0 && Date.now() - startedAt >= budgetMs) {
-      hooks.onExhausted(
+      onExhausted(
         exhaustedRetryError(lastError, maxRetries, { attempts, timedOut: true, budgetMs }),
         { attempts, timedOut: true },
       );
@@ -1857,7 +1890,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
           recordRetryableFailure(route, err, hooks.state);
         }
         console.log(`[FallbackLoop] retry time budget expired mid-attempt on ${route.platform}/${route.modelId} after ${(elapsedMs / 1000).toFixed(1)}s — rendering timedOut exhaustion ${ownedWholeBudget ? `and benching the route (silent for the whole ${budgetMs}ms budget)` : 'without benching'}`);
-        hooks.onExhausted(
+        onExhausted(
           exhaustedRetryError(lastError, maxRetries, { attempts, timedOut: true, budgetMs }),
           { attempts, timedOut: true },
         );
@@ -1945,7 +1978,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     }
   }
 
-  hooks.onExhausted(
+  onExhausted(
     exhaustedRetryError(lastError, maxRetries, { attempts }),
     { attempts, timedOut: false },
   );

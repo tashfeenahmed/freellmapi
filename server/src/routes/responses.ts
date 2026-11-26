@@ -808,11 +808,14 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   const hasImage = messageHasImage(messages);
   const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'responses', requestGroupId) : null;
   if (noVisionMessage) {
+    res.setHeader('X-Vision-Model-Available', 'false');
+    res.setHeader('X-Block-Cause', 'no_vision_model');
     res.status(422).json({
       error: {
         message: noVisionMessage,
         type: 'invalid_request_error',
         code: 'no_vision_model',
+        cause: 'no_vision_model',
       },
     });
     return;
@@ -1225,6 +1228,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     maxRetries: MAX_RETRIES,
     state,
     attemptLog,
+    requireVision: hasImage,
     logIdentity: { surface: 'responses', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
     abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },

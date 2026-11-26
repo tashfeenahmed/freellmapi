@@ -233,6 +233,7 @@ export async function runInboundChat(
   await runFallbackLoop({
     state,
     attemptLog,
+    requireVision: imageRequest,
     logIdentity: { surface: 'inbound chat', requestedModel: input.model ?? 'auto' },
     clientGone: () => clientGone,
     route: () => {
