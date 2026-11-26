@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { clientNotes, detectChatGptClient } from './detect.js';
 import type {
   CatalogModel,
@@ -260,6 +261,35 @@ function aider(ctx: GenerateContext): Generation {
 // config therefore carries no `apiKey`, and an explicit `undefined` retires the
 // placeholder an earlier run wrote. The config dir follows XDG_CONFIG_HOME the
 // same way, since that is where OpenCode reads it from.
+// OpenCode merges several config files, and a `provider.freellmapi.options`
+// key in any of them beats the auth.json key written below: a global
+// opencode.jsonc or config.json, or a project opencode.json in the folder
+// OpenCode starts in ("Launch in terminal" starts it in the home folder). A key
+// typed there by hand earlier (often the fla_ licence key) or an old
+// `{env:FREELLMAPI_API_KEY}` placeholder kept every request on "Invalid API
+// key" while Connect reported success. So Connect also clears our provider's
+// apiKey and baseURL from each of those files that sets them; a file that
+// does not exist or does not mention them is left alone.
+export function staleOpencodeOverrides(configHome: string, homeDir: string): string[] {
+  const candidates = [
+    path.join(configHome, 'opencode', 'opencode.jsonc'),
+    path.join(configHome, 'opencode', 'config.json'),
+    path.join(homeDir, 'opencode.json'),
+    path.join(homeDir, 'opencode.jsonc'),
+    path.join(homeDir, '.opencode', 'opencode.json'),
+    path.join(homeDir, '.opencode', 'opencode.jsonc'),
+  ];
+  return candidates.filter((file) => {
+    try {
+      if (!existsSync(file)) return false;
+      const options = (parseJsonc(readFileSync(file, 'utf8')) as any)?.provider?.freellmapi?.options;
+      return Boolean(options) && typeof options === 'object' && ('apiKey' in options || 'baseURL' in options);
+    } catch {
+      return false;
+    }
+  });
+}
+
 function opencode(ctx: GenerateContext): Generation {
   const model = primaryModel(ctx.models, ctx.requestedModelId);
   const configHome = process.env.XDG_CONFIG_HOME?.trim() || path.join(ctx.homeDir, '.config');
@@ -300,6 +330,11 @@ function opencode(ctx: GenerateContext): Generation {
           freellmapi: { type: 'api', key: ctx.apiKey },
         },
       },
+      ...staleOpencodeOverrides(configHome, ctx.homeDir).map((file) => ({
+        path: file,
+        format: 'json' as const,
+        value: { provider: { freellmapi: { options: { apiKey: undefined, baseURL: undefined } } } },
+      })),
     ],
     notes: [
       'The key is stored in OpenCode\'s auth.json, so no environment variable is needed (CLI or desktop app).',

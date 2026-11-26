@@ -11,7 +11,7 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { routeRequest, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getDb } from '../db/index.js';
-import { resolveAuth, prependSystemPrompt } from '../lib/system-prompt.js';
+import { resolveAuth, prependSystemPrompt, invalidApiKeyMessage } from '../lib/system-prompt.js';
 import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
 import { contentToString, estimateInputTokens, messageHasImage } from '../lib/content.js';
@@ -692,9 +692,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
 
   // Same auth as the proxy (accepts Bearer or x-api-key): unified key, or a
   // client-profile key carrying a server-enforced system prompt (#411).
-  const auth = resolveAuth(extractApiToken(req));
+  const token = extractApiToken(req);
+  const auth = resolveAuth(token);
   if (!auth) {
-    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    res.status(401).json({ error: { message: invalidApiKeyMessage(token), type: 'authentication_error' } });
     return;
   }
 

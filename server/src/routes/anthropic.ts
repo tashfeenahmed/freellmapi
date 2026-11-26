@@ -11,7 +11,7 @@ import type {
 } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveModelGroupCandidates, resolveRoutingChain, resolveStickyPreference, routingReserveTokens, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getDb, getSetting } from '../db/index.js';
-import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
+import { resolveAuth, prependSystemPrompt, invalidApiKeyMessage, type ResolvedAuth } from '../lib/system-prompt.js';
 import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { contentToString, estimateInputTokens } from '../lib/content.js';
 import { checkVisionCapacity } from '../lib/vision-gate.js';
@@ -280,9 +280,10 @@ function newMessageId(): string {
 // carries its server-enforced system prompt. A disabled/unknown profile fails
 // like a bad key so a revoked client learns nothing extra.
 function authenticate(req: Request, res: Response): ResolvedAuth | null {
-  const auth = resolveAuth(extractApiToken(req));
+  const token = extractApiToken(req);
+  const auth = resolveAuth(token);
   if (!auth) {
-    sendError(res, 401, 'authentication_error', 'Invalid API key');
+    sendError(res, 401, 'authentication_error', invalidApiKeyMessage(token));
     return null;
   }
   return auth;
