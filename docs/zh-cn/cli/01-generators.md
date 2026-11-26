@@ -54,6 +54,49 @@ npx freellmapi doctor
 
 验证客户端请求是否到达本网关（检查已路由的 `Authorization` 头、目录、实时探针）。
 
+## 状态、用量与请求日志
+
+```bash
+npx freellmapi status
+npx freellmapi usage --range 30d --top 5
+npx freellmapi requests --status error --limit 50
+```
+
+对运行中网关的只读视图，基于 `/livez` 与 `/api/analytics/{summary,by-platform,requests}`（`cli/src/status.ts`、`cli/src/analytics.ts`）。默认输出表格，加 `--json` 输出 JSON。
+
+| 命令 | 参数 | 输出 |
+| --- | --- | --- |
+| `status` | | 可达性与版本（无需令牌）。设置 `FREELLMAPI_DASHBOARD_TOKEN` 或 `--token` 后，另列出各平台的密钥数，以及 chat、media、embedding、search、decision 各类已启用/总模型数。无法访问或不可用时退出码为 1。 |
+| `usage` | `--range 24h\|7d\|30d\|all`（默认 `7d`）、`--top N`（默认 10） | 总计，加上每个提供商或自定义端点一行。 |
+| `requests` | `--range`（默认 `24h`）、`--status success\|error\|canceled`、`--limit N`（默认 20，最大 500） | 按时间倒序，错误信息压缩为一行。 |
+
+`usage` 与 `requests` 需要仪表盘会话令牌，通过 `cli/src/dashboard.ts` 与 `keys` 共用。提供商密钥和令牌均不会被打印。
+
+## 模型与密钥开关
+
+```bash
+npx freellmapi models list --kind media --disabled
+npx freellmapi models enable 42 43
+npx freellmapi keys disable groq --id 7
+npx freellmapi models add new-models.json --dry-run
+```
+
+`models`（`cli/src/dashboard-models.ts`）通过各类别的仪表盘路由列出并切换模型：`/api/models`、`/api/media`、`/api/embeddings`、`/api/search/engines`、`/api/decisions/models`。`--kind chat|media|embedding|search|decision`（默认 `chat`）；`list` 还支持 `--platform a,b`、`--enabled|--disabled`、`--json`。embedding 的切换合并为一次 `PUT /api/embeddings`，并保留各行的 priority。`keys enable|disable <platform> [--id N]` 使用 `PATCH /api/keys/:id`；不带 `--id` 时使用 `PATCH /api/keys/platform/:platform`。两者都需要仪表盘会话令牌。
+
+`models add <file.json> [--dry-run]` 从 JSON 数组通过 `POST /api/models` 注册 chat 模型（字段同 `createModelSchema`：`platform`、`modelId` 必填；`displayName`、`contextWindow`、`rpmLimit`、`rpdLimit`、`tpmLimit`、`tpdLimit`、`monthlyTokenBudget`、`supportsVision`、`supportsTools`、`keyId`、`endpointScope` 可选）。首个请求发出前会校验所有行；每行输出一条 `added`、`present` 或 `failed`，并回读 `/api/models` 确认，任一失败则退出码为 1。`--dry-run` 不发送 POST。
+
+## 设置与抽样测试
+
+```bash
+npx freellmapi settings get output-limit
+npx freellmapi settings set output-limit '{"mode":"auto"}'
+npx freellmapi test-sample --platform groq -n 2 --seed 7
+```
+
+`settings get [name]` 与 `settings set <name> <json>`（`cli/src/dashboard-settings.ts`）封装固定清单内非敏感路由设置的 `GET/PUT /api/settings/<name>`：`agent-compatibility`、`anthropic-map`、`compression`、`enable-mcp`、`fusion`、`gemini-map`、`guardrails`、`headroom`、`min-context-window`、`min-reliability-floor`、`output-limit`、`provider-moment-attribution`、`system-date`、`task-weight-share`、`unify`、`update-check`。`set` 先按本地复制的各 PUT schema 校验，再原样发送，请求体即 `settings --help` 给出的 JSON（`fusion`、`anthropic-map`、`gemini-map` 为配置或映射本身，而不是 `GET` 返回的外层包装）。`--dry-run` 只校验。`api-key`、`url-tokens`、`proxy` 不开放。
+
+`test-sample (--platform a,b | --all) [-n 2] [--pace SECONDS] [--seed N]`（`cli/src/test-sample.ts`）通过 `POST /api/models/:id/test`，对每个平台最多随机抽取 `-n` 个已启用的 chat 模型，逐个测试，调用间隔 `--pace` 秒（默认 2）。服务端对每个模型有五秒节流，遇到 429 会在窗口后重试一次。输出模型、结果、延迟和单行错误，任一失败则退出码为 1；打印出的 seed 可复现同一抽样。测试会消耗真实的免费额度。
+
 ## 通用参数
 
 | 参数 | 作用 |
