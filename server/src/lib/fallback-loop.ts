@@ -54,6 +54,7 @@ import {
   isContextTooLargeError,
   isTimeoutErrorText,
   isStreamTruncatedError,
+  isHostConnectionError,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
 import { benchForTools, clearToolRejections, noteToolRejection, toolCapabilityKey } from './tool-capability.js';
@@ -157,7 +158,7 @@ function benchKeyAcrossPlatform(
     state.skipKeys.add(`${route.platform}:${modelId}:${route.keyId}`);
     benched++;
   }
-  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${Math.round(durationMs / 60_000)}min`);
+  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${durationMs < 120_000 ? `${Math.round(durationMs / 1000)}s` : `${Math.round(durationMs / 60_000)}min`}`);
 }
 
 // ── Wall-clock retry budget ──────────────────────────────────────────────────
@@ -675,6 +676,21 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
     // different wallet and may well have credits, so only THIS key is out.
     benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state,
       isApinexCheckinRequired(route.platform, err) ? 'requires daily website check-in' : 'is out of credits (402)');
+  } else if (isHostConnectionError(err) && route.platform !== 'custom') {
+    // #2080: a reset / refused / unresolvable connection is the provider's
+    // HOST, and every model of the platform sits behind that host. The platform
+    // is already ruled out for THIS request above (isProviderLevelError), but
+    // the per-route cooldown benches only the model that was tried, so the
+    // next request picked the platform's next model and hit the same dead
+    // connection again: one wasted hop per model per request, which reads as
+    // "it keeps switching models inside the provider instead of switching
+    // provider". Bench this key on the platform's other models for the same
+    // short transient window. setCooldown never shortens a longer hold, and
+    // the cooldown probe lifts the bench early once the host answers again.
+    // Custom relays are exempt like the platform skip above (#2023): every
+    // relay shares the platform id 'custom', so this would bench other hosts.
+    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state,
+      `could not connect (${summarizeAttemptError(err?.message) || 'network error'})`);
   }
   // #1347 (PR 1): a provider-moment failure (429 / 5xx / timeout / transport)
   // is the provider's bad minute, not model evidence. When attribution is
@@ -1243,6 +1259,31 @@ function classifyRoutingDiagLine(line: string): RoutingDiagClass {
   return 'other';
 }
 
+/**
+ * Suffix for an exhaustion that ended because routing ran dry AFTER at least
+ * one attempt (#2080). Without it, "All 1 routed attempt(s) failed" reads as a
+ * failover that never moved to another provider, when in fact no other route
+ * was left: the failed provider was ruled out for the request, and every
+ * remaining candidate was unconfigured, on cooldown or unable to serve it. The
+ * router's own summary says which; a strict pin says why only one model's
+ * providers were eligible.
+ */
+export function failoverDeadEndNote(routeErr: any, strictPinnedModel?: string): string {
+  const raw = typeof routeErr?.message === 'string' ? routeErr.message.trim() : '';
+  // Drop the router's generic advice: the trail before this note already
+  // says what failed, and "add more API keys" is not the point here.
+  const summary = raw
+    .replace(/^All models exhausted[:.]?\s*/i, '')
+    .replace(/\s*Add more API keys or wait for rate limits to reset\.\s*/i, ' ')
+    .trim();
+  const reason = summary ? `: ${/[.!?]$/.test(summary) ? summary : `${summary}.`}` : '.';
+  const pin = strictPinnedModel
+    ? ` The request pinned model '${sanitizeProviderErrorMessage(strictPinnedModel)}', so failover only uses providers ` +
+      `that serve that model; send model "auto" to let a different model take over.`
+    : '';
+  return ` Failover stopped because no other route could take the request${reason}${pin}`;
+}
+
 export function routingExhaustionBody(routeErr: any): ExhaustionBody {
   const diag: string[] = Array.isArray(routeErr?.diagnostics) ? routeErr.diagnostics : [];
   const message: string = routeErr?.message ?? 'No model available to route this request';
@@ -1379,6 +1420,10 @@ export interface FallbackHooks {
   // logRoutingExhaustion). Absent = the line still fires, without identifying
   // the surface or the request.
   logIdentity?: { surface: string; requestId?: string; requestedModel?: string };
+  // The model id the client pinned, set ONLY when that pin routes strictly
+  // over the model's own providers (a unified model group) and never reaches
+  // a different model. Used to explain a failover that ran out of routes.
+  strictPinnedModel?: string;
   // Returns true once the client has hung up. Checked before STARTING each
   // retry: a chain nobody is waiting for must not keep burning provider
   // quota. Surfaces additionally thread a client-disconnect AbortSignal into
@@ -1554,9 +1599,16 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         );
         return;
       }
-      const exhaustion = lastError
+      let exhaustion = lastError
         ? exhaustedRetryError(lastError, undefined, { attempts })
         : routingExhaustionBody(routeErr);
+      // The trail alone reads as "failover never moved to another provider"
+      // (#2080). Say why it stopped: no other route was left to try.
+      if (lastError) {
+        const base = exhaustion.message.trimEnd();
+        const sep = /[.!?]$/.test(base) ? '' : '.';
+        exhaustion = { ...exhaustion, message: base + sep + failoverDeadEndNote(routeErr, hooks.strictPinnedModel) };
+      }
       // Zero attempts ran: log the router's per-candidate disposition, the only
       // record of why the pool was empty. With prior attempts the trail in the
       // exhaustion body already explains the failure.
