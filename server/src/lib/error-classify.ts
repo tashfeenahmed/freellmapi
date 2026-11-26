@@ -208,6 +208,44 @@ export function isTransportError(err: any): boolean {
   return false;
 }
 
+// ── Connection-level failures (#2080) ────────────────────────────────────────
+// The subset of transport failures that is about the HOST, not the model: the
+// TCP/TLS connection was reset, refused, never resolved or never opened. One
+// provider serves every model of its platform from the same host (NVIDIA NIM:
+// integrate.api.nvidia.com), so a sibling model on the same key would hit the
+// same dead connection. Deliberately excluded: response-header / body timeouts
+// and a bare "terminated", which can be one slow model on a healthy host.
+const HOST_CONNECTION_ERROR_CODES = new Set([
+  'ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'EPIPE', 'EAI_AGAIN', 'ENOTFOUND',
+  'EHOSTUNREACH', 'ENETUNREACH', 'EADDRNOTAVAIL',
+  'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_CLOSED',
+]);
+
+const HOST_CONNECTION_MESSAGE_HINTS = [
+  'econnreset', 'econnrefused', 'enotfound', 'eai_again', 'ehostunreach', 'enetunreach',
+  'socket hang up', 'other side closed', 'client network socket disconnected',
+];
+
+/** True when the error says the provider's HOST could not be reached or
+ *  dropped the connection (reset, refused, DNS, TLS handshake), as opposed to
+ *  a model being slow. Never true for a response with an HTTP status, or for
+ *  the gateway's own aborts. */
+export function isHostConnectionError(err: any): boolean {
+  if (err == null) return false;
+  if (typeof err.status === 'number' && err.status > 0) return false;
+  if (isClientAbortError(err) || isHedgeAbortError(err)) return false;
+  for (const { code, message } of errorChainLinks(err)) {
+    if (code && HOST_CONNECTION_ERROR_CODES.has(code)) return true;
+    const msg = message.toLowerCase();
+    if (!msg) continue;
+    // undici's wording for a connection that never opened (DNS, TLS, proxy),
+    // with or without the cause code describeFetchFailure appends.
+    if (msg === 'fetch failed' || msg.startsWith('fetch failed (')) return true;
+    if (HOST_CONNECTION_MESSAGE_HINTS.some(hint => msg.includes(hint))) return true;
+  }
+  return false;
+}
+
 // A genuine provider QUOTA signal: a structured 429 or rate-limit/quota wording.
 // Distinct from the much broader isRetryableError: timeouts, 5xx, transport
 // failures and dead-turn classes are retryable but say nothing about quotas.

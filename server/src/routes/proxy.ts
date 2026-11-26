@@ -2476,6 +2476,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // buckets by the canonical id the client sent, so the group prefers its last
   // successful provider without leaking stickiness across groups.
   let stickyStrategyKey: string | undefined = strategyKey;
+  // Set when the client's model id pins routing strictly to one model's
+  // providers (unified group). Lets an exhaustion say why failover never
+  // reached a different model (#2080).
+  let strictPinnedModel: string | undefined;
 
   if (aliasTierChain.length > 0) {
     // A tier-mapped Claude alias routes STRICTLY over its tier's pool. An
@@ -2524,6 +2528,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         return;
       }
       stickyStrategyKey = requestedModel;
+      strictPinnedModel = requestedModel;
       const sticky = getStickyModel(sessionMessages, sessionIdHeader, stickyStrategyKey);
       // Only prefer the sticky member if it's actually IN this group — passing a
       // non-member as preferredModelDbId would make routeRequest inject an
@@ -2587,6 +2592,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     state,
     attemptLog,
     logIdentity: { surface: 'chat completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
+    strictPinnedModel,
     clientGone: () => clientGone,
     abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
     streaming: stream === true,
