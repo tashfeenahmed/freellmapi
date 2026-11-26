@@ -1,3 +1,5 @@
+import { dashboardClient } from './dashboard.js';
+
 export interface KeyCommandOptions {
   url: string;
   args: string[];
@@ -33,24 +35,17 @@ export function keysHelp(): string {
     '  freellmapi keys list',
     '  freellmapi keys remove <platform> [--id ID]',
     '  freellmapi keys test <platform> [--id ID]',
+    '  freellmapi keys enable|disable <platform> [--id ID]',
     '',
     'Options: --url URL, --token TOKEN, --timeout MS (default 30000)',
     'Use FREELLMAPI_DASHBOARD_TOKEN or --token for the dashboard session token.',
     'The unified --api-key / FREELLMAPI_API_KEY is not dashboard authentication.',
     'Omit --key for hidden terminal input. Keyless providers do not prompt.',
     'remove requires --id when a platform has multiple keys; test checks all matches.',
+    'enable and disable switch one key with --id, or every key of the platform without it.',
     'list shows enabled chat model counts, respecting each key\'s model scope.',
     'add saves the key, then checks it; failed validation leaves it saved and exits 1.',
   ].join('\n');
-}
-
-function gatewayRoot(value: string): string {
-  let url: URL;
-  try { url = new URL(value.trim()); } catch { throw new Error('--url must be an HTTP(S) gateway URL'); }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
-    throw new Error('--url must be an HTTP(S) URL without credentials, a query, or a fragment');
-  }
-  return url.href.replace(/\/+$/, '').replace(/\/v1$/i, '');
 }
 
 function modelCount(key: KeyRow, models: ModelRow[]): number {
@@ -70,50 +65,20 @@ export async function runKeys(
   prompt: () => Promise<string>,
 ): Promise<number> {
   const [action, rawPlatform, ...extra] = options.args;
-  if (!action || !['add', 'list', 'remove', 'test'].includes(action)) {
-    throw new Error(`Expected keys add, list, remove, or test.\n\n${keysHelp()}`);
+  if (!action || !['add', 'list', 'remove', 'test', 'enable', 'disable'].includes(action)) {
+    throw new Error(`Expected keys add, list, remove, test, enable, or disable.\n\n${keysHelp()}`);
   }
   if (extra.length || (action === 'list' ? rawPlatform !== undefined : !rawPlatform)) {
     throw new Error(`Invalid arguments for keys ${action}.\n\n${keysHelp()}`);
   }
   if (options.dryRun) throw new Error('--dry-run is not supported by keys; no request was made');
   if (options.key !== undefined && action !== 'add') throw new Error('--key is only supported by keys add');
-  if (options.keyId !== undefined && action !== 'remove' && action !== 'test') {
-    throw new Error('--id is only supported by keys remove and keys test');
+  if (options.keyId !== undefined && !['remove', 'test', 'enable', 'disable'].includes(action)) {
+    throw new Error('--id is only supported by keys remove, test, enable, and disable');
   }
   const platform = rawPlatform?.toLowerCase();
   if (platform && !/^[a-z][a-z0-9_-]*$/.test(platform)) throw new Error('Invalid provider platform identifier');
-  const token = options.token?.trim();
-  if (!token) throw new Error('Set FREELLMAPI_DASHBOARD_TOKEN or pass --token with a dashboard session token');
-  const root = gatewayRoot(options.url);
-  const timeout = options.timeoutMs ?? 30_000;
-  if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout > 2_147_483_647) {
-    throw new Error('--timeout must be a positive integer of at most 2147483647 milliseconds');
-  }
-
-  async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-    let response: Response;
-    try {
-      response = await fetch(`${root}${path}`, {
-        method,
-        headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(timeout),
-        redirect: 'error',
-        cache: 'no-store',
-      });
-    } catch {
-      throw new Error('Could not complete the dashboard request. Check --url, connectivity, and --timeout.');
-    }
-    // Provider error bodies may contain credentials. Only report the HTTP
-    // status, never echo arbitrary response bodies or transport errors.
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('Dashboard authentication failed. Supply a current dashboard session token with --token or FREELLMAPI_DASHBOARD_TOKEN.');
-    }
-    if (!response.ok) throw new Error(`Dashboard request failed (HTTP ${response.status})`);
-    if (response.status === 204) return undefined as T;
-    try { return await response.json() as T; } catch { throw new Error('The gateway returned an invalid JSON response'); }
-  }
+  const { request } = dashboardClient(options);
 
   async function listKeys(): Promise<KeyRow[]> {
     const rows = await request<KeyRow[]>('/api/keys');
@@ -175,6 +140,20 @@ export async function runKeys(
     if (selected.length > 1) throw new Error('Multiple keys match. Run keys list and specify one with --id.');
     await request(`/api/keys/${selected[0].id}`, 'DELETE');
     process.stdout.write(`Removed ${platform} key ${selected[0].id}.\n`);
+    return 0;
+  }
+
+  if (action === 'enable' || action === 'disable') {
+    const enabled = action === 'enable';
+    if (options.keyId === undefined) {
+      const result = await request<{ updatedKeys?: number }>(`/api/keys/platform/${platform}`, 'PATCH', { enabled });
+      process.stdout.write(`${enabled ? 'Enabled' : 'Disabled'} ${result?.updatedKeys ?? selected.length} ${platform} key(s).
+`);
+    } else {
+      await request(`/api/keys/${selected[0].id}`, 'PATCH', { enabled });
+      process.stdout.write(`${enabled ? 'Enabled' : 'Disabled'} ${platform} key ${selected[0].id}.
+`);
+    }
     return 0;
   }
 

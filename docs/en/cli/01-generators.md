@@ -54,6 +54,34 @@ npx freellmapi doctor
 
 Proves a client's requests reach this gateway (checks routed `Authorization` header, catalog, live probe).
 
+## Status, usage and request log
+
+```bash
+npx freellmapi status
+npx freellmapi usage --range 30d --top 5
+npx freellmapi requests --status error --limit 50
+```
+
+Read-only views of a running gateway, backed by `/livez` and `/api/analytics/{summary,by-platform,requests}` (`cli/src/status.ts`, `cli/src/analytics.ts`). Each prints a table, or JSON with `--json`.
+
+| Command | Flags | Output |
+| --- | --- | --- |
+| `status` | | Reachability and version (no token needed). With `FREELLMAPI_DASHBOARD_TOKEN` or `--token`: keys per platform and enabled/total models for chat, media, embedding, search, decision. Exit 1 when unreachable or unavailable. |
+| `usage` | `--range 24h\|7d\|30d\|all` (default `7d`), `--top N` (default 10) | Totals plus one row per provider or custom endpoint. |
+| `requests` | `--range` (default `24h`), `--status success\|error\|canceled`, `--limit N` (default 20, max 500) | Newest requests first with a one-line error. |
+
+`usage` and `requests` need the dashboard session token, shared with `keys` through `cli/src/dashboard.ts`. Provider keys and the token are never printed.
+
+## Models and key switches
+
+```bash
+npx freellmapi models list --kind media --disabled
+npx freellmapi models enable 42 43
+npx freellmapi keys disable groq --id 7
+```
+
+`models` (`cli/src/dashboard-models.ts`) lists and toggles models through the dashboard route of each kind: `/api/models`, `/api/media`, `/api/embeddings`, `/api/search/engines`, `/api/decisions/models`. `--kind chat|media|embedding|search|decision` (default `chat`); `list` also takes `--platform a,b`, `--enabled|--disabled`, `--json`. Embedding toggles go in one `PUT /api/embeddings` that keeps each row's priority. `keys enable|disable <platform> [--id N]` uses `PATCH /api/keys/:id`, or `PATCH /api/keys/platform/:platform` without `--id`. Both need the dashboard session token.
+
 ## Common flags
 
 | Flag | Effect |
