@@ -47,7 +47,7 @@ export function compareVersions(a, b) {
  */
 export function decide({ pendingStatus, pendingVersion, liveVersion, candidate }) {
   if (pendingStatus && IN_FLIGHT.has(pendingStatus)) {
-    return { publish: false, reason: `a submission is already ${pendingStatus}; replacing it would cancel it` };
+    return { publish: false, reason: `a submission${pendingVersion ? ` of ${pendingVersion}` : ""} is in ${pendingStatus}; replacing it would cancel it` };
   }
   const live = parseVersion(liveVersion);
   const next = parseVersion(candidate);
