@@ -1,0 +1,130 @@
+name: Microsoft Store catch-up
+
+# Keeps the Microsoft Store copy in step with GitHub releases (#2103).
+#
+# The tagged `store` job in desktop-release.yml holds its upload while an
+# earlier submission is still in certification (cancelling it kept the Store
+# on 0.16.38 while releases reached 0.16.45). This workflow sends the newest
+# published release once the Store is clear: it reads Partner Center through
+# desktop/scripts/msstore-gate.mjs, and when nothing is in flight and the
+# Store is behind, it downloads that tag's `windows-store-package` artifact
+# from its Desktop release run and submits it.
+#
+# Triggers:
+#   - schedule (every 3 hours)   catch up for real
+#   - workflow_dispatch          catch up now, or dry_run to only report
+#   - pull_request (these files) dry run: report the gate's answer, never submit
+
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only report what would happen
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - '.github/workflows/msstore-catchup.yml'
+      - 'desktop/scripts/msstore-gate.mjs'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: msstore-submission
+  cancel-in-progress: false
+
+jobs:
+  catchup:
+    name: Send the newest release to the Store
+    # Same switch as the tagged job. Fork PRs get no secrets, so skip them.
+    if: >-
+      (vars.MSSTORE_SUBMIT == 'draft' || vars.MSSTORE_SUBMIT == 'auto') &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: desktop/scripts
+
+      - name: Find the newest release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # `gh release view` with no tag is the latest published, non-prerelease release.
+          tag=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Newest release: $tag"
+
+      - name: Ask Partner Center
+        id: gate
+        shell: bash
+        env:
+          MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+        run: node desktop/scripts/msstore-gate.mjs "${{ steps.release.outputs.tag }}"
+
+      - name: Decide
+        id: go
+        shell: bash
+        env:
+          PUBLISH: ${{ steps.gate.outputs.publish }}
+          DRY_RUN: ${{ github.event_name == 'pull_request' || inputs.dry_run == true }}
+        run: |
+          if [ "$PUBLISH" = true ] && [ "$DRY_RUN" != true ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            [ "$PUBLISH" = true ] && echo "::notice::Dry run: would submit ${{ steps.release.outputs.tag }} to the Store."
+            [ "$PUBLISH" = true ] || echo "::notice::Nothing to send: ${{ steps.gate.outputs.reason }}"
+          fi
+
+      - name: Download the release's Store package
+        if: steps.go.outputs.run == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          run_id=$(gh run list -R "$GITHUB_REPOSITORY" --workflow desktop-release.yml --branch "$TAG" --event push \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then echo "::error::no successful Desktop release run for $TAG"; exit 1; fi
+          gh run download "$run_id" -R "$GITHUB_REPOSITORY" -n windows-store-package -D store-package
+          ls -l store-package
+
+      - if: steps.go.outputs.run == 'true'
+        uses: microsoft/setup-msstore-cli@3b2ec9136230357ce9abc02b9d056626fb248d3f # v1.4
+
+      - name: Configure Store credentials
+        if: steps.go.outputs.run == 'true'
+        shell: bash
+        env:
+          TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+          SELLER_ID: ${{ secrets.MSSTORE_SELLER_ID }}
+          CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+        run: |
+          msstore reconfigure --tenantId "$TENANT_ID" --sellerId "$SELLER_ID" \
+            --clientId "$CLIENT_ID" --clientSecret "$CLIENT_SECRET" --output-stream stdout
+
+      - name: Publish to the Store
+        if: steps.go.outputs.run == 'true'
+        shell: bash
+        env:
+          MODE: ${{ vars.MSSTORE_SUBMIT }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          pkgs=(store-package/*.msix)
+          if [ "${#pkgs[@]}" -ne 1 ]; then echo "::error::expected exactly one .msix, found ${#pkgs[@]}"; exit 1; fi
+          args=(publish "${pkgs[0]}" --appId 9PBN6G8K2B7F --uploadTimeout 1800 --output-stream stdout)
+          if [ "$MODE" != auto ]; then args+=(--noCommit); fi
+          msstore "${args[@]}"
