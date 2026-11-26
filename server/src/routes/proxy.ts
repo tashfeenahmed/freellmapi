@@ -14,7 +14,7 @@ import { retryAfterSeconds } from '../lib/retry-hint.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, MediaError, MAX_TRANSCRIPTION_BYTES } from '../services/media.js';
 import multer from 'multer';
 import { getDb } from '../db/index.js';
-import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
+import { resolveAuth, prependSystemPrompt, invalidApiKeyMessage, type ResolvedAuth } from '../lib/system-prompt.js';
 import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { contentToString, estimateInputTokens, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../lib/content.js';
 import { checkVisionCapacity } from '../lib/vision-gate.js';
@@ -72,9 +72,10 @@ export { timingSafeStringEqual } from '../lib/system-prompt.js';
 // valid here — never on the /api dashboard surface. Writes the 401 itself so
 // call sites can simply bail on null.
 function requireInferenceAuth(req: Request, res: Response): ResolvedAuth | null {
-  const auth = resolveAuth(extractApiToken(req));
+  const token = extractApiToken(req);
+  const auth = resolveAuth(token);
   if (!auth) {
-    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    res.status(401).json({ error: { message: invalidApiKeyMessage(token), type: 'authentication_error' } });
     return null;
   }
   return auth;
