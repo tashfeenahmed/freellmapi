@@ -54,6 +54,24 @@ npx freellmapi doctor
 
 验证客户端请求是否到达本网关（检查已路由的 `Authorization` 头、目录、实时探针）。
 
+## 状态、用量与请求日志
+
+```bash
+npx freellmapi status
+npx freellmapi usage --range 30d --top 5
+npx freellmapi requests --status error --limit 50
+```
+
+对运行中网关的只读视图，基于 `/livez` 与 `/api/analytics/{summary,by-platform,requests}`（`cli/src/status.ts`、`cli/src/analytics.ts`）。默认输出表格，加 `--json` 输出 JSON。
+
+| 命令 | 参数 | 输出 |
+| --- | --- | --- |
+| `status` | | 可达性与版本（无需令牌）。设置 `FREELLMAPI_DASHBOARD_TOKEN` 或 `--token` 后，另列出各平台的密钥数，以及 chat、media、embedding、search、decision 各类已启用/总模型数。无法访问或不可用时退出码为 1。 |
+| `usage` | `--range 24h\|7d\|30d\|all`（默认 `7d`）、`--top N`（默认 10） | 总计，加上每个提供商或自定义端点一行。 |
+| `requests` | `--range`（默认 `24h`）、`--status success\|error\|canceled`、`--limit N`（默认 20，最大 500） | 按时间倒序，错误信息压缩为一行。 |
+
+`usage` 与 `requests` 需要仪表盘会话令牌，通过 `cli/src/dashboard.ts` 与 `keys` 共用。提供商密钥和令牌均不会被打印。
+
 ## 通用参数
 
 | 参数 | 作用 |

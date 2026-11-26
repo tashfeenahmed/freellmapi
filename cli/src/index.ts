@@ -12,13 +12,24 @@ import { getTool, tools } from './tools.js';
 import { resolveLaunchModel, type ResolvedModel } from './models.js';
 import { DOCTOR_TOOLS, diagnose, exitCodeFor, formatReport, type ToolReport } from './doctor.js';
 import { keysHelp, runKeys, type KeyCommandOptions } from './keys.js';
+import { runStatus, statusHelp } from './status.js';
+import { analyticsHelp, runRequests, runUsage } from './analytics.js';
 import type { CatalogModel, GenerateContext } from './types.js';
 
 interface CliOptions extends KeyCommandOptions {
   apiKey?: string;
   profile: string;
   model?: string;
+  json: boolean;
+  range?: string;
+  top?: string;
+  limit?: string;
+  requestStatus?: string;
 }
+
+// Commands that authenticate with the dashboard session token.
+const DASHBOARD_COMMANDS = ['keys', 'status', 'usage', 'requests'];
+const REPORT_FLAGS = ['--json', '--range', '--top', '--limit', '--status'];
 
 function rootUrl(url: string): string {
   return url.trim().replace(/\/+$/, '').replace(/\/v1$/i, '');
@@ -55,6 +66,7 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
     token: process.env.FREELLMAPI_DASHBOARD_TOKEN,
     profile: 'default',
     dryRun: false,
+    json: false,
     args: [],
   };
   let command: string | undefined;
@@ -75,6 +87,10 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
       options.dryRun = true;
       continue;
     }
+    if (arg === '--json') {
+      options.json = true;
+      continue;
+    }
     const equals = arg.indexOf('=');
     const flag = equals < 0 ? arg : arg.slice(0, equals);
     const inline = equals < 0 ? undefined : arg.slice(equals + 1);
@@ -83,6 +99,7 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
       flag === '--url' || flag === '--api-key' || flag === '--profile'
       || flag === '--model' || flag === '--timeout'
       || flag === '--token' || flag === '--key' || flag === '--id'
+      || flag === '--range' || flag === '--top' || flag === '--limit' || flag === '--status'
     ) {
       if (inline === undefined) index += 1;
       if (!value || (inline === undefined && value.startsWith('-'))) {
@@ -94,6 +111,10 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
       else if (flag === '--timeout') options.timeoutMs = parseTimeout(value);
       else if (flag === '--token') options.token = value;
       else if (flag === '--key') options.key = value;
+      else if (flag === '--range') options.range = value;
+      else if (flag === '--top') options.top = value;
+      else if (flag === '--limit') options.limit = value;
+      else if (flag === '--status') options.requestStatus = value;
       else if (flag === '--id') {
         if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
           throw new Error('--id must be a positive integer');
@@ -275,9 +296,12 @@ function help(): string {
     '  launch-codex      Run Codex CLI with provider overrides and injected credentials',
     '  list              List supported coding agents',
     '  keys              Add, list, remove, or test provider keys (keys --help)',
+    '  status            Gateway reachability, version, keys per platform, enabled models per kind',
+    '  usage             Request totals and per-provider split (--range, --top, --json)',
+    '  requests          Recent request log (--range, --status, --limit, --json)',
     '',
     'Environment:',
-    '  FREELLMAPI_URL, FREELLMAPI_API_KEY, FREELLMAPI_DASHBOARD_TOKEN (keys only)',
+    '  FREELLMAPI_URL, FREELLMAPI_API_KEY, FREELLMAPI_DASHBOARD_TOKEN (keys, status, usage, requests)',
   ].join('\n');
 }
 
@@ -462,22 +486,38 @@ async function runDoctor(options: CliOptions): Promise<number> {
   return exitCodeFor(reports);
 }
 
+function commandHelp(command: string | undefined): string {
+  if (command === 'keys') return keysHelp();
+  if (command === 'status') return statusHelp();
+  if (command === 'usage' || command === 'requests') return analyticsHelp(command);
+  return help();
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   const { command, options } = parseArgs(argv);
   if (!command || command === 'help' || argv.includes('--help') || argv.includes('-h')) {
-    process.stdout.write(`${command === 'keys' ? keysHelp() : help()}\n`);
+    process.stdout.write(`${commandHelp(command)}\n`);
     return 0;
   }
   for (const arg of argv) {
     const flag = arg.split('=', 1)[0];
-    if (command !== 'keys' && ['--token', '--key', '--id'].includes(flag)) {
+    if (command !== 'keys' && ['--key', '--id'].includes(flag)) {
       throw new Error(`${flag} is only supported by keys`);
     }
-    if (command === 'keys' && ['--api-key', '--profile', '--model'].includes(flag)) {
-      throw new Error(`${flag} is not supported by keys; use keys --help for available options`);
+    if (!DASHBOARD_COMMANDS.includes(command) && flag === '--token') {
+      throw new Error('--token is only supported by keys, status, usage, and requests');
+    }
+    if (!['status', 'usage', 'requests'].includes(command) && REPORT_FLAGS.includes(flag)) {
+      throw new Error(`${flag} is only supported by status, usage, and requests`);
+    }
+    if (DASHBOARD_COMMANDS.includes(command) && ['--api-key', '--profile', '--model'].includes(flag)) {
+      throw new Error(`${flag} is not supported by ${command}; use ${command} --help for available options`);
     }
   }
   if (command === 'keys') return runKeys(options, () => promptForKey(true));
+  if (command === 'status') return runStatus(options);
+  if (command === 'usage') return runUsage(options);
+  if (command === 'requests') return runRequests(options);
   // `doctor` and `keys` take positional arguments. Every other
   // one rejects them here, BEFORE dispatch — checking after the setup-* branch
   // would let `setup-claude typo` run with the stray word silently ignored,
