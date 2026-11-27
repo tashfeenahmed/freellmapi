@@ -60,7 +60,16 @@
     "emailChanged": "Matagumpay na napalitan ang e-mail.",
     "passwordReset": "Na-reset ang password. Mag-sign in po.",
     "resetCodeDockerHint": "Tumatakbo sa Docker? Nasa container log ang code: docker logs <container>.",
-    "desktopSessionFailed": "Hindi nakapag-sign in ang dashboard sa lokal na server. Isara ang FreeLLMAPI at buksan itong muli."
+    "desktopSessionFailed": "Hindi nakapag-sign in ang dashboard sa lokal na server. Isara ang FreeLLMAPI at buksan itong muli.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "I-save",
@@ -171,7 +180,12 @@
     "updateNow": "I-update ngayon",
     "updatingContainer": "Kinukuha ang bagong image at nagre-restart. Magre-reload ang page na ito kapag bumalik ang FreeLLMAPI.",
     "updateNowFailed": "Hindi tinanggap ng updater ang request. Tingnan kung tumatakbo ang watchtower container.",
-    "updateNowTimeout": "Hindi pa nagre-restart ang FreeLLMAPI pagkalipas ng 5 minuto. Tingnan ang logs ng watchtower container."
+    "updateNowTimeout": "Hindi pa nagre-restart ang FreeLLMAPI pagkalipas ng 5 minuto. Tingnan ang logs ng watchtower container.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Mga Modelo",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Pumili ng provider",
     "addKey": "Add key",
+    "addAnotherKey": "Magdagdag ng isa pang API key",
     "keyAdded": "Idinagdag ang susi",
     "endpointKeysShareModels": "Ang mga susi ng parehong endpoint ay nagbabahagi ng mga modelo nito.",
     "export": "Pag-export",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "opsyonal",
     "customFamily": "Pamilya",
     "customFamilyPlaceholder": "default sa model id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "susi API",
     "customCapabilities": "Mga Kakayahan",
     "addModel": "Magdagdag ng modelo",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Wala pang mga embedding na modelo",
     "emptyDesc": "Lumilitaw dito ang mga embedding family kapag nagdagdag ka ng provider key na sumusuporta sa embeddings.",
-    "dragToReorder": "I-drag para i-reorder ang provider"
+    "dragToReorder": "I-drag para i-reorder ang provider",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Pagsasanib",
@@ -1233,7 +1252,8 @@
       "hermes": "Ang self-improving na agent ng Nous Research na may persistent na memorya at mga skill, sa terminal o sa mga chat app.",
       "pi": "Isang minimal na terminal agent na hinuhubog mo gamit ang sarili mong mga extension, skill at prompt template.",
       "reasonix": "Isang terminal coding agent na ginawa para sa DeepSeek, nakabatay sa prefix caching para manatiling mura ang mahahabang session.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Isang lokal na terminal coding agent na may matibay na session, mga pahintulot, at anumang provider na tugma sa OpenAI."
     }
   },
   "update": {

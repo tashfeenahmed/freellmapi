@@ -29,6 +29,7 @@
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "multer": "^2.2.0",
+    "openid-client": "^6.9.1",
     "sharp": "^0.35.3",
     "socks-proxy-agent": "^10.0.0",
     "undici": "^6.21.0",

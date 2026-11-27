@@ -56,8 +56,15 @@ On Windows (PowerShell), with the unified key from the dashboard:
 ```powershell
 $env:ANTHROPIC_BASE_URL = "http://127.0.0.1:31415"
 $env:ANTHROPIC_AUTH_TOKEN = "<unified-key>"
+$env:CLAUDE_CODE_AUTO_MODE_SERVER = "0"
 claude
 ```
+
+`CLAUDE_CODE_AUTO_MODE_SERVER=0` keeps Claude Code's auto mode working behind
+FreeLLMAPI: Anthropic's server-side action review cannot run on non-Anthropic
+models, so Claude Code checks actions with its own classifier requests through
+the gateway and does not show the "isn't eligible" notice. `setup-claude` and
+`launch` set it for you. See the [REST API notes](../api/01-rest-api.md).
 
 Use the generator instead of hand-editing a client configuration:
 
@@ -94,6 +101,7 @@ context windows.
 | **Pi** | `setup-pi` | `http://localhost:3001/v1` | OpenAI Chat (`api: openai-completions`) |
 | **Reasonix** | `setup-reasonix` | `http://localhost:3001/v1` | OpenAI Chat (`kind = "openai"`) |
 | **ZCode** | `setup-zcode` | `http://localhost:3001/v1` | OpenAI Chat (`openai-chat-completions`) |
+| **Zero** | `setup-zero` | `http://localhost:3001/v1` | OpenAI Chat (`openai-compatible`) |
 | **QwenPaw** | Manual setup | `http://localhost:3001/v1` | OpenAI Chat (`chat.completions`) |
 | **Cursor** | `setup-cursor` prints the guide | public `https://…/v1` | OpenAI Chat |
 | **Anything else** | `setup-generic` prints a ready block | `http://localhost:3001/v1` | OpenAI Chat |
@@ -101,7 +109,7 @@ context windows.
 The root-vs-`/v1` distinction matters: Claude Code expects the server root
 because it appends the Anthropic Messages path. OpenAI-compatible clients in
 this table—including Cline, Aider, Goose, Codex, Continue, OpenCode, Qwen,
-Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, Reasonix, ZCode, QwenPaw, and DeepSeek Harness—expect their configured
+Roo, Kilo, Crush, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, Reasonix, ZCode, Zero, QwenPaw, and DeepSeek Harness—expect their configured
 base URL to include `/v1`.
 
 Codex prints "Model metadata for `auto` not found" on every run because it
@@ -342,6 +350,29 @@ registry over the file. Pick another `freellmapi/<model>` in the model picker
 Agents page's "seen recently" badge keys on. The older `~/.zcode/v2/config.json`
 and `~/.zcode/cli/config.json` files are only read once, for migration, so
 editing them has no effect.
+
+### Zero (`zero`)
+
+[Zero](https://github.com/Twigpine/zero) is a local terminal coding agent
+written in Go with durable sessions and permission controls. It reads
+`~/.config/zero/config.json` (`$XDG_CONFIG_HOME/zero/config.json` on
+macOS/Linux, `%APPDATA%\zero\config.json` on Windows). `setup-zero` adds a
+`freellmapi` entry under `providers` (`provider: "openai-compatible"`, the
+gateway's `/v1` as `baseURL`, and the chosen model) and sets `activeProvider`
+to `"freellmapi"`. Other providers are kept, and rerunning replaces only the
+`freellmapi` entry. The key is written with `0600` permissions and Zero moves
+inline keys into its credential store on startup.
+
+```bash
+npx freellmapi setup-zero --url http://localhost:3001 --api-key <unified-key>
+npm install -g @twigpine/zero
+zero exec "Say hello"
+```
+
+`--profile <name>` adds a second `freellmapi-<name>` provider without changing
+`activeProvider`; switch to it with `/provider` in Zero. Zero sends
+`User-Agent: zero/<version>` on every model request, which is what the Agents
+page's "seen recently" badge keys on.
 
 ### QwenPaw
 

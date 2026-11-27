@@ -60,7 +60,16 @@
     "emailChanged": "Az e-mail-cím módosult.",
     "passwordReset": "A jelszó visszaállt. Jelentkezzen be.",
     "resetCodeDockerHint": "Docker alatt fut? A kód a konténer naplójában található: docker logs <container>.",
-    "desktopSessionFailed": "Az irányítópult nem tudott bejelentkezni a helyi szerverre. Lépjen ki a FreeLLMAPI alkalmazásból, és nyissa meg újra."
+    "desktopSessionFailed": "Az irányítópult nem tudott bejelentkezni a helyi szerverre. Lépjen ki a FreeLLMAPI alkalmazásból, és nyissa meg újra.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Mentés",
@@ -171,7 +180,12 @@
     "updateNow": "Frissítés most",
     "updatingContainer": "Az új image letöltése és újraindítás. Az oldal újratöltődik, amikor a FreeLLMAPI visszatér.",
     "updateNowFailed": "A frissítő nem fogadta el a kérést. Ellenőrizze, hogy fut-e a watchtower konténer.",
-    "updateNowTimeout": "A FreeLLMAPI 5 perc után sem indult újra. Nézze meg a watchtower konténer naplóit."
+    "updateNowTimeout": "A FreeLLMAPI 5 perc után sem indult újra. Nézze meg a watchtower konténer naplóit.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modellek",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Válassz szolgáltatót",
     "addKey": "Add hozzá kulcsot",
+    "addAnotherKey": "Másik API-kulcs hozzáadása",
     "keyAdded": "Kulcs hozzáadva",
     "endpointKeysShareModels": "Ugyanazon végpont kulcsai közösen használják annak modelljeit.",
     "export": "Export",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "Opcionális",
     "customFamily": "Család",
     "customFamilyPlaceholder": "Alapértelmezett modellazonosító",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API kulcs",
     "customCapabilities": "Képességek",
     "addModel": "Modell hozzáadása",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Még nincsenek beágyazási modellek",
     "emptyDesc": "A beágyazási családok itt akkor jelennek meg, amikor hozzáadsz egy szolgáltatókulcsot, amely támogatja a beágyazásokat.",
-    "dragToReorder": "Húzás az újrarendelési szolgáltatóhoz"
+    "dragToReorder": "Húzás az újrarendelési szolgáltatóhoz",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fúzió",
@@ -1233,7 +1252,8 @@
       "hermes": "A Nous Research önfejlesztő ügynöke tartós memóriával és készségekkel, terminálban vagy csevegőalkalmazásokban.",
       "pi": "Minimalista terminálügynök, amelyet saját bővítményekkel, készségekkel és promptsablonokkal alakíthat.",
       "reasonix": "DeepSeekre szabott terminálos kódolóügynök, amely a prefix-gyorsítótárra épül, így a hosszú munkamenetek is olcsók maradnak.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Helyi terminálos kódolóügynök tartós munkamenetekkel, jogosultságokkal és bármely OpenAI-kompatibilis szolgáltató támogatásával."
     }
   },
   "update": {

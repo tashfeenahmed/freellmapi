@@ -60,7 +60,16 @@
     "emailChanged": "အီးမေးလ်ပြောင်းပြီးပါပြီ။",
     "passwordReset": "စကားဝှက်ပြန်လည်သတ်မှတ်ပြီးပါပြီ။ ဝင်ရောက်ပါ။",
     "resetCodeDockerHint": "Docker တွင် လည်ပတ်နေပါသလား။ ကုဒ်သည် ကွန်တိန်နာမှတ်တမ်းတွင် ရှိသည် - docker logs <container>",
-    "desktopSessionFailed": "ဒက်ရှ်ဘုတ်သည် ဒေသတွင်းဆာဗာသို့ ဝင်ရောက်၍ မရပါ။ FreeLLMAPI ကို ပိတ်ပြီး ပြန်ဖွင့်ပါ။"
+    "desktopSessionFailed": "ဒက်ရှ်ဘုတ်သည် ဒေသတွင်းဆာဗာသို့ ဝင်ရောက်၍ မရပါ။ FreeLLMAPI ကို ပိတ်ပြီး ပြန်ဖွင့်ပါ။",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "သိမ်းဆည်းပါ",
@@ -171,7 +180,12 @@
     "updateNow": "ယခု အပ်ဒိတ်လုပ်ရန်",
     "updatingContainer": "image အသစ်ကို ဆွဲယူပြီး ပြန်စတင်နေသည်။ FreeLLMAPI ပြန်လာသောအခါ ဤစာမျက်နှာ ပြန်ဖွင့်ပါမည်။",
     "updateNowFailed": "အပ်ဒိတ်လုပ်သူက တောင်းဆိုမှုကို မလက်ခံပါ။ watchtower container လည်ပတ်နေကြောင်း စစ်ဆေးပါ။",
-    "updateNowTimeout": "၅ မိနစ်ကြာသော်လည်း FreeLLMAPI ပြန်မစတင်သေးပါ။ watchtower container ၏ မှတ်တမ်းများကို စစ်ဆေးပါ။"
+    "updateNowTimeout": "၅ မိနစ်ကြာသော်လည်း FreeLLMAPI ပြန်မစတင်သေးပါ။ watchtower container ၏ မှတ်တမ်းများကို စစ်ဆေးပါ။",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "မော်ဒယ်များ",
@@ -436,6 +450,7 @@
     "familyHaiku": "ဟိုက်ကူး",
     "selectPlatform": "ပံ့ပိုးသူတစ်ဦးကို ရွေးချယ်ပါ",
     "addKey": "သော့ထည့်ပါ",
+    "addAnotherKey": "နောက်ထပ် API ကီးတစ်ခု ထည့်ပါ",
     "keyAdded": "သော့ချက် ထည့်သွင်းပြီးပါပြီ",
     "endpointKeysShareModels": "တူညီသောအဆုံးမှတ်၏ သော့များသည် ၎င်း၏မော်ဒယ်များကို မျှဝေသုံးသည်။",
     "export": "တင်ပို့ခြင်း",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ရွေးချယ်နိုင်သော",
     "customFamily": "မိသားစု",
     "customFamilyPlaceholder": "မော်ဒယ် ID ကို မူလအတိုင်း သတ်မှတ်သည်။",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API သော့",
     "customCapabilities": "စွမ်းဆောင်ရည်များ",
     "addModel": "မော်ဒယ်ထည့်ပါ",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} TOK အများဆုံး",
     "emptyTitle": "embedding မော်ဒယ်များ မရှိသေးပါ",
     "emptyDesc": "embedding မိသားစုများသည် embedding များကို ထောက်ပံ့သော provider key တစ်ခု ထည့်သွင်းပြီးနောက် ဤနေရာတွင် ပေါ်လာသည်။",
-    "dragToReorder": "ပံ့ပိုးသူကို ပြန်လည်စီစဉ်ရန် ဆွဲယူပါ"
+    "dragToReorder": "ပံ့ပိုးသူကို ပြန်လည်စီစဉ်ရန် ဆွဲယူပါ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ပေါင်းစပ်ခြင်း",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research ၏ မိမိကိုယ်ကို တိုးတက်အောင်လုပ်နိုင်သော အေးဂျင့်၊ တည်မြဲသည့်မှတ်ဉာဏ်နှင့် ကျွမ်းကျင်မှုများပါဝင်ပြီး terminal တွင်ဖြစ်စေ chat အက်ပ်များတွင်ဖြစ်စေ အသုံးပြုနိုင်သည်။",
       "pi": "သင့်ကိုယ်ပိုင် extension များ၊ ကျွမ်းကျင်မှုများနှင့် prompt template များဖြင့် ပုံဖော်နိုင်သော အနည်းဆုံး terminal အေးဂျင့်။",
       "reasonix": "DeepSeek အတွက် တည်ဆောက်ထားသော terminal coding agent ဖြစ်ပြီး ရှည်လျားသော session များ စျေးသက်သာစေရန် prefix caching ကို အခြေခံထားသည်။",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "တည်မြဲသော စက်ရှင်များ၊ ခွင့်ပြုချက်များနှင့် OpenAI နှင့် ကိုက်ညီသော မည်သည့်ဝန်ဆောင်မှုပေးသူမဆို သုံးနိုင်သည့် ဒေသတွင်း တာမီနယ် ကုဒ်ရေးအေးဂျင့်။"
     }
   },
   "update": {

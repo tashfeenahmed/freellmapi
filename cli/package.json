@@ -1,6 +1,6 @@
 {
   "name": "freellmapi",
-  "version": "0.8.2",
+  "version": "0.8.4",
   "description": "Set up coding agents to use a FreeLLMAPI gateway",
   "license": "MIT",
   "repository": {
@@ -38,6 +38,8 @@
     "dist/index.d.ts",
     "dist/config-files.js",
     "dist/config-files.d.ts",
+    "dist/detect.js",
+    "dist/detect.d.ts",
     "dist/doctor.js",
     "dist/doctor.d.ts",
     "dist/keys.js",
@@ -57,7 +59,7 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
-    "node": ">=20.18.0 <25.0.0"
+    "node": ">=20.18.0"
   },
   "dependencies": {
     "cross-spawn": "^7.0.6",

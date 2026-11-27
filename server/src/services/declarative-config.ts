@@ -1,16 +1,17 @@
 import fs from 'fs';
 import { z } from 'zod';
 import type { Db } from '../db/types.js';
-import { getDb, getSetting, setSetting } from '../db/index.js';
+import { getDb, getSetting } from '../db/index.js';
 import { encrypt } from '../lib/crypto.js';
 import { resolveProvider } from '../providers/index.js';
 import { setCustomWeights, setRoutingStrategy, setKeySelectionStrategy } from './router.js';
 import { ensureModelInProfiles } from './profile-models.js';
 import { customModelSeed } from './custom-model-seed.js';
 import { createUser, userCount } from './auth.js';
+import { setDeclarativeOidcConfig } from './oidc.js';
 import {
   SETTING_LICENSE_KEY,
-  refreshLicenseStatus,
+  storeActivatedLicense,
   syncCatalog,
   validateLicenseKey,
 } from './catalog-sync.js';
@@ -95,8 +96,27 @@ const adminSchema = z.object({
   password: z.string().min(8),
 });
 
+const oidcSchema = z.object({
+  issuerUrl: z.string().url(),
+  clientId: z.string().min(1),
+  clientSecret: z.string().min(1).optional(),
+  redirectUri: z.string().url().optional(),
+  scopes: z.string().min(1).optional(),
+  providerName: z.string().min(1).optional(),
+  allowedEmails: z.array(z.string().min(1)).optional(),
+  allowedGroups: z.array(z.string().min(1)).optional(),
+  groupsClaim: z.string().min(1).optional(),
+  autoProvision: z.boolean().optional(),
+  allowAnyUser: z.boolean().optional(),
+  disablePasswordLogin: z.boolean().optional(),
+  autoRedirect: z.boolean().optional(),
+  requireVerifiedEmail: z.boolean().optional(),
+  postLogoutRedirectUri: z.string().url().optional(),
+}).strict();
+
 const declarativeConfigSchema = z.object({
   admin: adminSchema.optional(),
+  oidc: oidcSchema.optional(),
   // Premium license key (freellmapi.co). Same minimum as the dashboard's
   // POST /api/premium/key length gate.
   license: z.string().min(8).optional(),
@@ -124,6 +144,8 @@ export interface DeclarativeConfigResult {
   source?: string;
   /** True when the `admin` entry created the first dashboard account. */
   admin: boolean;
+  /** True when an `oidc` block configured OIDC dashboard sign-in. */
+  oidc?: boolean;
   /** True when a `license` entry was handed to background activation. */
   license: boolean;
   keys: number;
@@ -525,6 +547,11 @@ export function applyDeclarativeConfig(input: unknown, source = 'inline'): Decla
   });
   apply();
 
+  if (parsed.data.oidc) {
+    setDeclarativeOidcConfig(parsed.data.oidc);
+    result.oidc = true;
+  }
+
   // License activation needs the license service — network I/O has no place in
   // the synchronous DB apply. It runs detached so a slow or unreachable
   // service never delays boot; a failure logs a warning and leaves settings
@@ -555,8 +582,7 @@ export async function activateConfiguredLicense(key: string): Promise<void> {
       console.warn(`[config] license: key rejected (${result.reason ?? 'invalid'}) — left unconfigured`);
       return;
     }
-    setSetting(SETTING_LICENSE_KEY, trimmed);
-    await refreshLicenseStatus();
+    await storeActivatedLicense(trimmed, result);
     // Live-tier sync kicks off right away so the upgrade is visible within
     // seconds; its own catch-all logs failures.
     void syncCatalog(true);

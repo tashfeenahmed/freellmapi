@@ -60,7 +60,16 @@
     "emailChanged": "បានប្តូរអ៊ីមែលដោយជោគជ័យ។",
     "passwordReset": "បានកំណត់ពាក្យសម្ងាត់ឡើងវិញ។ សូមចូលគណនី។",
     "resetCodeDockerHint": "កំពុងដំណើរការក្នុង Docker មែនទេ? លេខកូដស្ថិតនៅក្នុងកំណត់ហេតុកុងតឺន័រ៖ docker logs <container>។",
-    "desktopSessionFailed": "ផ្ទាំងគ្រប់គ្រងមិនអាចចូលទៅម៉ាស៊ីនមេមូលដ្ឋានបានទេ។ សូមបិទ FreeLLMAPI ហើយបើកវាឡើងវិញ។"
+    "desktopSessionFailed": "ផ្ទាំងគ្រប់គ្រងមិនអាចចូលទៅម៉ាស៊ីនមេមូលដ្ឋានបានទេ។ សូមបិទ FreeLLMAPI ហើយបើកវាឡើងវិញ។",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "រក្សាទុក",
@@ -171,7 +180,12 @@
     "updateNow": "ធ្វើបច្ចុប្បន្នភាពឥឡូវនេះ",
     "updatingContainer": "កំពុងទាញរូបភាពថ្មី ហើយចាប់ផ្ដើមឡើងវិញ។ ទំព័រនេះនឹងផ្ទុកឡើងវិញពេល FreeLLMAPI ត្រឡប់មកវិញ។",
     "updateNowFailed": "កម្មវិធីធ្វើបច្ចុប្បន្នភាពមិនបានទទួលសំណើទេ។ ពិនិត្យថា container watchtower កំពុងដំណើរការ។",
-    "updateNowTimeout": "FreeLLMAPI មិនទាន់ចាប់ផ្ដើមឡើងវិញក្រោយ ៥ នាទី។ ពិនិត្យកំណត់ហេតុរបស់ container watchtower។"
+    "updateNowTimeout": "FreeLLMAPI មិនទាន់ចាប់ផ្ដើមឡើងវិញក្រោយ ៥ នាទី។ ពិនិត្យកំណត់ហេតុរបស់ container watchtower។",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ម៉ូដែល",
@@ -436,6 +450,7 @@
     "familyHaiku": "ហៃគូ",
     "selectPlatform": "ជ្រើសរើសអ្នកផ្គត់ផ្គង់",
     "addKey": "បន្ថែមកូនសោ",
+    "addAnotherKey": "បន្ថែមសោ API ផ្សេងទៀត",
     "keyAdded": "បានបន្ថែមកូនសោ",
     "endpointKeysShareModels": "កូនសោនៃចំណុចបញ្ចប់តែមួយ ចែករំលែកម៉ូដែលរបស់វា។",
     "export": "នាំចេញ",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ជាជម្រើស",
     "customFamily": "គ្រួសារ",
     "customFamilyPlaceholder": "លំនាំដើមទៅលេខសម្គាល់ម៉ូដែល",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API",
     "customCapabilities": "សមត្ថភាព",
     "addModel": "បន្ថែមម៉ូដែល",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} TOK Max",
     "emptyTitle": "មិនទាន់មានម៉ូដែលបញ្ចូលនៅឡើយទេ",
     "emptyDesc": "គ្រួសារបញ្ចូលនឹងបង្ហាញនៅទីនេះបន្ទាប់ពីអ្នកបន្ថែមកូនសោអ្នកផ្គត់ផ្គង់ដែលគាំទ្រការបញ្ចូល។",
-    "dragToReorder": "អូសដើម្បីរៀបចំលំដាប់អ្នកផ្គត់ផ្គង់"
+    "dragToReorder": "អូសដើម្បីរៀបចំលំដាប់អ្នកផ្គត់ផ្គង់",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ការរួមបញ្ចូល",
@@ -1233,7 +1252,8 @@
       "hermes": "ភ្នាក់ងាររបស់ Nous Research ដែលកែលម្អខ្លួនឯង មានអង្គចងចាំអចិន្ត្រៃយ៍ និងជំនាញ នៅក្នុង terminal ឬលើកម្មវិធីជជែក។",
       "pi": "ភ្នាក់ងារ terminal តូចចង្អៀត ដែលអ្នករៀបចំដោយផ្នែកបន្ថែម ជំនាញ និងគំរូ prompt ផ្ទាល់ខ្លួន។",
       "reasonix": "ភ្នាក់ងារសរសេរកូដលើ terminal ដែលបង្កើតឡើងសម្រាប់ DeepSeek ផ្អែកលើ prefix caching ដើម្បីឱ្យវគ្គវែងៗនៅតែថោក។",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "ភ្នាក់ងារសរសេរកូដលើស្ថានីយក្នុងមូលដ្ឋាន ដែលមានវគ្គប្រើប្រាស់ស្ថិតស្ថេរ ការគ្រប់គ្រងសិទ្ធិ និងគាំទ្រអ្នកផ្តល់សេវាដែលត្រូវគ្នានឹង OpenAI ណាមួយ។"
     }
   },
   "update": {

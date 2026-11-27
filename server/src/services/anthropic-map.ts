@@ -165,7 +165,9 @@ export function resolveAnthropicModel(model?: string): ResolvedAnthropicModel {
   }
 
   // Not a Claude alias: treat as a concrete catalog model id and pin it if it
-  // exists and is enabled; otherwise auto-route (lenient, like the OpenAI route).
+  // exists and is enabled. Otherwise it stays unpinned, and the /v1/messages
+  // route resolves it through the model groups or rejects it, like
+  // /v1/chat/completions (#2090).
   const row = lookupEnabled((model ?? '').trim());
   return row ? { preferredModelDbId: row.id, modelId: row.model_id, pinned: true } : { pinned: false };
 }

@@ -60,7 +60,16 @@
     "emailChanged": "ඊමේල් සාර්ථකව වෙනස් විය.",
     "passwordReset": "මුරපදය යළි සකසන ලදි. පිවිසෙන්න.",
     "resetCodeDockerHint": "Docker තුළ ධාවනය වේද? කේතය කන්ටේනර් ලොගයේ ඇත: docker logs <container>.",
-    "desktopSessionFailed": "උපකරණ පුවරුවට දේශීය සේවාදායකයට පිවිසීමට නොහැකි විය. FreeLLMAPI වසා නැවත විවෘත කරන්න."
+    "desktopSessionFailed": "උපකරණ පුවරුවට දේශීය සේවාදායකයට පිවිසීමට නොහැකි විය. FreeLLMAPI වසා නැවත විවෘත කරන්න.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "සුරකින්න",
@@ -171,7 +180,12 @@
     "updateNow": "දැන් යාවත්කාලීන කරන්න",
     "updatingContainer": "නව image එක ලබාගෙන නැවත ආරම්භ කරමින්. FreeLLMAPI නැවත පැමිණි විට මෙම පිටුව නැවත පූරණය වේ.",
     "updateNowFailed": "යාවත්කාලීනකරු ඉල්ලීම පිළිගත්තේ නැත. watchtower container එක ධාවනය වන්නේදැයි පරීක්ෂා කරන්න.",
-    "updateNowTimeout": "මිනිත්තු 5කට පසුවත් FreeLLMAPI නැවත ආරම්භ වී නැත. watchtower container හි ලොග් පරීක්ෂා කරන්න."
+    "updateNowTimeout": "මිනිත්තු 5කට පසුවත් FreeLLMAPI නැවත ආරම්භ වී නැත. watchtower container හි ලොග් පරීක්ෂා කරන්න.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ආකෘති",
@@ -436,6 +450,7 @@
     "familyHaiku": "හයිකු",
     "selectPlatform": "සපයන්නෙකු තෝරන්න",
     "addKey": "යතුර එකතු කරන්න",
+    "addAnotherKey": "වෙනත් API යතුරක් එක් කරන්න",
     "keyAdded": "යතුර එකතු කරන ලදී",
     "endpointKeysShareModels": "එකම අන්තයේ යතුරු එහි ආකෘති බෙදා ගනී.",
     "export": "අපනයනය කරන්න",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "විකල්ප",
     "customFamily": "පවුල",
     "customFamilyPlaceholder": "මාදිලි හැඳුනුම්පතට පෙරනිමි",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API යතුර",
     "customCapabilities": "හැකියාවන්",
     "addModel": "ආකෘතිය එක් කරන්න",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "තවම කාවැද්දීම් ආකෘති නොමැත",
     "emptyDesc": "ඔබ කාවැද්දීම සඳහා සහාය දක්වන සැපයුම් යතුරක් එක් කළ පසු කාවැද්දීමේ පවුල් මෙහි දිස් වේ.",
-    "dragToReorder": "සැපයුම්කරු නැවත ඇණවුම් කිරීමට අදින්න"
+    "dragToReorder": "සැපයුම්කරු නැවත ඇණවුම් කිරීමට අදින්න",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "විලයනය",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research හි ස්වයං-වැඩිදියුණු වන ඒජන්තය, ස්ථිර මතකය සහ කුසලතා සමඟ, ටර්මිනලයේ හෝ චැට් යෙදුම්වල.",
       "pi": "ඔබේම දිගු, කුසලතා සහ prompt සැකිලි සමඟ හැඩගස්වන අවම ටර්මිනල් ඒජන්තයක්.",
       "reasonix": "DeepSeek සඳහා සාදන ලද ටර්මිනල් කේතන නියෝජිතයෙක්; දිගු සැසි ලාභදායීව තබා ගැනීමට prefix caching මත ගොඩනගා ඇත.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "ස්ථිර සැසි, අවසර සහ ඕනෑම OpenAI-අනුකූල සැපයුම්කරුවෙකු සමඟ ක්‍රියා කරන දේශීය ටර්මිනල් කේතීකරණ නියෝජිතයෙකි."
     }
   },
   "update": {

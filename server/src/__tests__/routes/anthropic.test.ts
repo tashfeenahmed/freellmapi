@@ -744,6 +744,86 @@ describe('Anthropic-compatible /v1/messages', () => {
       expect(status).toBe(200);
       expect(headers.get('x-routed-via')).toBe(`cerebras/${UNRELATED}`);
     });
+
+    // #2090: a non-Claude id that cannot be served used to come back 200 from
+    // an auto-routed model, with the requested id echoed in the body. These
+    // hold /v1/messages to the 404/503 that /v1/chat/completions returns.
+    describe('a pinned id that cannot be served is rejected, not auto-routed (#2090)', () => {
+      it('answers 404 not_found_error for an id that is not in the catalog', async () => {
+        const seen: string[] = [];
+        mockTwoPlatforms(seen);
+
+        const { status, body, headers } = await request(app, '/v1/messages', {
+          model: 'this-model-does-not-exist-xyz', max_tokens: 64, messages: [{ role: 'user', content: 'hi' }],
+        }, anthropicHeaders());
+
+        expect(status).toBe(404);
+        expect(body.type).toBe('error');
+        expect(body.error.type).toBe('not_found_error');
+        expect(body.error.message).toContain('is not in the catalog');
+        expect(headers.get('x-routed-via')).toBeNull();
+        expect(seen).toEqual([]);
+      });
+
+      it('answers 404 not_found_error for a catalog id that is disabled', async () => {
+        const seen: string[] = [];
+        mockTwoPlatforms(seen);
+        const disabledId = addModel('cerebras', 'disabled-test-model', 'Disabled Test Model', 5);
+        addedIds.push(disabledId);
+        getDb().prepare('UPDATE models SET enabled = 0 WHERE id = ?').run(disabledId);
+
+        const { status, body } = await request(app, '/v1/messages', {
+          model: 'disabled-test-model', max_tokens: 64, messages: [{ role: 'user', content: 'hi' }],
+        }, anthropicHeaders());
+
+        expect(status).toBe(404);
+        expect(body.error.type).toBe('not_found_error');
+        expect(body.error.message).toContain('is disabled');
+        expect(seen).toEqual([]);
+      });
+
+      it('answers 503 for a catalog id whose provider has no key', async () => {
+        const seen: string[] = [];
+        mockTwoPlatforms(seen);
+        // mistral has no key in this suite.
+        addedIds.push(addModel('mistral', 'keyless-test-model', 'Keyless Test Model', 5));
+
+        const { status, body, headers } = await request(app, '/v1/messages', {
+          model: 'keyless-test-model', max_tokens: 64, messages: [{ role: 'user', content: 'hi' }],
+        }, anthropicHeaders());
+
+        expect(status).toBe(503);
+        expect(body.error.code).toBe('no_providers_configured');
+        expect(headers.get('x-routed-via')).toBeNull();
+        expect(seen.some(s => s.includes(UNRELATED))).toBe(false);
+      });
+
+      it('routes a platform-qualified id strictly over its group, like /v1/chat/completions', async () => {
+        const seen: string[] = [];
+        mockTwoPlatforms(seen);
+
+        const { status, headers } = await request(app, '/v1/messages', {
+          model: `cerebras:${SHARED}`, max_tokens: 64, messages: [{ role: 'user', content: 'hi' }],
+        }, anthropicHeaders());
+
+        expect(status).toBe(200);
+        expect(headers.get('x-routed-via')).toBe(`cerebras/${SHARED}`);
+        expect(seen).toEqual([`cerebras/${SHARED}`]);
+      });
+
+      it('behaves the same when the request is streamed', async () => {
+        const seen: string[] = [];
+        mockTwoPlatforms(seen);
+
+        const { status, body } = await request(app, '/v1/messages', {
+          model: 'this-model-does-not-exist-xyz', max_tokens: 64, stream: true, messages: [{ role: 'user', content: 'hi' }],
+        }, anthropicHeaders());
+
+        expect(status).toBe(404);
+        expect(body.error.type).toBe('not_found_error');
+        expect(seen).toEqual([]);
+      });
+    });
   });
 
 });

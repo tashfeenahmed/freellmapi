@@ -60,7 +60,16 @@
     "emailChanged": "E-mailadres gewijzigd.",
     "passwordReset": "Wachtwoord gereset. Log opnieuw in.",
     "resetCodeDockerHint": "Draait het in Docker? De code staat in de containerlog: docker logs <container>.",
-    "desktopSessionFailed": "Het dashboard kon niet inloggen op de lokale server. Sluit FreeLLMAPI af en open het opnieuw."
+    "desktopSessionFailed": "Het dashboard kon niet inloggen op de lokale server. Sluit FreeLLMAPI af en open het opnieuw.",
+    "signInWithSso": "Inloggen met {provider}",
+    "orContinueWithPassword": "of ga verder met e-mail",
+    "reverifyWithSso": "Opnieuw verifiëren met {provider}",
+    "oidcReauthHint": "Bevestig je identiteit met {provider} om platte-tekstsleutels te bekijken.",
+    "oidcReauthSuccess": "Identiteit geverifieerd voor de komende 5 minuten.",
+    "oidcErrorNotAllowed": "Je account mag niet inloggen op dit dashboard.",
+    "oidcErrorUnverifiedEmail": "Je identiteitsprovider moet je e-mailadres verifiëren voordat je inlogt.",
+    "oidcErrorNoAccount": "Er bestaat geen overeenkomstig account en automatisch aanmaken is uitgeschakeld.",
+    "oidcErrorFailed": "Single sign-on mislukt. Probeer het opnieuw."
   },
   "common": {
     "save": "Sla op",
@@ -171,7 +180,12 @@
     "updateNow": "Nu bijwerken",
     "updatingContainer": "De nieuwe image wordt opgehaald en herstart. Deze pagina laadt opnieuw zodra FreeLLMAPI terug is.",
     "updateNowFailed": "De updater heeft het verzoek niet geaccepteerd. Controleer of de watchtower-container draait.",
-    "updateNowTimeout": "FreeLLMAPI is na 5 minuten niet herstart. Bekijk de logs van de watchtower-container."
+    "updateNowTimeout": "FreeLLMAPI is na 5 minuten niet herstart. Bekijk de logs van de watchtower-container.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modellen",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Selecteer een aanbieder",
     "addKey": "Voeg sleutel toe",
+    "addAnotherKey": "Nog een API-sleutel toevoegen",
     "keyAdded": "Sleutel toegevoegd",
     "endpointKeysShareModels": "Sleutels voor hetzelfde endpoint delen de modellen ervan.",
     "export": "Export",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "optioneel",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "Standaard naar model-ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API sleutel",
     "customCapabilities": "Capaciteiten",
     "addModel": "Model toevoegen",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Nog geen embeddingmodellen",
     "emptyDesc": "Embeddingfamilies verschijnen hier zodra je een provider-sleutel toevoegt die embeddings ondersteunt.",
-    "dragToReorder": "Drag om provider opnieuw te bestellen"
+    "dragToReorder": "Drag om provider opnieuw te bestellen",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusie",
@@ -1233,7 +1252,8 @@
       "hermes": "De zelfverbeterende agent van Nous Research met blijvend geheugen en skills, in de terminal of in chat-apps.",
       "pi": "Een minimalistische terminal-agent die je vormgeeft met je eigen extensies, skills en promptsjablonen.",
       "reasonix": "Een terminal-codeeragent gebouwd voor DeepSeek, rond prefix-caching, zodat lange sessies goedkoop blijven.",
-      "zcode": "De codeeragent van Z.ai voor zijn GLM-modellen, verbindt met elke OpenAI-compatibele endpoint via een providerregister."
+      "zcode": "De codeeragent van Z.ai voor zijn GLM-modellen, verbindt met elke OpenAI-compatibele endpoint via een providerregister.",
+      "zero": "Een lokale terminal-codeeragent met blijvende sessies, machtigingen en elke OpenAI-compatibele provider."
     }
   },
   "update": {

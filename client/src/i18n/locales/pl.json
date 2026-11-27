@@ -60,7 +60,16 @@
     "emailChanged": "E-mail został zmieniony.",
     "passwordReset": "Hasło zresetowane. Zaloguj się ponownie.",
     "resetCodeDockerHint": "Serwer działa w kontenerze Docker? Kod znajduje się w logu kontenera: docker logs <container>.",
-    "desktopSessionFailed": "Panel nie mógł zalogować się do lokalnego serwera. Zamknij FreeLLMAPI i otwórz go ponownie."
+    "desktopSessionFailed": "Panel nie mógł zalogować się do lokalnego serwera. Zamknij FreeLLMAPI i otwórz go ponownie.",
+    "signInWithSso": "Zaloguj się przez {provider}",
+    "orContinueWithPassword": "lub kontynuuj przez e-mail",
+    "reverifyWithSso": "Potwierdź ponownie przez {provider}",
+    "oidcReauthHint": "Potwierdź tożsamość w {provider}, aby uzyskać dostęp do jawnych kluczy.",
+    "oidcReauthSuccess": "Tożsamość zweryfikowana na kolejne 5 minut.",
+    "oidcErrorNotAllowed": "Twoje konto nie ma uprawnień do logowania się do tego panelu.",
+    "oidcErrorUnverifiedEmail": "Dostawca tożsamości musi zweryfikować Twój adres e-mail przed zalogowaniem.",
+    "oidcErrorNoAccount": "Brak pasującego konta, a automatyczne tworzenie kont jest wyłączone.",
+    "oidcErrorFailed": "Logowanie jednokrotne nie powiodło się. Spróbuj ponownie."
   },
   "common": {
     "save": "Zapisz",
@@ -171,7 +180,12 @@
     "updateNow": "Aktualizuj teraz",
     "updatingContainer": "Pobieranie nowego obrazu i ponowne uruchamianie. Strona odświeży się, gdy FreeLLMAPI wróci.",
     "updateNowFailed": "Aktualizator nie przyjął żądania. Sprawdź, czy kontener watchtower działa.",
-    "updateNowTimeout": "FreeLLMAPI nie uruchomił się ponownie po 5 minutach. Sprawdź logi kontenera watchtower."
+    "updateNowTimeout": "FreeLLMAPI nie uruchomił się ponownie po 5 minutach. Sprawdź logi kontenera watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modele",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Wybierz dostawcę",
     "addKey": "Dodaj klucz",
+    "addAnotherKey": "Dodaj kolejny klucz API",
     "keyAdded": "Dodano klucz",
     "endpointKeysShareModels": "Klucze tego samego punktu końcowego współdzielą jego modele.",
     "export": "Eksportuj",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "opcjonalne",
     "customFamily": "Rodzina",
     "customFamilyPlaceholder": "domyślnie jest to identyfikator modelu",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Klucz API",
     "customCapabilities": "Możliwości",
     "addModel": "Dodaj model",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Nie ma jeszcze osadzonych modeli",
     "emptyDesc": "Rodziny osadzania pojawiają się tutaj po dodaniu klucza dostawcy obsługującego osadzanie.",
-    "dragToReorder": "Przeciągnij, aby zmienić kolejność dostawcy"
+    "dragToReorder": "Przeciągnij, aby zmienić kolejność dostawcy",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fuzja",
@@ -1233,7 +1252,8 @@
       "hermes": "Samodoskonalący się agent Nous Research z trwałą pamięcią i umiejętnościami, w terminalu lub w aplikacjach czatowych.",
       "pi": "Minimalistyczny agent terminalowy, który kształtujesz własnymi rozszerzeniami, umiejętnościami i szablonami promptów.",
       "reasonix": "Terminalowy agent do programowania stworzony dla DeepSeek, oparty na cache'owaniu prefiksów, by długie sesje pozostawały tanie.",
-      "zcode": "Agent kodujący Z.ai dla jego modeli GLM, łączący się z dowolnym końcowym punktem zgodnym z OpenAI przez rejestr dostawców."
+      "zcode": "Agent kodujący Z.ai dla jego modeli GLM, łączący się z dowolnym końcowym punktem zgodnym z OpenAI przez rejestr dostawców.",
+      "zero": "Lokalny terminalowy agent programistyczny z trwałymi sesjami, uprawnieniami i obsługą dowolnego dostawcy zgodnego z OpenAI."
     }
   },
   "update": {

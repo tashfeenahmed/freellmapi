@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { getSetting, setSetting, getDb } from '../db/index.js';
+import { getSetting, getDb } from '../db/index.js';
 import {
   SETTING_LICENSE_KEY,
   SETTING_LICENSE_STATUS,
@@ -9,6 +9,7 @@ import {
   getCachedLicenseStatus,
   getSyncState,
   refreshLicenseStatus,
+  storeActivatedLicense,
   syncCatalog,
   validateLicenseKey,
 } from '../services/catalog-sync.js';
@@ -67,8 +68,7 @@ premiumRouter.post('/key', async (req: Request, res: Response) => {
     return;
   }
 
-  setSetting(SETTING_LICENSE_KEY, key);
-  await refreshLicenseStatus();
+  await storeActivatedLicense(key, result);
   const sync = await syncCatalog(true);
   res.json({ ...statusPayload(), sync });
 });

@@ -60,7 +60,16 @@
     "emailChanged": "E-mail byl změněn.",
     "passwordReset": "Heslo bylo resetováno. Přihlaste se.",
     "resetCodeDockerHint": "Používáte Docker? Kód je v logu kontejneru: docker logs <container>.",
-    "desktopSessionFailed": "Řídicí panel se nedokázal přihlásit k místnímu serveru. Ukončete FreeLLMAPI a spusťte jej znovu."
+    "desktopSessionFailed": "Řídicí panel se nedokázal přihlásit k místnímu serveru. Ukončete FreeLLMAPI a spusťte jej znovu.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Uložit",
@@ -171,7 +180,12 @@
     "updateNow": "Aktualizovat nyní",
     "updatingContainer": "Stahuje se nový obraz a probíhá restart. Stránka se znovu načte, až bude FreeLLMAPI zpět.",
     "updateNowFailed": "Aktualizátor požadavek nepřijal. Zkontrolujte, že kontejner watchtower běží.",
-    "updateNowTimeout": "FreeLLMAPI se ani po 5 minutách nerestartoval. Zkontrolujte logy kontejneru watchtower."
+    "updateNowTimeout": "FreeLLMAPI se ani po 5 minutách nerestartoval. Zkontrolujte logy kontejneru watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modely",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Vyberte poskytovatele",
     "addKey": "Přidat klíč",
+    "addAnotherKey": "Přidat další klíč API",
     "keyAdded": "Klíč přidán",
     "endpointKeysShareModels": "Klíče stejného endpointu sdílejí jeho modely.",
     "export": "Export",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "volitelné",
     "customFamily": "Rodina",
     "customFamilyPlaceholder": "výchozí nastavení na model id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API klíč",
     "customCapabilities": "Schopnosti",
     "addModel": "Přidat model",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Modely zatím nejsou žádné embedding",
     "emptyDesc": "Embedding families se zde objeví, jakmile přidáte klíč poskytovatele, který embeddingy podporuje.",
-    "dragToReorder": "Poskytovatel přetahování pro přeobjednaní"
+    "dragToReorder": "Poskytovatel přetahování pro přeobjednaní",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fúze",
@@ -1233,7 +1252,8 @@
       "hermes": "Samozdokonalující se agent od Nous Research s trvalou pamětí a dovednostmi, v terminálu nebo v chatovacích aplikacích.",
       "pi": "Minimalistický terminálový agent, který si přizpůsobíte vlastními rozšířeními, dovednostmi a šablonami promptů.",
       "reasonix": "Terminálový agent pro programování stavěný pro DeepSeek, postavený na cachování prefixů, aby dlouhé relace zůstaly levné.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Lokální terminálový agent pro programování s trvalými relacemi, oprávněními a podporou jakéhokoli poskytovatele kompatibilního s OpenAI."
     }
   },
   "update": {

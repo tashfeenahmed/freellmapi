@@ -40,6 +40,34 @@ function msSinceUtcMidnight(now: number): number {
   return now - new Date(now).setUTCHours(0, 0, 0, 0);
 }
 
+const pacificDate = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric', day: 'numeric',
+});
+const pacificHour = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles', hour: 'numeric', hourCycle: 'h23',
+});
+
+/** Midnight Pacific on the Pacific date of `now`, plus `dayOffset` days, as
+ *  epoch ms. Gemini daily quotas reset then, DST included (23/25-hour days).
+ *  https://ai.google.dev/gemini-api/docs/rate-limits */
+export function pacificMidnight(now: number, dayOffset = 0): number {
+  const parts = pacificDate.formatToParts(now);
+  const part = (name: string) => Number(parts.find(p => p.type === name)!.value);
+  // 08:00 UTC on that Pacific date is either midnight (PST) or 01:00 (PDT).
+  // Read the offset on that date, not now.
+  const candidate = Date.UTC(part('year'), part('month') - 1, part('day') + dayOffset, 8);
+  return candidate - Number(pacificHour.format(candidate)) * 3_600_000;
+}
+
+/** Width of the per-model daily (rpd/tpd) window. Google resets at midnight
+ *  Pacific, so its window starts there: a sliding 24h kept a model whose 20
+ *  requests were spent at 23:00 PT skipped until about 23:00 the next day,
+ *  with a fresh allowance waiting since midnight. Other providers keep the
+ *  sliding day: their per-model limits are not documented as wall-clock. */
+function dailyWindowMs(platform: string, now: number): number {
+  return platform === 'google' ? now - pacificMidnight(now) : DAY;
+}
+
 function withDb<T>(fn: (db: RateLimitDb) => T): T | undefined {
   try {
     return fn(getDb());
@@ -345,7 +373,7 @@ export function canMakeRequest(
   }
 
   if (limits.rpd !== null) {
-    if (requestCount(platform, modelId, keyId, DAY, now) + inFlight >= limits.rpd) return false;
+    if (requestCount(platform, modelId, keyId, dailyWindowMs(platform, now), now) + inFlight >= limits.rpd) return false;
   }
 
   return true;
@@ -368,7 +396,7 @@ export function canUseTokens(
   }
 
   if (limits.tpd !== null) {
-    const used = tokenCount(platform, modelId, keyId, DAY, now);
+    const used = tokenCount(platform, modelId, keyId, dailyWindowMs(platform, now), now);
     if (used + inFlight + estimatedTokens > limits.tpd) return false;
   }
 
@@ -1152,9 +1180,9 @@ export function getCooldownDecisionForLimit(
   const quotaSignal = opts?.quotaSignal ?? true;
   const now = Date.now();
   const rpdExhausted =
-    limits.rpd !== null && requestCount(platform, modelId, keyId, DAY, now) >= limits.rpd;
+    limits.rpd !== null && requestCount(platform, modelId, keyId, dailyWindowMs(platform, now), now) >= limits.rpd;
   const tpdExhausted =
-    limits.tpd !== null && tokenCount(platform, modelId, keyId, DAY, now) >= limits.tpd;
+    limits.tpd !== null && tokenCount(platform, modelId, keyId, dailyWindowMs(platform, now), now) >= limits.tpd;
   // No daily quota published → use repeated-429 heuristic: 2+ 429s in the
   // last hour is treated as effectively daily-exhausted. This unsticks
   // providers that publish no daily cap (ollama, cloudflare, etc.) from the
@@ -1571,7 +1599,7 @@ export function getRateLimitStatus(
 
   return {
     rpm: { used: requestCount(platform, modelId, keyId, MINUTE, now), limit: limits.rpm },
-    rpd: { used: requestCount(platform, modelId, keyId, DAY, now), limit: limits.rpd },
+    rpd: { used: requestCount(platform, modelId, keyId, dailyWindowMs(platform, now), now), limit: limits.rpd },
     tpm: { used: tokenCount(platform, modelId, keyId, MINUTE, now), limit: limits.tpm },
   };
 }

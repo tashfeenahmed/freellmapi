@@ -137,7 +137,7 @@ export function EditKeyDialog({
     mutationFn: (body: UpdateBody) =>
       apiFetch(`/api/keys/${apiKey.id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     onSuccess: () => {
-      for (const key of ['keys', 'health']) queryClient.invalidateQueries({ queryKey: [key] })
+      for (const key of ['keys', 'health', 'fallback']) queryClient.invalidateQueries({ queryKey: [key] })
       invalidateSearchQueries(queryClient)
       onOpenChange(false)
     },

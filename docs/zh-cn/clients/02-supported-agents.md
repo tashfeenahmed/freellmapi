@@ -75,6 +75,7 @@ npx freellmapi setup-<agent> --url http://localhost:3001 --api-key <unified-key>
 | Pi | `setup-pi` | `/v1` |
 | Reasonix | `setup-reasonix` | `/v1` |
 | ZCode | `setup-zcode` | `/v1` |
+| Zero | `setup-zero` | `/v1` |
 | Zed, JetBrains AI | [Ollama 模拟](01-agent-clients.md#ollama-客户端) | Ollama `/api` |
 | Cursor | `setup-cursor` 输出配置指南 | 公网 `https://…/v1` |
 | 其他客户端 | `setup-generic` 输出可直接使用的配置 | `/v1` |

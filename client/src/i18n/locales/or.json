@@ -60,7 +60,16 @@
     "emailChanged": "ଇମେଲ ସଫଳତାର ସହ ବଦଳିଲା।",
     "passwordReset": "ପାସୱାର୍ଡ ରିସେଟ ହେଲା। ଦୟାକରି ସାଇନ ଇନ କରନ୍ତୁ।",
     "resetCodeDockerHint": "Docker ରେ ଚଳାଉଛନ୍ତି କି? କୋଡ କଣ୍ଟେନର ଲଗରେ ଅଛି: docker logs <container>।",
-    "desktopSessionFailed": "ଡ୍ୟାସବୋର୍ଡ ଲୋକାଲ ସର୍ଭରରେ ସାଇନ ଇନ କରିପାରିଲା ନାହିଁ। FreeLLMAPI ବନ୍ଦ କରି ପୁଣି ଖୋଲନ୍ତୁ।"
+    "desktopSessionFailed": "ଡ୍ୟାସବୋର୍ଡ ଲୋକାଲ ସର୍ଭରରେ ସାଇନ ଇନ କରିପାରିଲା ନାହିଁ। FreeLLMAPI ବନ୍ଦ କରି ପୁଣି ଖୋଲନ୍ତୁ।",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "ସଞ୍ଚୟ କରନ୍ତୁ",
@@ -171,7 +180,12 @@
     "updateNow": "ବର୍ତ୍ତମାନ ଅପଡେଟ୍ କରନ୍ତୁ",
     "updatingContainer": "ନୂଆ ଇମେଜ୍ ଟାଣାଯାଉଛି ଏବଂ ପୁନଃ ଆରମ୍ଭ ହେଉଛି। FreeLLMAPI ଫେରିଲେ ଏହି ପୃଷ୍ଠା ପୁନଃ ଲୋଡ୍ ହେବ।",
     "updateNowFailed": "ଅପଡେଟର ଅନୁରୋଧ ଗ୍ରହଣ କଲା ନାହିଁ। watchtower କଣ୍ଟେନର ଚାଲୁଛି କି ନାହିଁ ଯାଞ୍ଚ କରନ୍ତୁ।",
-    "updateNowTimeout": "୫ ମିନିଟ ପରେ ମଧ୍ୟ FreeLLMAPI ପୁନଃ ଆରମ୍ଭ ହୋଇନାହିଁ। watchtower କଣ୍ଟେନରର ଲଗ୍ ଦେଖନ୍ତୁ।"
+    "updateNowTimeout": "୫ ମିନିଟ ପରେ ମଧ୍ୟ FreeLLMAPI ପୁନଃ ଆରମ୍ଭ ହୋଇନାହିଁ। watchtower କଣ୍ଟେନରର ଲଗ୍ ଦେଖନ୍ତୁ।",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ମଡେଲଗୁଡିକ",
@@ -436,6 +450,7 @@
     "familyHaiku": "ହାଇକୁ",
     "selectPlatform": "ଏକ ପ୍ରଦାନକାରୀ ଚୟନ କରନ୍ତୁ",
     "addKey": "କୀ ଯୋଡନ୍ତୁ",
+    "addAnotherKey": "ଆଉ ଏକ API କି ଯୋଡନ୍ତୁ",
     "keyAdded": "କୀ ଯୋଡାଯାଇଛି",
     "endpointKeysShareModels": "ସମାନ ଏଣ୍ଡପଏଣ୍ଟର କୀଗୁଡିକ ଏହାର ମଡେଲ ସେୟାର କରନ୍ତି।",
     "export": "ରପ୍ତାନୀ",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ଇଚ୍ଛାଧୀନ",
     "customFamily": "ପରିବାର",
     "customFamilyPlaceholder": "ମଡେଲ୍ IDକୁ ଡିଫଲ୍ଟ କରନ୍ତୁ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API କୀ",
     "customCapabilities": "ସାମର୍ଥ୍ୟ",
     "addModel": "ମଡେଲ ଯୋଡନ୍ତୁ",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ଟୋକ୍ ସର୍ବାଧିକ",
     "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ଏମ୍ବେଡିଂ ମଡେଲ୍ ନାହିଁ",
     "emptyDesc": "ଥରେ ଏମ୍ବେଡିଂ ପରିବାରଗୁଡିକ ଏଠାରେ ଦୃଶ୍ୟମାନ ହେବ ଥରେ ଆପଣ ଏକ ପ୍ରଦାନକାରୀ କୀ ଯୋଡିଲେ ଯାହା ଏମ୍ବେଡିଂଗୁଡିକ ସମର୍ଥନ କରେ।",
-    "dragToReorder": "ପ୍ରଦାନକାରୀ ପୁନଃକ୍ରମ କରିବାକୁ ଡ୍ରାଗ୍ କରନ୍ତୁ"
+    "dragToReorder": "ପ୍ରଦାନକାରୀ ପୁନଃକ୍ରମ କରିବାକୁ ଡ୍ରାଗ୍ କରନ୍ତୁ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ଫ୍ୟୁଜନ୍",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research ର ନିଜକୁ ଉନ୍ନତ କରୁଥିବା ଏଜେଣ୍ଟ, ସ୍ଥାୟୀ ମେମୋରୀ ଓ ଦକ୍ଷତା ସହିତ, ଟର୍ମିନାଲରେ କିମ୍ବା ଚାଟ୍ ଆପ୍‌ରେ।",
       "pi": "ଏକ ସର୍ବନିମ୍ନ ଟର୍ମିନାଲ ଏଜେଣ୍ଟ, ଯାହାକୁ ଆପଣ ନିଜର ଏକ୍ସଟେନସନ, ଦକ୍ଷତା ଓ ପ୍ରମ୍ପ୍ଟ ଟେମ୍ପଲେଟରେ ଗଢ଼ନ୍ତି।",
       "reasonix": "DeepSeek ପାଇଁ ତିଆରି ଟର୍ମିନାଲ କୋଡିଂ ଏଜେଣ୍ଟ, ଲମ୍ବା ସେସନ ଶସ୍ତା ରହିବା ପାଇଁ ପ୍ରିଫିକ୍ସ କ୍ୟାଶିଂ ଉପରେ ଗଢ଼ାଯାଇଛି।",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "ସ୍ଥାୟୀ ସେସନ୍, ଅନୁମତି ଏବଂ ଯେକୌଣସି OpenAI-ସୁସଙ୍ଗତ ପ୍ରଦାତା ସହିତ ଏକ ସ୍ଥାନୀୟ ଟର୍ମିନାଲ୍ କୋଡିଂ ଏଜେଣ୍ଟ।"
     }
   },
   "update": {

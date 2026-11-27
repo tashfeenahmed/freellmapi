@@ -136,7 +136,7 @@ export default function KeysPage() {
               <ProviderChecklistSection onAddKey={platform => openAddKey(platform as Platform)} />
               <KeylessNotice />
             </div>
-            <ProviderList onAddKey={() => openAddKey()} />
+            <ProviderList onAddKey={platform => openAddKey(platform ?? '')} />
           </>
         )}
       </div>

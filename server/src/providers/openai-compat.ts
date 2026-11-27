@@ -116,6 +116,44 @@ function pinnedToolChoiceRetry(options?: CompletionOptions): CompletionOptions |
 }
 
 /**
+ * OpenAI reasoning model families (`gpt-5*`, `o1*`, `o3*`, `o4*`) reject
+ * `max_tokens` on Chat Completions and require `max_completion_tokens` instead.
+ * Inspects the final path segment so namespaced ids like `openai/gpt-5`,
+ * `azure:openai/gpt-5.4-mini`, or `openai/o3-mini` match while non-reasoning
+ * models (`gpt-4o`, `gpt-4.1`, `openai/gpt-oss-120b`, `olmo-2`) do not. (#2056)
+ */
+const MAX_COMPLETION_TOKENS_MODEL_RE = /^(?:gpt-5|o[134])(?:$|[-._:@])/;
+
+export function usesMaxCompletionTokens(modelId: string): boolean {
+  const leaf = modelId.trim().toLowerCase().split('/').pop() ?? '';
+  return MAX_COMPLETION_TOKENS_MODEL_RE.test(leaf);
+}
+
+/**
+ * Detect a 400 response where the upstream explicitly rejects `max_tokens` in
+ * favour of `max_completion_tokens` (e.g. OpenAI / Azure gateways serving
+ * reasoning models under a relabeled or deployment-specific model id). (#2056)
+ */
+export function isMaxTokensUnsupportedError(
+  status: number,
+  errBody: unknown,
+  fallbackText = '',
+): boolean {
+  if (status !== 400) return false;
+  const e = (errBody as { error?: { code?: unknown; param?: unknown; message?: unknown }; detail?: unknown; title?: unknown } | null)?.error;
+  const code = typeof e?.code === 'string' ? e.code.toLowerCase() : '';
+  const param = typeof e?.param === 'string' ? e.param.toLowerCase() : '';
+  if (code === 'unsupported_parameter' && param === 'max_tokens') return true;
+  const rawText = [
+    typeof e?.message === 'string' ? e.message : '',
+    typeof (errBody as { detail?: unknown } | null)?.detail === 'string' ? (errBody as { detail: string }).detail : '',
+    typeof (errBody as { title?: unknown } | null)?.title === 'string' ? (errBody as { title: string }).title : '',
+    fallbackText,
+  ].join(' ').toLowerCase();
+  return rawText.includes('max_tokens') && rawText.includes('max_completion_tokens');
+}
+
+/**
  * Generic provider for platforms that use an OpenAI-compatible API.
  * Covers: Groq, Cerebras, NVIDIA NIM, Mistral, OpenRouter,
  * GitHub Models, Fireworks AI.
@@ -362,6 +400,24 @@ export class OpenAICompatProvider extends BaseProvider {
     return sanitized;
   }
 
+  /** Build the output-token budget field for Chat Completions. Custom endpoints
+   *  targeting OpenAI reasoning models (`gpt-5*`, `o1*`, `o3*`, `o4*`) send
+   *  `max_completion_tokens` proactively, and any endpoint can flip to it on a
+   *  reactive retry when the upstream rejects `max_tokens` (#2056). */
+  private maxTokensFieldFor(
+    modelId: string,
+    options?: CompletionOptions,
+    forceMaxCompletionTokens = false,
+  ): { max_tokens: number } | { max_completion_tokens: number } | Record<string, never> {
+    const maxTokens = resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget);
+    if (maxTokens === undefined) return {};
+    if (this.platform === 'nutrient') return { max_completion_tokens: maxTokens };
+    if (forceMaxCompletionTokens || (this.platform === 'custom' && usesMaxCompletionTokens(modelId))) {
+      return { max_completion_tokens: maxTokens };
+    }
+    return { max_tokens: maxTokens };
+  }
+
   async chatCompletion(
     apiKey: string,
     messages: ChatMessage[],
@@ -369,7 +425,19 @@ export class OpenAICompatProvider extends BaseProvider {
     options?: CompletionOptions,
     quotaContext?: QuotaObservationContext,
   ): Promise<ChatCompletionResponse> {
+    return this.chatCompletionInternal(apiKey, messages, modelId, options, quotaContext, false);
+  }
+
+  private async chatCompletionInternal(
+    apiKey: string,
+    messages: ChatMessage[],
+    modelId: string,
+    options: CompletionOptions | undefined,
+    quotaContext: QuotaObservationContext | undefined,
+    forceMaxCompletionTokens: boolean,
+  ): Promise<ChatCompletionResponse> {
     const sampling = this.samplingForModel(modelId, options);
+    const maxTokensField = this.maxTokensFieldFor(modelId, options, forceMaxCompletionTokens);
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -382,7 +450,7 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        ...maxTokensField,
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
@@ -420,9 +488,14 @@ export class OpenAICompatProvider extends BaseProvider {
         out._routed_via = { platform: this.platform, model: modelId };
         return out;
       }
+      const errText = this.upstreamErrorText(err, res);
+      if ('max_tokens' in maxTokensField && isMaxTokensUnsupportedError(res.status, err, errText)) {
+        console.log(`[${this.name}] 400 on max_tokens; retrying with max_completion_tokens (#2056)`);
+        return this.chatCompletionInternal(apiKey, messages, modelId, options, quotaContext, true);
+      }
       const retry = this.pinnedToolChoiceRetryFor(res.status, options);
-      if (retry) return this.chatCompletion(apiKey, messages, modelId, retry, quotaContext);
-      throw providerHttpError(res, `${this.name} API error ${res.status}: ${this.upstreamErrorText(err, res)}`, err);
+      if (retry) return this.chatCompletionInternal(apiKey, messages, modelId, retry, quotaContext, forceMaxCompletionTokens);
+      throw providerHttpError(res, `${this.name} API error ${res.status}: ${errText}`, err);
     }
 
     let data: ChatCompletionResponse;
@@ -514,7 +587,19 @@ export class OpenAICompatProvider extends BaseProvider {
     options?: CompletionOptions,
     quotaContext?: QuotaObservationContext,
   ): AsyncGenerator<ChatCompletionChunk> {
+    yield* this.streamChatCompletionInternal(apiKey, messages, modelId, options, quotaContext, false);
+  }
+
+  private async *streamChatCompletionInternal(
+    apiKey: string,
+    messages: ChatMessage[],
+    modelId: string,
+    options: CompletionOptions | undefined,
+    quotaContext: QuotaObservationContext | undefined,
+    forceMaxCompletionTokens: boolean,
+  ): AsyncGenerator<ChatCompletionChunk> {
     const sampling = this.samplingForModel(modelId, options);
+    const maxTokensField = this.maxTokensFieldFor(modelId, options, forceMaxCompletionTokens);
     const res = await this.fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -527,7 +612,7 @@ export class OpenAICompatProvider extends BaseProvider {
         model: modelId,
         messages: this.messagesForPlatform(messages, modelId),
         temperature: sampling.temperature,
-        max_tokens: resolveMaxTokens(this.platform, options?.max_tokens, options?.contextBudget),
+        ...maxTokensField,
         top_p: sampling.topP,
         stop: options?.stop,
         tools: options?.tools,
@@ -561,12 +646,18 @@ export class OpenAICompatProvider extends BaseProvider {
         yield { ...base, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] };
         return;
       }
-      const retry = this.pinnedToolChoiceRetryFor(res.status, options);
-      if (retry) {
-        yield* this.streamChatCompletion(apiKey, messages, modelId, retry, quotaContext);
+      const errText = this.upstreamErrorText(err, res);
+      if ('max_tokens' in maxTokensField && isMaxTokensUnsupportedError(res.status, err, errText)) {
+        console.log(`[${this.name}] 400 on max_tokens; retrying with max_completion_tokens (stream, #2056)`);
+        yield* this.streamChatCompletionInternal(apiKey, messages, modelId, options, quotaContext, true);
         return;
       }
-      throw providerHttpError(res, `${this.name} API error ${res.status}: ${this.upstreamErrorText(err, res)}`, err);
+      const retry = this.pinnedToolChoiceRetryFor(res.status, options);
+      if (retry) {
+        yield* this.streamChatCompletionInternal(apiKey, messages, modelId, retry, quotaContext, forceMaxCompletionTokens);
+        return;
+      }
+      throw providerHttpError(res, `${this.name} API error ${res.status}: ${errText}`, err);
     }
 
     // First-byte grace (#584): the same chat timeout that bounded the headers

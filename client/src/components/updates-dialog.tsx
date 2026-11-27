@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { CopyButton } from '@/components/copy-button'
 import { UPDATE_CHECK_CHANGED_EVENT } from '@/components/update-reminder'
 import { apiFetch } from '@/lib/api'
-import { checkDesktopUpdates, hasDesktopUpdater, useDesktopUpdater } from '@/lib/desktop-updater'
+import { checkDesktopUpdates, useDesktopUpdater } from '@/lib/desktop-updater'
 import { useDockerUpdate } from '@/lib/docker-update'
 import { RELEASES_URL } from '@/lib/updates'
 import { useI18n } from '@/i18n'
@@ -65,13 +65,20 @@ function UpdatesContent() {
   // Runs on open and on every retry; state is only set once answers are back.
   useEffect(() => {
     let cancelled = false
-    if (hasDesktopUpdater()) {
-      void checkDesktopUpdates()
-    } else {
-      apiFetch<CheckResult>('/api/update/check')
-        .then(r => { if (!cancelled) setResult(r) }, () => { if (!cancelled) setFailed(true) })
-        .finally(() => { if (!cancelled) setChecking(false) })
+    async function check() {
+      try {
+        const native = await checkDesktopUpdates()
+        if (cancelled || (native && native.phase !== 'unsupported')) return
+        // Portable and store packages expose the bridge but cannot update in-app.
+        const response = await apiFetch<CheckResult>('/api/update/check')
+        if (!cancelled) setResult(response)
+      } catch {
+        if (!cancelled) setFailed(true)
+      } finally {
+        if (!cancelled) setChecking(false)
+      }
     }
+    void check()
     return () => { cancelled = true }
   }, [attempt])
 
@@ -121,6 +128,9 @@ function UpdatesContent() {
   )
 
   function body(): ReactNode {
+    if (failed && (!desktop || desktop.state.phase === 'idle' || desktop.state.phase === 'checking')) {
+      return <Status icon="error" title={t('settings.checkFailed')} detail={t('updates.offline')} action={retryButton} />
+    }
     if (desktop) {
       const state = desktop.state
       switch (state.phase) {
@@ -170,7 +180,6 @@ function UpdatesContent() {
     }
 
     if (checking && !result) return <Status icon="busy" title={t('keys.checking')} />
-    if (failed) return <Status icon="error" title={t('settings.checkFailed')} detail={t('updates.offline')} action={retryButton} />
     if (!result) return <Status icon="busy" title={t('keys.checking')} />
 
     switch (result.status) {

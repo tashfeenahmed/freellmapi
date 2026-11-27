@@ -60,7 +60,16 @@
     "emailChanged": "E-posten er endret.",
     "passwordReset": "Passordet er tilbakestilt. Logg inn.",
     "resetCodeDockerHint": "Kjører du i Docker? Koden står i containerloggen: docker logs <container>.",
-    "desktopSessionFailed": "Dashbordet kunne ikke logge inn på den lokale serveren. Avslutt FreeLLMAPI og åpne det på nytt."
+    "desktopSessionFailed": "Dashbordet kunne ikke logge inn på den lokale serveren. Avslutt FreeLLMAPI og åpne det på nytt.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Lagre",
@@ -171,7 +180,12 @@
     "updateNow": "Oppdater nå",
     "updatingContainer": "Henter det nye imaget og starter på nytt. Siden lastes inn på nytt når FreeLLMAPI er tilbake.",
     "updateNowFailed": "Oppdateringstjenesten godtok ikke forespørselen. Sjekk at watchtower-containeren kjører.",
-    "updateNowTimeout": "FreeLLMAPI har ikke startet på nytt etter 5 minutter. Sjekk loggene til watchtower-containeren."
+    "updateNowTimeout": "FreeLLMAPI har ikke startet på nytt etter 5 minutter. Sjekk loggene til watchtower-containeren.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeller",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Velg en leverandør",
     "addKey": "Legg til nøkkel",
+    "addAnotherKey": "Legg til en annen API-nøkkel",
     "keyAdded": "Nøkkel lagt til",
     "endpointKeysShareModels": "Nøkler for det samme endepunktet deler modellene dets.",
     "export": "Eksport",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "valgfritt",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "Standardinnstilling til modell-ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API nøkkel",
     "customCapabilities": "Kapasiteter",
     "addModel": "Legg til modell",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Ingen innbeddingsmodeller ennå",
     "emptyDesc": "Embedding-familier vises her når du legger til en leverandørnøkkel som støtter embeddings.",
-    "dragToReorder": "Dra for å omorganisere leverandøren"
+    "dragToReorder": "Dra for å omorganisere leverandøren",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusjon",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Researchs selvforbedrende agent med varig minne og ferdigheter, i terminalen eller i chat-apper.",
       "pi": "En minimal terminalagent du former med egne utvidelser, ferdigheter og promptmaler.",
       "reasonix": "En terminalbasert kodeagent laget for DeepSeek rundt prefiks-caching, slik at lange økter forblir billige.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "En lokal terminalbasert kodeagent med varige økter, tillatelser og støtte for enhver OpenAI-kompatibel leverandør."
     }
   },
   "update": {
