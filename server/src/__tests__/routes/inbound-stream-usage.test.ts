@@ -100,6 +100,34 @@ describe('streamed Gemini/Ollama turns report the upstream token usage', () => {
     });
   }
 
+  // Usage on BOTH a choice frame and a later choice-less frame (some
+  // relays repeat a cumulative block): the last block wins, never a sum.
+  const usageBoth = frame({ content: 'Hello world' }, 'stop', { usage: { prompt_tokens: 1234, completion_tokens: 50, total_tokens: 1284 } })
+    + `data: ${JSON.stringify({ id: 'x', object: 'chat.completion.chunk', created: 1, model: 'x', choices: [], usage })}\n\n`
+    + 'data: [DONE]\n\n';
+
+  it('usage on both a choice frame and a choice-less frame is counted once', async () => {
+    mockGroqStream(usageBoth);
+    const { status, text } = await gemini();
+    expect(status).toBe(200);
+    expect(geminiUsage(text)).toEqual({ promptTokenCount: 1234, candidatesTokenCount: 56, totalTokenCount: 1290 });
+    expect(loggedTokens()).toEqual({ input_tokens: 1234, output_tokens: 56 });
+    const rows = getDb().prepare("SELECT COUNT(*) AS n FROM requests WHERE status = 'success'").get() as { n: number };
+    expect(rows.n).toBe(1);
+  });
+
+  for (const [label, sse] of [['own frame', usageOwnFrame], ['last choice frame', usageLastFrame]] as const) {
+    it(`ollama /api/generate stream: usage on its ${label}`, async () => {
+      mockGroqStream(sse);
+      const { status, text } = await request(app, '/api/generate', { model: 'auto', prompt: 'hi' });
+      expect(status).toBe(200);
+      const last = JSON.parse(text.trim().split('\n').at(-1)!);
+      expect(last.done).toBe(true);
+      expect({ prompt: last.prompt_eval_count, eval: last.eval_count }).toEqual({ prompt: 1234, eval: 56 });
+      expect(loggedTokens()).toEqual({ input_tokens: 1234, output_tokens: 56 });
+    });
+  }
+
   // Control: without upstream usage the estimate (chars/4) still applies.
   it('keeps the estimate when the upstream stream reports none', async () => {
     mockGroqStream(noUsage);
