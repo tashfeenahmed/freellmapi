@@ -63,3 +63,22 @@ describe('routing strategy "More options" disclosure', () => {
     expect(page).toContain('<ChevronDown')
   })
 })
+
+// The server accepts three key selection strategies (#919, #2022). A value the
+// select has no <option> for would render as the first option, so the page
+// would claim "Auto" while round-robin is in force.
+describe('key selection select', () => {
+  it('offers every strategy the server accepts, labelled in every locale', () => {
+    for (const [value, key] of [
+      ['auto', 'keySelectionAuto'],
+      ['least-remaining', 'keySelectionLeastRemaining'],
+      ['round-robin', 'keySelectionRoundRobin'],
+    ]) {
+      expect(page).toContain(`<option value="${value}">{t('strategies.${key}')}</option>`)
+      for (const name of locales) {
+        const dictionary = JSON.parse(readFileSync(path.join(localeDir, `${name}.json`), 'utf8'))
+        expect(typeof dictionary.strategies[key], `${name} is missing strategies.${key}`).toBe('string')
+      }
+    }
+  })
+})

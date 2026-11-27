@@ -15,7 +15,7 @@ effective = base × headroomFactor × rateLimitFactor               (guardrail m
 
 The **weights** come from a selectable strategy (`balanced` / `smartest` / `fastest` / `reliable` / `custom` / `priority` / `decision`). The default is `balanced` (0.5 / 0.25 / 0.25). Operators can switch strategies from the dashboard or via `PUT /api/fallback/routing`.
 
-Key selection within a model is driven by a separate `KeySelectionStrategy` (`auto` / `least-remaining`), independent of the model-ranking bandit so the two concerns don't interfere (#919, #930).
+Key selection within a model is driven by a separate `KeySelectionStrategy` (`auto` / `least-remaining` / `round-robin`), independent of the model-ranking bandit so the two concerns don't interfere (#919, #930).
 
 ---
 
@@ -261,7 +261,7 @@ With `decision` selected, a decision model (Models → Decision: Clef on Cloudfl
 - **Which model decides:** `routing_decision_model`, `auto` by default (first enabled decision model with a key). `auto` skips BeatAPI's free JEV routes, whose 1 request/minute cannot keep up with chat traffic; pinning one explicitly still works.
 - **Visibility:** each routed response carries `X-FreeLLM-Routing-Strategy: <preset>` (or `balanced; fallback=<reason>`), decisions are logged under Models → Decision with client `freellmapi-router`, and `GET /api/fallback/routing` returns `decision: { model, minProbability, ready, counts, fallbacks, recent }`.
 
-### Key Selection Strategy (#919, #930)
+### Key Selection Strategy (#919, #930, #2022)
 
 Independent of the routing strategy on purpose — model ranking and key selection are independent choices, and folding this into the strategy enum would make switching key policy also switch (or disable) the model bandit.
 
@@ -269,11 +269,13 @@ Independent of the routing strategy on purpose — model ranking and key selecti
 |----------|----------|
 | `auto` (default) | Per-key bandit score when ≥2 keys have recorded data, else round-robin |
 | `least-remaining` | Additionally rank by observed remaining quota — roomiest key first, so the key nearest its cap is held back instead of being the next to 429 |
+| `round-robin` | Strict rotation over the model's keys from the live cursor, one request each, ignoring per-key scores; cooldowns, rate limits, caps and benches still skip a key (#2022) |
 
 - `least-remaining` layers **on top** of the existing order (bandit ranking when there's data, else the round-robin rotation) — ties fall back to that order instead of rowid.
 - Account-scoped pools (`<platform>::account`) are **skipped** for remaining-quota weighting, since every key reports the same shared number and reordering would only churn the rotation (#919).
 - Reads quota headroom through the cached platform-filtered `getKeyQuotaHeadroom()` query.
 - A key the quota tracker has never seen gets a neutral `UNKNOWN_QUOTA_HEADROOM = 0.5` — no opinion, not a reason to prefer or avoid.
+- The `round-robin` cursor is the same in-memory one the legacy rotation uses: one per model (platform, model id, endpoint scope), per process, and it starts again at the first key after a restart.
 
 ---
 

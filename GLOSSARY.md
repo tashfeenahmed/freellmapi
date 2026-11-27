@@ -58,7 +58,7 @@ dive wins; fix this file.
   multiplied by headroom guardrails — not round-robin.
 - **Strategy**: the weight preset (`balanced`, `smartest`, `fastest`,
   `reliable`, `custom`, `priority`). Key selection (`auto` /
-  `least-remaining`) is independent of it.
+  `least-remaining` / `round-robin`) is independent of it.
 - **Headroom**: remaining quota as a 0–1 factor. Steers traffic away
   before a cap hits; it never lets a request through a real limit.
 - **Quota windows**: RPM / TPM (sliding minute) and RPD / TPD (UTC day).

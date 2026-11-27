@@ -79,7 +79,7 @@ export interface DecisionRoutingStatus {
 // How the gateway picks between several keys of ONE platform, once a model has
 // been chosen (#919). Separate from RoutingStrategy, which ranks models: the
 // two are independent knobs and the Fallback page sets them side by side.
-export type KeySelectionStrategy = 'auto' | 'least-remaining'
+export type KeySelectionStrategy = 'auto' | 'least-remaining' | 'round-robin'
 
 export type RoutingWeights = { reliability: number; speed: number; intelligence: number }
 
