@@ -2106,14 +2106,11 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   const hasImage = messageHasImage(messages);
   const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'chat completions', requestGroupId) : null;
   if (noVisionMessage) {
-    res.setHeader('X-Vision-Model-Available', 'false');
-    res.setHeader('X-Block-Cause', 'no_vision_model');
     res.status(422).json({
       error: {
         message: noVisionMessage,
         type: 'invalid_request_error',
         code: 'no_vision_model',
-        cause: 'no_vision_model',
       },
       execution_id: requestGroupId,
     });
