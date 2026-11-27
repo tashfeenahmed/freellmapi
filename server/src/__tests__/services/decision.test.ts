@@ -64,9 +64,9 @@ describe('decision service', () => {
   });
 
   it('has adapters for the supported decision platforms', () => {
-    expect([...DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'custom', 'google', 'halx', 'openrouter', 'silvr']);
+    expect([...DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'classifierdev', 'cloudflare', 'custom', 'google', 'halx', 'nutrient', 'openrouter', 'silvr', 'tanod']);
     // Custom endpoints are user-registered (#1777): the catalog never adds or prunes them.
-    expect([...CATALOG_DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'cloudflare', 'google', 'halx', 'openrouter', 'silvr']);
+    expect([...CATALOG_DECISION_PLATFORMS].sort()).toEqual(['aisense', 'apinex', 'beatapi', 'blockrun', 'classifierdev', 'cloudflare', 'google', 'halx', 'nutrient', 'openrouter', 'silvr', 'tanod']);
   });
 
   function seed(platform: string, model: string) {
@@ -93,6 +93,27 @@ describe('decision service', () => {
     expect(calls(fn)[0][0]).toBe('https://aisenseapi.com/services/v1/decide');
     expect(bodyOf(calls(fn)[0])).toEqual({ model, state: { message: REQUEST.state }, questions: REQUEST.questions });
     expect(calls(fn)[0][1].headers).toEqual({ 'Content-Type': 'application/json' });
+  });
+
+  it('uses anonymous classifier.dev with training disabled and checks the resolved Jev identity', async () => {
+    seed('classifierdev', 'jev-latest'); addKey('classifierdev', 'do-not-forward');
+    const fn = mockFetch(() => json({ model: 'jev-1.13.0', answers: ANSWERS, usage: { input_tokens: 42 } }));
+    const result = await runDecision(REQUEST, { model: 'jev-latest' });
+    expect(result).toMatchObject({ modelVersion: 'jev-1.13.0', provider: 'classifierdev', answers: ANSWERS });
+    const [url, init] = calls(fn)[0];
+    expect(url).toBe('https://classifier.dev/v1/systemone');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json', 'X-Classifier-Share-Data': 'false' });
+    expect(init.redirect).toBe('error');
+    expect(bodyOf(calls(fn)[0])).toEqual({ model: 'jev-latest', state: REQUEST.state, questions: REQUEST.questions, share_data: false });
+  });
+
+  it.each([
+    { model: 'jev-omni', answers: ANSWERS },
+    { model: 'jev-1.13.0', answers: {} },
+  ])('rejects substituted or incomplete classifier.dev responses', async response => {
+    seed('classifierdev', 'jev-latest'); addKey('classifierdev', 'no-key');
+    mockFetch(() => json(response));
+    await expect(runDecision(REQUEST, { model: 'jev-latest' })).rejects.toMatchObject({ status: 502 });
   });
 
   it('rejects substituted and missing keyless decision answers', async () => {

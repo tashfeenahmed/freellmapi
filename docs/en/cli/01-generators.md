@@ -12,6 +12,7 @@ npx freellmapi setup-mimo          # wire MiMo Code
 npx freellmapi setup-atomcode      # wire AtomCode
 npx freellmapi --dry-run setup-claude  # preview without writing
 npx freellmapi setup-claude --model gpt-4o  # pin a model
+npx freellmapi setup-claude --context-window max  # size Claude Code to your largest model
 ```
 
 Every generator (`cli/src/tools.ts:52-622`) fetches the live catalog, resolves `--model` against the unfiltered catalog (`c942352`), backs up existing config with a timestamped copy, merges without clobbering unrelated keys, and writes with `0600`.
@@ -61,6 +62,7 @@ Proves a client's requests reach this gateway (checks routed `Authorization` hea
 | `--dry-run` | Preview changes without writing; shows diff |
 | `--model <id>` | Pin to a model (resolved against unfiltered catalog) |
 | `--profile <name>` | Named profile (Codex `codex --profile NAME`, Claude `CLAUDE_CONFIG_DIR`) |
+| `--context-window max\|<tokens>` | `setup-claude` and `launch` only. Sets `CLAUDE_CODE_AUTO_COMPACT_WINDOW`. Default: the `context_window` of `auto` (the window most of your models hold). `max`: the `max_context_window` of `auto` (your largest tool-capable model). See [Claude Code compacts near 105k](../troubleshooting/01-common-issues.md#claude-code-compacts-near-105k-tokens) |
 
 ## Related
 

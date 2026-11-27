@@ -60,7 +60,16 @@
     "emailChanged": "El. paštas pakeistas.",
     "passwordReset": "Slaptažodis atstatytas. Prisijunkite.",
     "resetCodeDockerHint": "Naudojate Docker? Kodas yra konteinerio žurnale: docker logs <container>.",
-    "desktopSessionFailed": "Valdymo skydeliui nepavyko prisijungti prie vietinio serverio. Uždarykite FreeLLMAPI ir atidarykite iš naujo."
+    "desktopSessionFailed": "Valdymo skydeliui nepavyko prisijungti prie vietinio serverio. Uždarykite FreeLLMAPI ir atidarykite iš naujo.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Išsaugoti",
@@ -171,7 +180,12 @@
     "updateNow": "Atnaujinti dabar",
     "updatingContainer": "Atsisiunčiamas naujas atvaizdas ir paleidžiama iš naujo. Puslapis įsikels iš naujo, kai FreeLLMAPI grįš.",
     "updateNowFailed": "Atnaujintuvas nepriėmė užklausos. Patikrinkite, ar veikia watchtower konteineris.",
-    "updateNowTimeout": "FreeLLMAPI per 5 minutes nepasileido iš naujo. Peržiūrėkite watchtower konteinerio žurnalus."
+    "updateNowTimeout": "FreeLLMAPI per 5 minutes nepasileido iš naujo. Peržiūrėkite watchtower konteinerio žurnalus.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeliai",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Pasirinkite paslaugų teikėją",
     "addKey": "Pridėti klavišą",
+    "addAnotherKey": "Pridėti dar vieną API raktą",
     "keyAdded": "Pridėtas raktas",
     "endpointKeysShareModels": "To paties galinio taško raktai dalijasi jo modeliais.",
     "export": "Eksportas",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "Pasirenkama",
     "customFamily": "Šeima",
     "customFamilyPlaceholder": "Numatytasis modelio ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API raktas",
     "customCapabilities": "Galimybės",
     "addModel": "Pridėti modelį",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} Tok Max",
     "emptyTitle": "Kol kas nėra įterpiamų modelių",
     "emptyDesc": "Įterpimo šeimos čia atsiranda, kai pridedate tiekėjo raktą, kuris palaiko įterpimus.",
-    "dragToReorder": "Vilkti į peružsakymo tiekėją"
+    "dragToReorder": "Vilkti į peružsakymo tiekėją",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Sintezė",
@@ -1233,7 +1252,8 @@
       "hermes": "Save tobulinantis Nous Research agentas su nuolatine atmintimi ir įgūdžiais, terminale arba pokalbių programose.",
       "pi": "Minimalistinis terminalo agentas, kurį pritaikote savais plėtiniais, įgūdžiais ir užklausų šablonais.",
       "reasonix": "DeepSeek sukurtas terminalo programavimo agentas, paremtas prefiksų talpykla, kad ilgos sesijos liktų pigios.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Vietinis terminalo programavimo agentas su išliekančiomis sesijomis, leidimais ir bet kurio su OpenAI suderinamo tiekėjo palaikymu."
     }
   },
   "update": {

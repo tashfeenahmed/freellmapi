@@ -60,7 +60,16 @@
     "emailChanged": "ఇమెయిల్ విజయవంతంగా మార్చబడింది.",
     "passwordReset": "పాస్‌వర్డ్ రీసెట్ అయింది. దయచేసి సైన్ ఇన్ చేయండి.",
     "resetCodeDockerHint": "Docker లో నడుపుతున్నారా? కోడ్ కంటైనర్ లాగ్‌లో ఉంది: docker logs <container>.",
-    "desktopSessionFailed": "డాష్‌బోర్డ్ లోకల్ సర్వర్‌కు సైన్ ఇన్ కాలేకపోయింది. FreeLLMAPI ని మూసివేసి మళ్లీ తెరవండి."
+    "desktopSessionFailed": "డాష్‌బోర్డ్ లోకల్ సర్వర్‌కు సైన్ ఇన్ కాలేకపోయింది. FreeLLMAPI ని మూసివేసి మళ్లీ తెరవండి.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "సేవ్ చేయండి",
@@ -171,7 +180,12 @@
     "updateNow": "ఇప్పుడే అప్‌డేట్ చేయండి",
     "updatingContainer": "కొత్త ఇమేజ్‌ను తెచ్చి రీస్టార్ట్ అవుతోంది. FreeLLMAPI తిరిగి వచ్చాక ఈ పేజీ రీలోడ్ అవుతుంది.",
     "updateNowFailed": "అప్‌డేటర్ అభ్యర్థనను అంగీకరించలేదు. watchtower కంటైనర్ నడుస్తోందో లేదో చూడండి.",
-    "updateNowTimeout": "5 నిమిషాల తర్వాత కూడా FreeLLMAPI రీస్టార్ట్ కాలేదు. watchtower కంటైనర్ లాగ్‌లను చూడండి."
+    "updateNowTimeout": "5 నిమిషాల తర్వాత కూడా FreeLLMAPI రీస్టార్ట్ కాలేదు. watchtower కంటైనర్ లాగ్‌లను చూడండి.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "మోడల్స్",
@@ -436,6 +450,7 @@
     "familyHaiku": "హైకూ",
     "selectPlatform": "ప్రొవైడర్‌ను ఎంచుకోండి",
     "addKey": "కీని జోడించండి",
+    "addAnotherKey": "మరో API కీని జోడించండి",
     "keyAdded": "కీ జోడించబడింది",
     "endpointKeysShareModels": "ఒకే ఎండ్‌పాయింట్ కీలు దాని మోడల్‌లను పంచుకుంటాయి.",
     "export": "ఎగుమతి చేయండి",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ఐచ్ఛికం",
     "customFamily": "కుటుంబం",
     "customFamilyPlaceholder": "మోడల్ ఐడికి డిఫాల్ట్",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API కీ",
     "customCapabilities": "సామర్థ్యాలు",
     "addModel": "మోడల్‌ని జోడించండి",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} గరిష్టంగా",
     "emptyTitle": "ఇంకా పొందుపరిచే మోడల్‌లు లేవు",
     "emptyDesc": "ఎంబెడ్డింగ్‌లకు మద్దతిచ్చే ప్రొవైడర్ కీని మీరు జోడించిన తర్వాత పొందుపరిచే కుటుంబాలు ఇక్కడ కనిపిస్తాయి.",
-    "dragToReorder": "ప్రొవైడర్‌ని మళ్లీ ఆర్డర్ చేయడానికి లాగండి"
+    "dragToReorder": "ప్రొవైడర్‌ని మళ్లీ ఆర్డర్ చేయడానికి లాగండి",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ఫ్యూజన్",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research యొక్క స్వీయ-మెరుగుదల ఏజెంట్, శాశ్వత మెమరీ మరియు నైపుణ్యాలతో, టెర్మినల్‌లో లేదా చాట్ యాప్‌లలో.",
       "pi": "మీ సొంత ఎక్స్‌టెన్షన్‌లు, నైపుణ్యాలు, ప్రాంప్ట్ టెంప్లేట్‌లతో మీరు తీర్చిదిద్దే కనీస టెర్మినల్ ఏజెంట్.",
       "reasonix": "DeepSeek కోసం రూపొందించిన టెర్మినల్ కోడింగ్ ఏజెంట్; దీర్ఘ సెషన్లు కూడా చౌకగా ఉండేలా ప్రిఫిక్స్ క్యాషింగ్ చుట్టూ నిర్మించబడింది.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "స్థిరమైన సెషన్‌లు, అనుమతులు మరియు ఏదైనా OpenAI-అనుకూల ప్రొవైడర్‌తో కూడిన లోకల్ టెర్మినల్ కోడింగ్ ఏజెంట్."
     }
   },
   "update": {

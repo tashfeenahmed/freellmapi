@@ -60,7 +60,16 @@
     "emailChanged": "इमेल सफलतापूर्वक परिवर्तन भयो।",
     "passwordReset": "पासवर्ड रिसेट भयो। कृपया साइन इन गर्नुहोस्।",
     "resetCodeDockerHint": "Docker मा चलाइरहनुभएको छ? कोड कन्टेनर लगमा छ: docker logs <container>।",
-    "desktopSessionFailed": "ड्यासबोर्डले लोकल सर्भरमा साइन इन गर्न सकेन। FreeLLMAPI बन्द गरेर फेरि खोल्नुहोस्।"
+    "desktopSessionFailed": "ड्यासबोर्डले लोकल सर्भरमा साइन इन गर्न सकेन। FreeLLMAPI बन्द गरेर फेरि खोल्नुहोस्।",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "बचत गर्नुहोस्",
@@ -171,7 +180,12 @@
     "updateNow": "अहिले अपडेट गर्नुहोस्",
     "updatingContainer": "नयाँ इमेज तानिँदै र पुनः सुरु हुँदैछ। FreeLLMAPI फर्केपछि यो पेज पुनः लोड हुन्छ।",
     "updateNowFailed": "अपडेटरले अनुरोध स्वीकार गरेन। watchtower कन्टेनर चलिरहेको छ कि छैन जाँच गर्नुहोस्।",
-    "updateNowTimeout": "५ मिनेटपछि पनि FreeLLMAPI पुनः सुरु भएको छैन। watchtower कन्टेनरका लगहरू हेर्नुहोस्।"
+    "updateNowTimeout": "५ मिनेटपछि पनि FreeLLMAPI पुनः सुरु भएको छैन। watchtower कन्टेनरका लगहरू हेर्नुहोस्।",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "नमूनाहरू",
@@ -436,6 +450,7 @@
     "familyHaiku": "हाइकु",
     "selectPlatform": "प्रदायक चयन गर्नुहोस्",
     "addKey": "कुञ्जी थप्नुहोस्",
+    "addAnotherKey": "अर्को API कुञ्जी थप्नुहोस्",
     "keyAdded": "कुञ्जी थपियो",
     "endpointKeysShareModels": "एउटै एन्डपोइन्टका कुञ्जीहरूले त्यसका मोडेलहरू साझा गर्छन्।",
     "export": "निर्यात गर्नुहोस्",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "वैकल्पिक",
     "customFamily": "परिवार",
     "customFamilyPlaceholder": "नमूना आईडीमा पूर्वनिर्धारितहरू",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "कुञ्जी API गर्नुहोस्",
     "customCapabilities": "क्षमताहरू",
     "addModel": "नमूना थप्नुहोस्",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} अधिकतम",
     "emptyTitle": "अहिले सम्म कुनै सम्मिलित नमुना छैन",
     "emptyDesc": "तपाईँले एम्बेडिङलाई समर्थन गर्ने प्रदायक कुञ्जी थप्नु भएपछि सम्मिलित परिवारहरू यहाँ देखा पर्दछ।",
-    "dragToReorder": "प्रदायक पुन: क्रमबद्ध गर्न तान्नुहोस्"
+    "dragToReorder": "प्रदायक पुन: क्रमबद्ध गर्न तान्नुहोस्",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "फ्युजन",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research को आफैं सुधारिने एजेन्ट, स्थायी मेमोरी र सीपहरूसहित, टर्मिनलमा वा च्याट एपहरूमा।",
       "pi": "एक न्यूनतम टर्मिनल एजेन्ट, जसलाई तपाईं आफ्नै एक्सटेन्सन, सीप र प्रम्प्ट टेम्प्लेटले आकार दिनुहुन्छ।",
       "reasonix": "DeepSeek का लागि बनाइएको टर्मिनल कोडिङ एजेन्ट, लामा सत्रहरू सस्तो रहून् भनेर प्रिफिक्स क्यासिङको वरिपरि निर्माण गरिएको।",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "स्थायी सत्र, अनुमतिहरू र कुनै पनि OpenAI-अनुकूल प्रदायकसँग काम गर्ने स्थानीय टर्मिनल कोडिङ एजेन्ट।"
     }
   },
   "update": {

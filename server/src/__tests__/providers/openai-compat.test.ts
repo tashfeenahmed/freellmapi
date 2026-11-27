@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import dns from 'node:dns';
-import { OpenAICompatProvider, inBandCreditsError, inBandErrorEnvelope } from '../../providers/openai-compat.js';
+import { OpenAICompatProvider, inBandCreditsError, inBandErrorEnvelope, usesMaxCompletionTokens, isMaxTokensUnsupportedError } from '../../providers/openai-compat.js';
 import { stubPublicDns } from '../helpers/dns.js';
 
 // Fake relay hosts must resolve for the URL guard (#1875).
@@ -1382,5 +1382,208 @@ describe('OpenCode session header (#1639)', () => {
     if ((global as any).__lastHeaders) {
       expect((global as any).__lastHeaders['x-opencode-session']).toBeUndefined();
     }
+  });
+});
+
+describe('max_completion_tokens remapping for reasoning models (#2056)', () => {
+  const messages = [{ role: 'user' as const, content: 'hello' }];
+  const custom = () => new OpenAICompatProvider({
+    platform: 'custom',
+    name: 'Custom (OpenAI-compatible)',
+    baseUrl: 'https://gateway.example.com/v1',
+  });
+  const okJson = () => ({
+    ok: true,
+    status: 200,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: () => Promise.resolve({
+      id: 'chatcmpl-1',
+      object: 'chat.completion',
+      created: 1,
+      model: 'gpt-5',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+    }),
+  }) as any;
+  const okStream = () => {
+    const encoder = new TextEncoder();
+    const frames = [
+      'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"gpt-5","choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":null}]}\n\n',
+      'data: {"id":"chatcmpl-1","object":"chat.completion.chunk","created":1,"model":"gpt-5","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n',
+      'data: [DONE]\n\n',
+    ];
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const frame of frames) controller.enqueue(encoder.encode(frame));
+        controller.close();
+      },
+    });
+    return { ok: true, status: 200, body, headers: new Headers() } as any;
+  };
+  const unsupportedMaxTokens400 = () => ({
+    ok: false,
+    status: 400,
+    statusText: 'Bad Request',
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: () => Promise.resolve({
+      error: {
+        code: 'unsupported_parameter',
+        message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+        param: 'max_tokens',
+        type: 'invalid_request_error',
+      },
+    }),
+  }) as any;
+
+  function upstream(...responses: Array<() => any>) {
+    const bodies: any[] = [];
+    vi.spyOn(global, 'fetch').mockImplementation(async (_u, init) => {
+      bodies.push(JSON.parse((init as any).body));
+      const next = responses[bodies.length - 1];
+      if (!next) throw new Error(`unexpected request #${bodies.length}`);
+      return next();
+    });
+    return bodies;
+  }
+
+  let log: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('classifies OpenAI reasoning model ids without false positives', () => {
+    for (const id of [
+      'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5.4', 'gpt-5.4-mini', 'GPT-5-Pro',
+      'openai/gpt-5', 'azure:openai/gpt-5.4-mini', 'gpt-5:2025-08-07',
+      'o1', 'o1-mini', 'o1-preview', 'o3', 'o3-mini', 'o3-pro', 'o4-mini',
+      'openai/o3-mini', 'my-org/o4-mini:high',
+    ]) {
+      expect(usesMaxCompletionTokens(id), id).toBe(true);
+    }
+    for (const id of [
+      'gpt-4o', 'gpt-4.1', 'gpt-4o-mini', 'openai/gpt-oss-120b', 'gpt-50b',
+      'llama-3.3-70b', 'olmo-2', 'foo1-mini', 'neo3', 'o2-preview', 'claude-sonnet-4-6',
+    ]) {
+      expect(usesMaxCompletionTokens(id), id).toBe(false);
+    }
+  });
+
+  it('detects unsupported max_tokens 400 errors and ignores unrelated 400s', () => {
+    expect(isMaxTokensUnsupportedError(400, {
+      error: { code: 'unsupported_parameter', param: 'max_tokens', message: 'unsupported' },
+    })).toBe(true);
+    expect(isMaxTokensUnsupportedError(400, {
+      error: { message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead." },
+    })).toBe(true);
+    expect(isMaxTokensUnsupportedError(400, {
+      detail: "max_tokens is not supported; pass max_completion_tokens",
+    })).toBe(true);
+    expect(isMaxTokensUnsupportedError(500, {
+      error: { code: 'unsupported_parameter', param: 'max_tokens', message: "Use 'max_completion_tokens' instead." },
+    })).toBe(false);
+    expect(isMaxTokensUnsupportedError(400, {
+      error: { message: 'max_tokens must be at most 4096' },
+    })).toBe(false);
+  });
+
+  it('proactively sends max_completion_tokens (and omits max_tokens) on custom reasoning models (non-stream + stream)', async () => {
+    const bodies = upstream(okJson, okStream);
+    await custom().chatCompletion('k', messages, 'gpt-5', { max_tokens: 4096, contextBudget: 2048 });
+    for await (const _ of custom().streamChatCompletion('k', messages, 'openai/o3-mini', { max_tokens: 1024 })) { /* drain */ }
+
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].max_completion_tokens).toBe(2048);
+    expect(bodies[0]).not.toHaveProperty('max_tokens');
+    expect(bodies[1].max_completion_tokens).toBe(1024);
+    expect(bodies[1]).not.toHaveProperty('max_tokens');
+    expect(bodies[1].stream).toBe(true);
+  });
+
+  it('omits both max_tokens and max_completion_tokens when no output budget is provided', async () => {
+    const bodies = upstream(okJson);
+    await custom().chatCompletion('k', messages, 'gpt-5');
+    expect(bodies[0]).not.toHaveProperty('max_tokens');
+    expect(bodies[0]).not.toHaveProperty('max_completion_tokens');
+  });
+
+  it('keeps sending max_tokens for non-reasoning custom models and built-in platforms', async () => {
+    const bodies = upstream(okJson, okJson, okJson);
+    await custom().chatCompletion('k', messages, 'gpt-4o', { max_tokens: 512 });
+    await custom().chatCompletion('k', messages, 'openai/gpt-oss-120b', { max_tokens: 512 });
+    const openrouter = new OpenAICompatProvider({ platform: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' });
+    await openrouter.chatCompletion('k', messages, 'openai/gpt-5', { max_tokens: 512 });
+
+    for (const b of bodies) {
+      expect(b.max_tokens).toBe(512);
+      expect(b).not.toHaveProperty('max_completion_tokens');
+    }
+  });
+
+  it('non-stream: retries a 400 once with max_completion_tokens for relabeled reasoning models', async () => {
+    const bodies = upstream(unsupportedMaxTokens400, okJson);
+    const res = await custom().chatCompletion('k', messages, 'corp-reasoning-prod', { max_tokens: 2048 });
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].max_tokens).toBe(2048);
+    expect(bodies[0]).not.toHaveProperty('max_completion_tokens');
+    expect(bodies[1].max_completion_tokens).toBe(2048);
+    expect(bodies[1]).not.toHaveProperty('max_tokens');
+    expect(res.choices[0].message.content).toBe('ok');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('#2056'));
+  });
+
+  it('stream: retries a 400 once with max_completion_tokens for relabeled reasoning models', async () => {
+    const bodies = upstream(unsupportedMaxTokens400, okStream);
+    const chunks: any[] = [];
+    for await (const c of custom().streamChatCompletion('k', messages, 'corp-reasoning-prod', { max_tokens: 2048 })) chunks.push(c);
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].max_tokens).toBe(2048);
+    expect(bodies[1].max_completion_tokens).toBe(2048);
+    expect(bodies[1]).not.toHaveProperty('max_tokens');
+    expect(bodies[1].stream).toBe(true);
+    expect(chunks.some(c => c.choices[0]?.delta?.content === 'ok')).toBe(true);
+  });
+
+  it('throws the retry error without a third attempt when max_completion_tokens is also rejected', async () => {
+    const second400 = () => ({
+      ok: false, status: 400, statusText: 'Bad Request',
+      json: () => Promise.resolve({ error: { message: 'still invalid' } }),
+    }) as any;
+    const bodies = upstream(unsupportedMaxTokens400, second400);
+    await expect(
+      custom().chatCompletion('k', messages, 'corp-reasoning-prod', { max_tokens: 2048 }),
+    ).rejects.toThrow('Custom (OpenAI-compatible) API error 400: still invalid');
+    expect(bodies).toHaveLength(2);
+  });
+
+  it('does not retry ceiling 400 errors on max_tokens', async () => {
+    const ceiling400 = () => ({
+      ok: false, status: 400, statusText: 'Bad Request',
+      json: () => Promise.resolve({ error: { message: 'max_tokens must be at most 4096' } }),
+    }) as any;
+    const bodies = upstream(ceiling400);
+    await expect(
+      custom().chatCompletion('k', messages, 'gpt-4o', { max_tokens: 65536 }),
+    ).rejects.toThrow('max_tokens must be at most 4096');
+    expect(bodies).toHaveLength(1);
+  });
+
+  it('preserves max_completion_tokens when composing with pinned tool_choice retry (#1548)', async () => {
+    const tool = { type: 'function' as const, function: { name: 'lookup', description: 'Lookup', parameters: { type: 'object', properties: {} } } };
+    const pinned = { type: 'function' as const, function: { name: 'lookup' } };
+    const toolChoice400 = () => ({
+      ok: false, status: 400, statusText: 'Bad Request',
+      json: () => Promise.resolve({ error: { message: 'tool_choice object unsupported' } }),
+    }) as any;
+    const bodies = upstream(toolChoice400, okJson);
+    await custom().chatCompletion('k', messages, 'gpt-5', { tools: [tool], tool_choice: pinned, max_tokens: 500 });
+    expect(bodies).toHaveLength(2);
+    expect(bodies[0].max_completion_tokens).toBe(500);
+    expect(bodies[0]).not.toHaveProperty('max_tokens');
+    expect(bodies[1].max_completion_tokens).toBe(500);
+    expect(bodies[1]).not.toHaveProperty('max_tokens');
+    expect(bodies[1].tool_choice).toBe('required');
   });
 });

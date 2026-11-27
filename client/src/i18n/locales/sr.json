@@ -60,7 +60,16 @@
     "emailChanged": "Имејл је промењен.",
     "passwordReset": "Лозинка је ресетована. Пријавите се.",
     "resetCodeDockerHint": "Користите Docker? Код се налази у логу контејнера: docker logs <container>.",
-    "desktopSessionFailed": "Контролна табла није успела да се пријави на локални сервер. Затворите FreeLLMAPI и поново га отворите."
+    "desktopSessionFailed": "Контролна табла није успела да се пријави на локални сервер. Затворите FreeLLMAPI и поново га отворите.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Сачувај",
@@ -171,7 +180,12 @@
     "updateNow": "Ажурирај сада",
     "updatingContainer": "Преузима се нова слика и поново се покреће. Страница ће се поново учитати када се FreeLLMAPI врати.",
     "updateNowFailed": "Ажурирач није прихватио захтев. Проверите да ли контејнер watchtower ради.",
-    "updateNowTimeout": "FreeLLMAPI се није поново покренуо након 5 минута. Проверите логове контејнера watchtower."
+    "updateNowTimeout": "FreeLLMAPI се није поново покренуо након 5 минута. Проверите логове контејнера watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Модели",
@@ -436,6 +450,7 @@
     "familyHaiku": "Хаику",
     "selectPlatform": "Изаберите провајдера",
     "addKey": "Додај кључ",
+    "addAnotherKey": "Додај још један API кључ",
     "keyAdded": "Кључ је додат",
     "endpointKeysShareModels": "Кључеви исте крајње тачке деле њене моделе.",
     "export": "Извоз",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "опционо",
     "customFamily": "Породица",
     "customFamilyPlaceholder": "подразумевано је на ИД модела",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Кључ API",
     "customCapabilities": "Могућности",
     "addModel": "Додајте модел",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ток мак",
     "emptyTitle": "Још нема модела за уграђивање",
     "emptyDesc": "Породице за уграђивање се појављују овде када додате кључ добављача који подржава уграђивање.",
-    "dragToReorder": "Превуците да бисте променили редослед добављача"
+    "dragToReorder": "Превуците да бисте променили редослед добављача",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Фусион",
@@ -1233,7 +1252,8 @@
       "hermes": "Агент компаније Nous Research који сам себе усавршава, са трајном меморијом и вештинама, у терминалу или у чет апликацијама.",
       "pi": "Минималистички терминалски агент који обликујете сопственим проширењима, вештинама и шаблонима упита.",
       "reasonix": "Терминалски агент за програмирање направљен за DeepSeek, око кеширања префикса, како би дуге сесије остале јефтине.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Локални терминалски агент за програмирање са трајним сесијама, дозволама и подршком за било ког провајдера компатибилног са OpenAI."
     }
   },
   "update": {

@@ -60,7 +60,16 @@
     "emailChanged": "ኢሜይል በተሳካ ሁኔታ ተቀይሯል።",
     "passwordReset": "የይለፍ ቃል ዳግም ተጀምሯል። እባክዎ ይግቡ።",
     "resetCodeDockerHint": "በ Docker ውስጥ እየሮጠ ነው? ኮዱ በኮንቴይነሩ መዝገብ ውስጥ ነው፦ docker logs <container>።",
-    "desktopSessionFailed": "ዳሽቦርዱ ወደ አካባቢያዊ አገልጋዩ መግባት አልቻለም። FreeLLMAPI ን ዘግተው እንደገና ይክፈቱት።"
+    "desktopSessionFailed": "ዳሽቦርዱ ወደ አካባቢያዊ አገልጋዩ መግባት አልቻለም። FreeLLMAPI ን ዘግተው እንደገና ይክፈቱት።",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "አስቀምጥ",
@@ -171,7 +180,12 @@
     "updateNow": "አሁን አዘምን",
     "updatingContainer": "አዲሱን ምስል እያወረደ እንደገና በመጀመር ላይ። FreeLLMAPI ሲመለስ ይህ ገጽ እንደገና ይጫናል።",
     "updateNowFailed": "አዘማኙ ጥያቄውን አልተቀበለም። የwatchtower ኮንቴይነር እየሰራ መሆኑን ያረጋግጡ።",
-    "updateNowTimeout": "FreeLLMAPI ከ5 ደቂቃ በኋላም እንደገና አልጀመረም። የwatchtower ኮንቴይነርን ምዝግብ ማስታወሻዎች ይመልከቱ።"
+    "updateNowTimeout": "FreeLLMAPI ከ5 ደቂቃ በኋላም እንደገና አልጀመረም። የwatchtower ኮንቴይነርን ምዝግብ ማስታወሻዎች ይመልከቱ።",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ሞዴሎች",
@@ -436,6 +450,7 @@
     "familyHaiku": "ሃይኩ",
     "selectPlatform": "አቅራቢ ይምረጡ",
     "addKey": "ቁልፍ አክል",
+    "addAnotherKey": "ሌላ የAPI ቁልፍ ያክሉ",
     "keyAdded": "ቁልፍ ታክሏል",
     "endpointKeysShareModels": "የአንድ መዳረሻ ቁልፎች ተመሳሳይ ሞዴሎችን ይጋራሉ።",
     "export": "ወደ ውጪ መላክ",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ግዴታ ያልሆነ",
     "customFamily": "ቤተሰብ",
     "customFamilyPlaceholder": "የሞዴል መታወቂያ ነባሪዎች",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ቁልፍ",
     "customCapabilities": "ችሎታዎች",
     "addModel": "ሞዴል ያክሉ",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ቶክ ማክስ",
     "emptyTitle": "እስካሁን ምንም የመክተት ሞዴሎች የሉም",
     "emptyDesc": "መክተትን የሚደግፍ የአቅራቢ ቁልፍ ካከሉ በኋላ ቤተሰቦችን መክተት እዚህ ይታያል።",
-    "dragToReorder": "አቅራቢውን እንደገና ለማዘዝ ይጎትቱ"
+    "dragToReorder": "አቅራቢውን እንደገና ለማዘዝ ይጎትቱ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ቅልጥፍና",
@@ -1233,7 +1252,8 @@
       "hermes": "የ Nous Research ራሱን የሚያሻሽል ኤጀንት፣ ቋሚ ማህደረ ትውስታ እና ክህሎቶች ያሉት፣ በተርሚናል ወይም በቻት መተግበሪያዎች ላይ።",
       "pi": "በራስዎ ቅጥያዎች፣ ክህሎቶች እና የጥያቄ አብነቶች የሚቀርጹት አነስተኛ የተርሚናል ኤጀንት።",
       "reasonix": "ለDeepSeek የተሰራ የተርሚናል ኮዲንግ ወኪል፤ ረጅም ክፍለ ጊዜዎች ርካሽ እንዲሆኑ በprefix caching ዙሪያ የተገነባ።",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "ዘላቂ ክፍለ ጊዜዎች፣ ፈቃዶች እና ከOpenAI ጋር የሚስማማ ማንኛውም አቅራቢ ያለው የአካባቢ ተርሚናል ኮዲንግ ወኪል።"
     }
   },
   "update": {

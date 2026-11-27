@@ -60,7 +60,16 @@
     "emailChanged": "Sähköposti vaihdettu.",
     "passwordReset": "Salasana palautettu. Kirjaudu sisään.",
     "resetCodeDockerHint": "Onko käytössä Docker? Koodi on kontin lokissa: docker logs <container>.",
-    "desktopSessionFailed": "Hallintapaneeli ei voinut kirjautua paikalliselle palvelimelle. Sulje FreeLLMAPI ja avaa se uudelleen."
+    "desktopSessionFailed": "Hallintapaneeli ei voinut kirjautua paikalliselle palvelimelle. Sulje FreeLLMAPI ja avaa se uudelleen.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Tallenna",
@@ -171,7 +180,12 @@
     "updateNow": "Päivitä nyt",
     "updatingContainer": "Ladataan uutta imagea ja käynnistetään uudelleen. Sivu latautuu uudelleen, kun FreeLLMAPI palaa.",
     "updateNowFailed": "Päivittäjä ei hyväksynyt pyyntöä. Tarkista, että watchtower-kontti on käynnissä.",
-    "updateNowTimeout": "FreeLLMAPI ei ole käynnistynyt uudelleen 5 minuutissa. Tarkista watchtower-kontin lokit."
+    "updateNowTimeout": "FreeLLMAPI ei ole käynnistynyt uudelleen 5 minuutissa. Tarkista watchtower-kontin lokit.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Mallit",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Valitse palveluntarjoaja",
     "addKey": "Lisää avain",
+    "addAnotherKey": "Lisää toinen API-avain",
     "keyAdded": "Avain lisätty",
     "endpointKeysShareModels": "Saman päätepisteen avaimet jakavat sen mallit.",
     "export": "Vienti",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "Valinnainen",
     "customFamily": "Perhe",
     "customFamilyPlaceholder": "Oletukset malli-ID:hen",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API avain",
     "customCapabilities": "Kyvykkyydet",
     "addModel": "Lisää malli",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Ei vielä upotusmalleja",
     "emptyDesc": "Upotusperheet näkyvät tässä, kun lisäät palveluntarjoajan avaimen, joka tukee upotuksia.",
-    "dragToReorder": "Drag reorder-palveluntarjoajalle"
+    "dragToReorder": "Drag reorder-palveluntarjoajalle",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fuusio",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research -yhtiön itseään kehittävä agentti, jolla on pysyvä muisti ja taitoja, terminaalissa tai chat-sovelluksissa.",
       "pi": "Minimalistinen terminaaliagentti, jota muokkaat omilla laajennuksilla, taidoilla ja kehotepohjilla.",
       "reasonix": "DeepSeekille rakennettu päätteen koodausagentti, joka nojaa etuliitevälimuistiin, jotta pitkät istunnot pysyvät edullisina.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Paikallinen päätteen koodausagentti pysyvillä istunnoilla, käyttöoikeuksilla ja tuella mille tahansa OpenAI-yhteensopivalle palveluntarjoajalle."
     }
   },
   "update": {

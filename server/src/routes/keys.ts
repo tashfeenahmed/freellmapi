@@ -11,7 +11,14 @@ import { getSyncState } from '../services/catalog-sync.js';
 import { encrypt, decrypt, maskKey } from '../lib/crypto.js';
 import { parseKeysFromFile, stripJsoncComments, stripTrailingCommas } from '../lib/key-parser.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
-import { verifyCredentials, recordReauthFailure, clearReauthFailures } from '../services/auth.js';
+import { budgetInputSchema } from '../lib/budget-input.js';
+import {
+  verifyCredentials,
+  recordReauthFailure,
+  clearReauthFailures,
+  isSessionRecentlyReauthenticated,
+  type SessionUser,
+} from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential, normalizeGroupLabel, setCustomEndpointGroup } from '../services/custom-endpoint.js';
@@ -49,7 +56,9 @@ export const keysRouter = Router();
 // cannot create a key (#1565, #1768). The API still serves existing keys.
 // Waterfall: users report being unable to create new keys (#1768). A working
 // public site/models endpoint does not establish that key creation works.
-const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall']);
+// AINative Studio: no free tier — its pricing page lists paid plans only
+// (#2019). Existing keys keep working.
+const UNLISTED_PLATFORMS = new Set<string>(['aclide', 'waterfall', 'ainative']);
 
 // Active providers — must match providers/index.ts registrations + shared/types.ts Platform.
 // Moonshot and MiniMax direct integrations were dropped in V4. HuggingFace
@@ -91,13 +100,16 @@ const PLATFORMS = [
   'serpsearch',
   'brave',
   'outcrawl',
+  'tinyfish',
   'halx',
   'aisense',
+  'classifierdev',
+  'nutrient', 'tanod',
   'freeai',
   'google', 'groq', 'cerebras', 'sail', 'electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare', 'bai', 'radeon', 'nvidia', 'mistral',
   'openrouter', 'cohere', 'tavily', 'exa', 'firecrawl', 'linkup', 'parallel', 'keenable', 'cloudflare', 'zhipu', 'ollama',
   'kilo', 'pollinations', 'llm7', 'huggingface', 'opencode', 'ovh', 'agnes', 'reka', 'siliconflow',
-  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'powertokens', 'cheapllm', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
+  'routeway', 'bazaarlink', 'ainative', 'aion', 'anyapi', 'powertokens', 'cheapllm', 'llmkiwi', 'tokenreply', 'puter', 'requesty', 'navy', 'nara', 'sealion', 'orcarouter', 'unorouter', 'xkiro', 'modelscope',
   'qianfan', 'volcengine', 'longcat', 'xfyun', 'aihorde', 'custom',
 ] as const;
 
@@ -620,7 +632,19 @@ function skipsReauth(req: Request): boolean {
 // otherwise the response has been sent.
 function passesReauth(req: Request, res: Response, action: string): boolean {
   if (skipsReauth(req)) return true;
-  const user = (req as any).user as { userId: number; email: string };
+  const user = (req as any).user as SessionUser;
+  // #2008: OIDC sessions can step-up re-authenticate with the IdP (prompt=login,
+  // max_age=60) for a 5-minute window instead of re-entering a local password.
+  if (isSessionRecentlyReauthenticated(user)) return true;
+  if (!user.hasLocalPassword && user.authSource === 'oidc') {
+    res.status(403).json({
+      error: {
+        message: `SSO re-verification required to ${action}`,
+        type: 'oidc_reauth_required',
+      },
+    });
+    return false;
+  }
   const password = req.headers['x-reauth-password'] as string | undefined;
   if (!password) {
     res.status(403).json({ error: { message: `Password verification required to ${action}`, type: 'authentication_error' } });
@@ -926,6 +950,8 @@ const modelEntrySchema = z.union([
     displayName: z.string().optional(),
     supportsTools: z.boolean().optional(),
     supportsVision: z.boolean().optional(),
+    monthlyTokenBudget: budgetInputSchema.optional(),
+    tpdLimit: z.number().int().positive().nullable().optional(),
     // #1506: a kind forwarded from discovery metadata (the endpoint's own
     // `type`/metadata) so an id with no media keyword still routes to the
     // table that can serve it. Absent, the handler falls back to the
@@ -949,6 +975,8 @@ const customProviderSchema = z.object({
   // (object form) overrides them for that one model.
   supportsTools: z.boolean().optional(),
   supportsVision: z.boolean().optional(),
+  monthlyTokenBudget: budgetInputSchema.optional(),
+  tpdLimit: z.number().int().positive().nullable().optional(),
   // Endpoint group (#1176). Absent keeps the endpoint's current group; '' moves
   // it back to the single "Custom" group.
   groupLabel: z.string().trim().max(80).optional(),
@@ -1087,6 +1115,10 @@ async function registerImportedModels(
         dimensions,
         maxInputTokens: null,
         quotaLabel: 'custom endpoint',
+        // No rate-limit windows here on purpose: a bulk key import has no
+        // per-model limit input, and omitting them leaves whatever an operator
+        // configured through POST /api/embeddings/custom intact instead of
+        // silently resetting it to unlimited.
       });
       registered++;
     } catch (err: any) {
@@ -1415,9 +1447,11 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
   // whatever name it already has on re-registration (see the upsert below).
   const topTools = parsed.data.supportsTools;
   const topVision = parsed.data.supportsVision;
-  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean; kind?: DiscoveredModelKind }[] = [];
+  const topMonthlyTokenBudget = parsed.data.monthlyTokenBudget?.trim() || undefined;
+  const topTpdLimit = parsed.data.tpdLimit;
+  const entries: { modelId: string; displayName: string | null; supportsTools?: boolean; supportsVision?: boolean; monthlyTokenBudget?: string; tpdLimit?: number | null; kind?: DiscoveredModelKind }[] = [];
   const seen = new Set<string>();
-  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean, kind?: DiscoveredModelKind) => {
+  const addEntry = (rawId: string, rawDisplay?: string, tools?: boolean, vision?: boolean, kind?: DiscoveredModelKind, monthlyTokenBudget?: string, tpdLimit?: number | null) => {
     const modelId = rawId.trim();
     if (!modelId || seen.has(modelId)) return;
     seen.add(modelId);
@@ -1426,13 +1460,15 @@ keysRouter.post('/custom', async (req: Request, res: Response) => {
       displayName: rawDisplay?.trim() || null,
       supportsTools: tools ?? topTools,
       supportsVision: vision ?? topVision,
+      monthlyTokenBudget: monthlyTokenBudget?.trim() || topMonthlyTokenBudget,
+      tpdLimit: tpdLimit !== undefined ? tpdLimit : topTpdLimit,
       kind,
     });
   };
   if (parsed.data.model?.trim()) addEntry(parsed.data.model, parsed.data.displayName);
   for (const m of parsed.data.models ?? []) {
     if (typeof m === 'string') addEntry(m);
-    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision, m.kind);
+    else addEntry(m.model, m.displayName, m.supportsTools, m.supportsVision, m.kind, m.monthlyTokenBudget, m.tpdLimit);
   }
   // A lone model submitted through the plural `models` also carries its name in
   // the top-level `displayName` — that is exactly what the dashboard's custom

@@ -60,7 +60,16 @@
     "emailChanged": "ईमेल यशस्वीरित्या बदलला.",
     "passwordReset": "पासवर्ड रीसेट झाला. कृपया साइन इन करा.",
     "resetCodeDockerHint": "Docker मध्ये चालवत आहात? कोड कंटेनर लॉगमध्ये आहे: docker logs <container>.",
-    "desktopSessionFailed": "डॅशबोर्ड लोकल सर्व्हरमध्ये साइन इन करू शकला नाही. FreeLLMAPI बंद करून पुन्हा उघडा."
+    "desktopSessionFailed": "डॅशबोर्ड लोकल सर्व्हरमध्ये साइन इन करू शकला नाही. FreeLLMAPI बंद करून पुन्हा उघडा.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "जतन करा",
@@ -171,7 +180,12 @@
     "updateNow": "आता अपडेट करा",
     "updatingContainer": "नवीन इमेज ओढली जात आहे आणि रीस्टार्ट होत आहे. FreeLLMAPI परत आल्यावर हे पेज रीलोड होईल.",
     "updateNowFailed": "अपडेटरने विनंती स्वीकारली नाही. watchtower कंटेनर चालू आहे का ते तपासा.",
-    "updateNowTimeout": "५ मिनिटांनंतरही FreeLLMAPI रीस्टार्ट झाले नाही. watchtower कंटेनरचे लॉग तपासा."
+    "updateNowTimeout": "५ मिनिटांनंतरही FreeLLMAPI रीस्टार्ट झाले नाही. watchtower कंटेनरचे लॉग तपासा.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "मॉडेल्स",
@@ -436,6 +450,7 @@
     "familyHaiku": "हायकू",
     "selectPlatform": "प्रदाता निवडा",
     "addKey": "की जोडा",
+    "addAnotherKey": "आणखी एक API की जोडा",
     "keyAdded": "की जोडली",
     "endpointKeysShareModels": "एकाच एंडपॉइंटच्या की त्याचे मॉडेल सामायिक करतात.",
     "export": "निर्यात करा",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "पर्यायी",
     "customFamily": "कुटुंब",
     "customFamilyPlaceholder": "मॉडेल आयडीवर डीफॉल्ट",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API की",
     "customCapabilities": "क्षमता",
     "addModel": "मॉडेल जोडा",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} टोक कमाल",
     "emptyTitle": "अद्याप कोणतेही एम्बेडिंग मॉडेल नाहीत",
     "emptyDesc": "तुम्ही एम्बेडिंगला सपोर्ट करणारी प्रदाता की जोडल्यानंतर एम्बेडिंग कुटुंबे येथे दिसतात.",
-    "dragToReorder": "प्रदाता पुनर्क्रमित करण्यासाठी ड्रॅग करा"
+    "dragToReorder": "प्रदाता पुनर्क्रमित करण्यासाठी ड्रॅग करा",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "फ्यूजन",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research चा स्वतःत सुधारणा करणारा एजंट, कायमस्वरूपी मेमरी आणि कौशल्यांसह, टर्मिनलमध्ये किंवा चॅट अ‍ॅप्सवर.",
       "pi": "एक किमान टर्मिनल एजंट, जो तुम्ही तुमच्या स्वतःच्या एक्सटेन्शन, कौशल्ये आणि प्रॉम्प्ट टेम्पलेट्सने घडवता.",
       "reasonix": "DeepSeek साठी बनवलेला टर्मिनल कोडिंग एजंट, प्रीफिक्स कॅशिंगभोवती रचलेला जेणेकरून दीर्घ सेशनही स्वस्त राहतील.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "कायमस्वरूपी सत्रे, परवानग्या आणि कोणत्याही OpenAI-सुसंगत प्रदात्यासह स्थानिक टर्मिनल कोडिंग एजंट."
     }
   },
   "update": {

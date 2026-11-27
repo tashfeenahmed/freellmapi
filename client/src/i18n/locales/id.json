@@ -60,7 +60,16 @@
     "emailChanged": "E-mail berhasil diubah.",
     "passwordReset": "Kata sandi telah direset. Silakan masuk.",
     "resetCodeDockerHint": "Menjalankan di Docker? Kode ada di log container: docker logs <container>.",
-    "desktopSessionFailed": "Dasbor tidak dapat masuk ke server lokal. Tutup FreeLLMAPI lalu buka lagi."
+    "desktopSessionFailed": "Dasbor tidak dapat masuk ke server lokal. Tutup FreeLLMAPI lalu buka lagi.",
+    "signInWithSso": "Masuk dengan {provider}",
+    "orContinueWithPassword": "atau lanjutkan dengan email",
+    "reverifyWithSso": "Verifikasi ulang dengan {provider}",
+    "oidcReauthHint": "Konfirmasi identitas Anda dengan {provider} untuk mengakses kunci teks biasa.",
+    "oidcReauthSuccess": "Identitas terverifikasi selama 5 menit ke depan.",
+    "oidcErrorNotAllowed": "Akun Anda tidak diizinkan masuk ke dasbor ini.",
+    "oidcErrorUnverifiedEmail": "Penyedia identitas Anda harus memverifikasi alamat email Anda sebelum masuk.",
+    "oidcErrorNoAccount": "Tidak ada akun yang cocok dan pembuatan akun otomatis dinonaktifkan.",
+    "oidcErrorFailed": "Login SSO gagal. Silakan coba lagi."
   },
   "common": {
     "save": "Simpan",
@@ -171,7 +180,12 @@
     "updateNow": "Perbarui sekarang",
     "updatingContainer": "Menarik image baru dan memulai ulang. Halaman ini dimuat ulang saat FreeLLMAPI kembali.",
     "updateNowFailed": "Pembaru tidak menerima permintaan. Pastikan kontainer watchtower berjalan.",
-    "updateNowTimeout": "FreeLLMAPI belum dimulai ulang setelah 5 menit. Periksa log kontainer watchtower."
+    "updateNowTimeout": "FreeLLMAPI belum dimulai ulang setelah 5 menit. Periksa log kontainer watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Model",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Pilih penyedia",
     "addKey": "Tambahkan kunci",
+    "addAnotherKey": "Tambahkan kunci API lain",
     "keyAdded": "Kunci ditambahkan",
     "endpointKeysShareModels": "Kunci untuk endpoint yang sama berbagi model-modelnya.",
     "export": "Ekspor",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "opsional",
     "customFamily": "Keluarga",
     "customFamilyPlaceholder": "default untuk id model",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Kunci API",
     "customCapabilities": "Kemampuan",
     "addModel": "Tambahkan model",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} hingga maks",
     "emptyTitle": "Belum ada model penyematan",
     "emptyDesc": "Keluarga penyematan muncul di sini setelah Anda menambahkan kunci penyedia yang mendukung penyematan.",
-    "dragToReorder": "Tarik untuk menyusun ulang penyedia"
+    "dragToReorder": "Tarik untuk menyusun ulang penyedia",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusi",
@@ -1233,7 +1252,8 @@
       "hermes": "Agen dari Nous Research yang terus memperbaiki diri, dengan memori persisten dan keterampilan, di terminal atau di aplikasi chat.",
       "pi": "Agen terminal minimalis yang Anda bentuk dengan ekstensi, keterampilan, dan templat prompt Anda sendiri.",
       "reasonix": "Agen coding terminal yang dibuat khusus untuk DeepSeek, dibangun di sekitar prefix caching agar sesi panjang tetap murah.",
-      "zcode": "Agen kode Z.ai untuk model GLM-nya, terhubung ke endpoint apa pun yang kompatibel dengan OpenAI melalui registri penyedia."
+      "zcode": "Agen kode Z.ai untuk model GLM-nya, terhubung ke endpoint apa pun yang kompatibel dengan OpenAI melalui registri penyedia.",
+      "zero": "Agen coding terminal lokal dengan sesi persisten, kontrol izin, dan penyedia apa pun yang kompatibel dengan OpenAI."
     }
   },
   "update": {

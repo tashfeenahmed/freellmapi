@@ -60,7 +60,16 @@
     "emailChanged": "เปลี่ยนอีเมลเรียบร้อยแล้ว",
     "passwordReset": "รีเซ็ตรหัสผ่านแล้ว กรุณาเข้าสู่ระบบ",
     "resetCodeDockerHint": "ใช้งานใน Docker อยู่ใช่ไหม รหัสอยู่ในบันทึกของคอนเทนเนอร์: docker logs <container>",
-    "desktopSessionFailed": "แดชบอร์ดไม่สามารถลงชื่อเข้าใช้เซิร์ฟเวอร์ในเครื่องได้ ปิด FreeLLMAPI แล้วเปิดใหม่อีกครั้ง"
+    "desktopSessionFailed": "แดชบอร์ดไม่สามารถลงชื่อเข้าใช้เซิร์ฟเวอร์ในเครื่องได้ ปิด FreeLLMAPI แล้วเปิดใหม่อีกครั้ง",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "บันทึก",
@@ -171,7 +180,12 @@
     "updateNow": "อัปเดตตอนนี้",
     "updatingContainer": "กำลังดึงอิมเมจใหม่และรีสตาร์ต หน้านี้จะโหลดใหม่เมื่อ FreeLLMAPI กลับมา",
     "updateNowFailed": "ตัวอัปเดตไม่รับคำขอ ตรวจสอบว่าคอนเทนเนอร์ watchtower กำลังทำงาน",
-    "updateNowTimeout": "FreeLLMAPI ยังไม่รีสตาร์ตหลังผ่านไป 5 นาที ตรวจสอบบันทึกของคอนเทนเนอร์ watchtower"
+    "updateNowTimeout": "FreeLLMAPI ยังไม่รีสตาร์ตหลังผ่านไป 5 นาที ตรวจสอบบันทึกของคอนเทนเนอร์ watchtower",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "โมเดล",
@@ -436,6 +450,7 @@
     "familyHaiku": "ไฮกุ",
     "selectPlatform": "เลือกผู้ให้บริการ",
     "addKey": "เพิ่มรหัส",
+    "addAnotherKey": "เพิ่มคีย์ API อื่น",
     "keyAdded": "เพิ่มคีย์แล้ว",
     "endpointKeysShareModels": "คีย์ของเอนด์พอยต์เดียวกันใช้โมเดลร่วมกัน",
     "export": "ส่งออก",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ไม่จำเป็น",
     "customFamily": "ครอบครัว",
     "customFamilyPlaceholder": "ค่าเริ่มต้นเป็นรหัสรุ่น",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "คีย์ API",
     "customCapabilities": "ความสามารถ",
     "addModel": "เพิ่มรุ่น",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} โทเค็นสูงสุด",
     "emptyTitle": "ยังไม่มีการฝังโมเดล",
     "emptyDesc": "กลุ่มการฝังจะปรากฏที่นี่เมื่อคุณเพิ่มรหัสผู้ให้บริการที่รองรับการฝัง",
-    "dragToReorder": "ลากเพื่อจัดลำดับผู้ให้บริการใหม่"
+    "dragToReorder": "ลากเพื่อจัดลำดับผู้ให้บริการใหม่",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ฟิวชั่น",
@@ -1233,7 +1252,8 @@
       "hermes": "เอเจนต์ที่พัฒนาตัวเองได้ของ Nous Research พร้อมหน่วยความจำถาวรและทักษะ ใช้ได้ทั้งในเทอร์มินัลและบนแอปแชต",
       "pi": "เอเจนต์เทอร์มินัลแบบมินิมอลที่คุณปรับแต่งได้ด้วยส่วนขยาย ทักษะ และเทมเพลตพรอมต์ของคุณเอง",
       "reasonix": "เอเจนต์เขียนโค้ดบนเทอร์มินัลที่สร้างมาเพื่อ DeepSeek โดยออกแบบรอบ prefix caching ให้เซสชันยาว ๆ ยังคงประหยัด",
-      "zcode": "เอเจนต์เขียนโค้ดของ Z.ai สำหรับโมเดล GLM เชื่อมต่อกับ endpoint ที่เข้ากันได้กับ OpenAI ผ่านทะเบียนผู้ให้บริการ"
+      "zcode": "เอเจนต์เขียนโค้ดของ Z.ai สำหรับโมเดล GLM เชื่อมต่อกับ endpoint ที่เข้ากันได้กับ OpenAI ผ่านทะเบียนผู้ให้บริการ",
+      "zero": "เอเจนต์เขียนโค้ดบนเทอร์มินัลในเครื่องที่มีเซสชันถาวร การจัดการสิทธิ์ และรองรับผู้ให้บริการที่เข้ากันได้กับ OpenAI ทุกราย"
     }
   },
   "update": {

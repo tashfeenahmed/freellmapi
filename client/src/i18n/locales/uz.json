@@ -60,7 +60,16 @@
     "emailChanged": "E-pochta muvaffaqiyatli o'zgartirildi.",
     "passwordReset": "Parol tiklandi. Iltimos, kiring.",
     "resetCodeDockerHint": "Docker ichida ishlayaptimi? Kod konteyner jurnalida: docker logs <container>.",
-    "desktopSessionFailed": "Boshqaruv paneli lokal serverga kira olmadi. FreeLLMAPI dasturini yopib, qayta oching."
+    "desktopSessionFailed": "Boshqaruv paneli lokal serverga kira olmadi. FreeLLMAPI dasturini yopib, qayta oching.",
+    "signInWithSso": "{provider} orqali kirish",
+    "orContinueWithPassword": "yoki email bilan davom eting",
+    "reverifyWithSso": "{provider} orqali qayta tasdiqlash",
+    "oidcReauthHint": "Ochiq kalitlarga kirish uchun shaxsingizni {provider} orqali tasdiqlang.",
+    "oidcReauthSuccess": "Shaxsingiz keyingi 5 daqiqa davomida tasdiqlandi.",
+    "oidcErrorNotAllowed": "Hisobingiz ushbu boshqaruv paneliga kirish huquqiga ega emas.",
+    "oidcErrorUnverifiedEmail": "Kirishdan oldin identifikatsiya provayderingiz email manzilingizni tasdiqlashi kerak.",
+    "oidcErrorNoAccount": "Mos keladigan hisob topilmadi va avtomatik hisob yaratish o'chirilgan.",
+    "oidcErrorFailed": "Yagona kirish (SSO) amalga oshmadi. Qaytadan urinib ko'ring."
   },
   "common": {
     "save": "Saqlash",
@@ -171,7 +180,12 @@
     "updateNow": "Hozir yangilash",
     "updatingContainer": "Yangi obraz yuklab olinmoqda va qayta ishga tushirilmoqda. FreeLLMAPI qaytganda bu sahifa qayta yuklanadi.",
     "updateNowFailed": "Yangilovchi so‘rovni qabul qilmadi. watchtower konteyneri ishlayotganini tekshiring.",
-    "updateNowTimeout": "FreeLLMAPI 5 daqiqadan keyin ham qayta ishga tushmadi. watchtower konteyneri jurnallarini tekshiring."
+    "updateNowTimeout": "FreeLLMAPI 5 daqiqadan keyin ham qayta ishga tushmadi. watchtower konteyneri jurnallarini tekshiring.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modellar",
@@ -436,6 +450,7 @@
     "familyHaiku": "Xayku",
     "selectPlatform": "Provayderni tanlang",
     "addKey": "Kalit qo'shing",
+    "addAnotherKey": "Boshqa API kalitini qo‘shish",
     "keyAdded": "Kalit qo'shildi",
     "endpointKeysShareModels": "Bir xil endpoint kalitlari uning modellarini baham ko'radi.",
     "export": "Eksport",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ixtiyoriy",
     "customFamily": "Oila",
     "customFamilyPlaceholder": "standart identifikatori uchun",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API kaliti",
     "customCapabilities": "Imkoniyatlar",
     "addModel": "Model qo'shing",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok maks",
     "emptyTitle": "Hozircha oʻrnatish modellari yoʻq",
     "emptyDesc": "Oʻrnatishlarni qoʻllab-quvvatlaydigan provayder kalitini qoʻshganingizdan soʻng, oʻrnatish oilalari shu yerda paydo boʻladi.",
-    "dragToReorder": "Provayderni qayta tartiblash uchun torting"
+    "dragToReorder": "Provayderni qayta tartiblash uchun torting",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research'ning o'zini takomillashtiradigan agenti; doimiy xotira va ko'nikmalar bilan, terminalda yoki chat ilovalarida.",
       "pi": "O'z kengaytmalaringiz, ko'nikmalaringiz va so'rov shablonlaringiz bilan shakllantiradigan minimal terminal agenti.",
       "reasonix": "DeepSeek uchun yaratilgan terminal kodlash agenti; uzoq sessiyalar arzon qolishi uchun prefiks keshlash asosida qurilgan.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Barqaror sessiyalar, ruxsatlar va har qanday OpenAI-mos provayder bilan ishlaydigan mahalliy terminal kodlash agenti."
     }
   },
   "update": {

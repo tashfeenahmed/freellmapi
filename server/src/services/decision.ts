@@ -3,6 +3,7 @@ import { BEATAPI_BASE_URL } from '../providers/beatapi.js';
 import { APINEX_BASE_URL } from '../providers/apinex.js';
 import { BLOCKRUN_BASE_URL } from '../providers/blockrun.js';
 import { SILVR_BASE_URL } from '../providers/silvr.js';
+import { tanodLabels, tanodStatus } from '../providers/tanod.js';
 import { parseRetryAfterMs, parseStatedRetryMs } from '../providers/base.js';
 import { RetryHintTracker } from '../lib/retry-hint.js';
 import { getClientContext } from '../lib/client-context.js';
@@ -63,6 +64,7 @@ export interface ExtractionRequest {
 }
 
 export const CLAIRIC_MODEL = '@cf/cloudflare/clairic';
+export const isClairic = (id?: string) => id === CLAIRIC_MODEL || id === CLAIRIC_MODEL + '-flash';
 
 export interface DecisionResponse {
   /** The decision model that answered (its catalog id). */
@@ -169,9 +171,9 @@ async function upstream(url: string, platform: string, init: RequestInit, signal
     FETCH_TIMEOUT_MS,
   );
   if (!res.ok) {
-    if (platform === 'silvr') {
+    if (platform === 'silvr' || platform === 'nutrient') {
       await res.body?.cancel();
-      throw new DecisionError(`SilvR decision request failed (${res.status})`, res.status, undefined, parseRetryAfterMs(res.headers.get('retry-after')));
+      throw new DecisionError(`${platform === 'silvr' ? 'SilvR' : 'Nutrient'} decision request failed (${res.status})`, res.status, undefined, parseRetryAfterMs(res.headers.get('retry-after')));
     }
     const text = await res.text().catch(() => '');
     // Same rule as the chat path (providers/base.ts buildUpstreamError): a
@@ -215,6 +217,30 @@ function cloudflareKey(key: string): { accountId: string; token: string } {
 }
 
 const ADAPTERS: Record<string, Adapter> = {
+  nutrient: async (cred, modelId, body, signal) => {
+    if (!['nutrient-document-decision','nutrient-systemone'].includes(modelId)) throw new DecisionError('Unsupported Nutrient decision model', 400);
+    const json = await upstream('https://api.nutrient.io/ai/v1/systemone', 'nutrient', {
+      method: 'POST', redirect: 'error', headers: {Authorization: 'Bearer ' + cred.key, 'Content-Type': 'application/json'},
+      body: JSON.stringify({model:modelId, state:body.state, questions:body.questions}),
+    }, signal);
+    return checkedDecisionResult(json, 'nutrient', modelId, body);
+  },
+  tanod: async (_cred, modelId, body, signal) => {
+    const entries = Object.entries(body.questions);
+    if (modelId !== 'nli-deberta-v3-xsmall' || typeof body.state !== 'string' || entries.length !== 1) throw new DecisionError('Tanod takes one English choice question about text', 400);
+    const [id,q] = entries[0]!;
+    if (q.type !== 'choice' || !q.criteria || typeof q.criteria !== 'object' || Array.isArray(q.criteria) || typeof q.instructions !== 'string') throw new DecisionError('Tanod requires named choice criteria', 400);
+    const criteria = Object.entries(q.criteria);
+    if (criteria.some(([,v]) => v != null && typeof v !== 'string')) throw new DecisionError('Tanod criteria must be text labels', 400);
+    const labels=criteria.map(([k,v])=>v ? k+': '+v : k);
+    try {
+      const scores=await tanodLabels(body.state, labels, q.instructions, signal);
+      const ranked=criteria.map(([k],i)=>[k,scores.get(labels[i]!)!] as const).sort((a,b)=>b[1]-a[1]);
+      const total=ranked.reduce((sum,[,score])=>sum+score,0);
+      if(total<=0) throw new DecisionError('Tanod returned no label evidence',502);
+      return {answers:{[id]:{type:'choice', choice:ranked[0]![0], confidence:ranked[0]![1], probabilities:Object.fromEntries(ranked.map(([k,v])=>[k,v/total]))}},usage:{input_tokens:0,output_tokens:0}};
+    } catch(e) { throw new DecisionError(e instanceof Error ? e.message : 'Tanod failed', tanodStatus(e)); }
+  },
   // The tested SilvR route uses named predicate questions, not System One's
   // state/object schema. Do not silently simulate untested choice/score types.
   silvr: async (cred, modelId, body, signal) => {
@@ -266,6 +292,18 @@ const ADAPTERS: Record<string, Adapter> = {
       }
     }
     return checked;
+  },
+  classifierdev: async (_cred, modelId, body, signal) => {
+    if (modelId !== 'jev-latest') throw new DecisionError('Unsupported classifier.dev model', 400);
+    // Anonymous text only. Never forward workspace keys, paid long-context
+    // options, or the upstream's default training-data opt-in.
+    const json = await upstream('https://classifier.dev/v1/systemone', 'classifierdev', {
+      method: 'POST', redirect: 'error',
+      headers: { 'Content-Type': 'application/json', 'X-Classifier-Share-Data': 'false' },
+      body: JSON.stringify({ model: modelId, state: body.state, questions: body.questions, share_data: false }),
+    }, signal);
+    const version = 'jev-1.13.0'; // Only this resolved identity is verified for the free route.
+    return { ...checkedDecisionResult(json, 'classifierdev', version, body), modelVersion: version };
   },
   // HAL-X uses `question`, not System One's `instructions`.
   halx: async (_cred, modelId, body, signal) => {
@@ -592,19 +630,19 @@ function checkedDecisionResult(raw: unknown, platform: string, model: string, bo
 
 /** Clairic extracts typed fields; it cannot answer choice/noul/score questions.
  * Text + numeric fields are the live-tested subset exposed here. */
-async function extractClairic(cred: ReservedProviderCredential, body: ExtractionRequest, signal?: AbortSignal): Promise<AdapterResult> {
+async function extractClairic(cred: ReservedProviderCredential, model: string, body: ExtractionRequest, signal?: AbortSignal): Promise<AdapterResult> {
   const { accountId, token } = cloudflareKey(cred.key);
-  const payload = JSON.stringify({ model: 'clairic', state: body.state, fields: body.fields });
+  const payload = JSON.stringify({ ...(model === CLAIRIC_MODEL ? { model: 'clairic' } : {}), state: body.state, fields: body.fields });
   const json = await meterCloudflare(
-    cred.key, CLAIRIC_MODEL, { inputTokens: roughTokens(payload) },
-    () => upstream(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${CLAIRIC_MODEL}`, 'cloudflare', {
+    cred.key, model, { inputTokens: roughTokens(payload) },
+    () => upstream(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${model}`, 'cloudflare', {
       method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: payload,
     }, signal) as Promise<{ success?: boolean; result?: { model?: unknown; answers?: unknown; usage?: unknown; truncated?: boolean } } | null>,
     j => (j?.result ? { inputTokens: usageOf(j.result.usage).input_tokens || roughTokens(payload) } : null),
     capAsDecisionError,
   );
-  if (!json?.success || json.result?.model !== 'clairic') throw new DecisionError('cloudflare returned an invalid Clairic result', 502);
+  if (!json?.success || !json.result || json.result.model !== model.split('/').at(-1)) throw new DecisionError('cloudflare returned an invalid Clairic result', 502);
   const answers = answersOf(json.result.answers, 'cloudflare');
   for (const [id, field] of Object.entries(body.fields)) {
     const a = answers[id] as { type?: unknown; value?: unknown } | undefined;
@@ -664,7 +702,7 @@ function hasUsableKey(platform: string): boolean {
  *  any key of platform 'custom', so it checks that key specifically. */
 export function decisionsAvailable(): boolean {
   return allDecisionRows().some(r => {
-    if (r.enabled !== 1 || r.model_id === CLAIRIC_MODEL || !ADAPTERS[r.platform]) return false;
+    if (r.enabled !== 1 || isClairic(r.model_id) || !ADAPTERS[r.platform]) return false;
     if (r.platform === 'custom') {
       if (r.key_id == null) return false;
       return !!getDb()
@@ -676,7 +714,7 @@ export function decisionsAvailable(): boolean {
 }
 
 function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<string>, rowId?: number, extraction = false): DecisionModelRow[] {
-  const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform] && (r.model_id === CLAIRIC_MODEL) === extraction);
+  const enabled = allDecisionRows().filter(r => r.enabled === 1 && ADAPTERS[r.platform] && (isClairic(r.model_id)) === extraction);
   if (rowId !== undefined) {
     const pinned = enabled.find(r => r.id === rowId);
     if (!pinned) throw new DecisionError('Decision model is unavailable or turned off', 400);
@@ -699,8 +737,8 @@ function decisionChain(model: string | undefined, skipPlatforms?: ReadonlySet<st
 export async function runDecision(body: DecisionRequest | ExtractionRequest, opts: DecisionOptions = {}): Promise<DecisionResponse> {
   const extraction = 'fields' in body;
   if (extraction && body.questions !== undefined) throw new DecisionError('Send fields or questions, not both', 400);
-  if (!extraction && opts.model === CLAIRIC_MODEL) throw new DecisionError('Clairic requires fields, not questions', 400);
-  if (extraction && opts.model && !['auto', CLAIRIC_MODEL].includes(opts.model)) throw new DecisionError('This model does not support extraction fields', 400);
+  if (!extraction && isClairic(opts.model)) throw new DecisionError('Clairic requires fields, not questions', 400);
+  if (extraction && opts.model && opts.model !== 'auto' && !isClairic(opts.model)) throw new DecisionError('This model does not support extraction fields', 400);
   const chain = decisionChain(opts.model, opts.skipPlatforms, opts.rowId, extraction);
   const clientAgent = opts.clientAgent !== undefined ? opts.clientAgent : getClientContext().agent;
   const questionCount = Object.keys(extraction ? body.fields : body.questions).length;
@@ -730,7 +768,7 @@ export async function runDecision(body: DecisionRequest | ExtractionRequest, opt
       attempted++;
       const started = Date.now();
       try {
-        const out = extraction ? await extractClairic(credential, body, opts.signal)
+        const out = extraction ? await extractClairic(credential, row.model_id, body, opts.signal)
           : await ADAPTERS[row.platform]!(credential, row.model_id, body, opts.signal);
         logDecision(row, credential.id, 'ok', Date.now() - started, questionCount, out.usage.input_tokens, clientAgent, null);
         // A served decision is evidence the key works, the same as a served

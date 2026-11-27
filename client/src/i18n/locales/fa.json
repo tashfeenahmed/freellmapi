@@ -60,7 +60,16 @@
     "emailChanged": "ایمیل با موفقیت تغییر کرد.",
     "passwordReset": "رمز عبور بازنشانی شد. لطفاً وارد شوید.",
     "resetCodeDockerHint": "در Docker اجرا می‌کنید؟ کد در لاگ کانتینر است: docker logs <container>.",
-    "desktopSessionFailed": "داشبورد نتوانست به سرور محلی وارد شود. FreeLLMAPI را ببندید و دوباره باز کنید."
+    "desktopSessionFailed": "داشبورد نتوانست به سرور محلی وارد شود. FreeLLMAPI را ببندید و دوباره باز کنید.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "ذخیره کنید",
@@ -171,7 +180,12 @@
     "updateNow": "اکنون به‌روزرسانی کن",
     "updatingContainer": "در حال دریافت ایمیج جدید و راه‌اندازی مجدد. وقتی FreeLLMAPI برگردد این صفحه دوباره بارگذاری می‌شود.",
     "updateNowFailed": "به‌روزرسان درخواست را نپذیرفت. بررسی کنید کانتینر watchtower در حال اجراست.",
-    "updateNowTimeout": "FreeLLMAPI پس از ۵ دقیقه دوباره راه‌اندازی نشده است. گزارش‌های کانتینر watchtower را بررسی کنید."
+    "updateNowTimeout": "FreeLLMAPI پس از ۵ دقیقه دوباره راه‌اندازی نشده است. گزارش‌های کانتینر watchtower را بررسی کنید.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "مدل ها",
@@ -436,6 +450,7 @@
     "familyHaiku": "هایکو",
     "selectPlatform": "ارائه دهنده ای را انتخاب کنید",
     "addKey": "کلید اضافه کنید",
+    "addAnotherKey": "افزودن کلید API دیگر",
     "keyAdded": "کلید اضافه شد",
     "endpointKeysShareModels": "کلیدهای یک نقطه پایانی، مدل‌های آن را به اشتراک می‌گذارند.",
     "export": "صادرات",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "اختیاری",
     "customFamily": "خانواده",
     "customFamilyPlaceholder": "به طور پیش فرض به مدل ID است",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "کلید API",
     "customCapabilities": "قابلیت ها",
     "addModel": "اضافه کردن مدل",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} توک حداکثر",
     "emptyTitle": "هنوز مدل تعبیه نشده است",
     "emptyDesc": "هنگامی که کلید ارائه دهنده ای را اضافه کنید که از جاسازی ها پشتیبانی می کند، خانواده های جاسازی در اینجا ظاهر می شوند.",
-    "dragToReorder": "برای سفارش دادن مجدد ارائه دهنده را بکشید"
+    "dragToReorder": "برای سفارش دادن مجدد ارائه دهنده را بکشید",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "فیوژن",
@@ -1233,7 +1252,8 @@
       "hermes": "عامل خودبهبود Nous Research با حافظهٔ ماندگار و مهارت‌ها، در ترمینال یا در اپ‌های چت.",
       "pi": "یک عامل مینیمال ترمینال که با افزونه‌ها، مهارت‌ها و قالب‌های پرامپت خودتان شکلش می‌دهید.",
       "reasonix": "عامل کدنویسی ترمینال که برای DeepSeek ساخته شده و حول کش پیشوند طراحی شده تا جلسه‌های طولانی ارزان بمانند.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "عامل کدنویسی محلی در ترمینال با جلسه‌های ماندگار، کنترل دسترسی و پشتیبانی از هر ارائه‌دهنده سازگار با OpenAI."
     }
   },
   "update": {

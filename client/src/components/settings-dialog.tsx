@@ -546,10 +546,37 @@ function PreviewSection({ state }: { state: CompressionState }) {
   )
 }
 
-function GeneralSection() {
+type SystemDateMode = 'off' | 'web_search' | 'always'
+
+function GeneralSection({ open }: { open: boolean }) {
   const { t } = useI18n()
   const { theme, setTheme } = useTheme()
   const loginItem = useDesktopLoginItem()
+  const [systemDateMode, setSystemDateMode] = useState<SystemDateMode>('off')
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    apiFetch<{ mode: SystemDateMode }>('/api/settings/system-date')
+      .then(res => {
+        if (!cancelled && (res.mode === 'off' || res.mode === 'web_search' || res.mode === 'always')) {
+          setSystemDateMode(res.mode)
+        }
+      })
+      .catch(() => { /* keep default when offline/test env */ })
+    return () => { cancelled = true }
+  }, [open])
+
+  function updateSystemDateMode(next: SystemDateMode) {
+    const prev = systemDateMode
+    setSystemDateMode(next)
+    apiFetch<{ mode: SystemDateMode }>('/api/settings/system-date', {
+      method: 'PUT',
+      body: JSON.stringify({ mode: next }),
+    }).catch(() => {
+      setSystemDateMode(prev)
+    })
+  }
 
   return (
     <>
@@ -571,6 +598,23 @@ function GeneralSection() {
             }))}
             ariaLabel={t('settings.theme')}
             className="w-full grid-cols-3 sm:w-64"
+          />
+        )}
+      />
+      <Row
+        label={t('settings.injectSystemDate')}
+        hint={t('settings.injectSystemDateHelp')}
+        control={(
+          <OptionBar
+            value={systemDateMode}
+            onValueChange={updateSystemDateMode}
+            options={[
+              { value: 'off', label: t('settings.injectSystemDateOff') },
+              { value: 'web_search', label: t('settings.injectSystemDateWebSearch') },
+              { value: 'always', label: t('settings.injectSystemDateAlways') },
+            ]}
+            ariaLabel={t('settings.injectSystemDate')}
+            className="w-full grid-cols-3 sm:w-72"
           />
         )}
       />
@@ -649,7 +693,7 @@ export function SettingsDialog({
 
           {/* min-height keeps the popup from resizing as sections are switched. */}
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:min-h-[27rem] sm:px-6 sm:py-6">
-            {section === 'general' && <GeneralSection />}
+            {section === 'general' && <GeneralSection open={open} />}
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" />

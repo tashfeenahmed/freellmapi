@@ -29,6 +29,10 @@
  *     <parameter name="k">v</parameter></invoke></dots_function_call>
  *     (parameter values: JSON numbers/booleans/arrays/objects get that type,
  *     everything else is a string)
+ *  6. Claude-style XML, same body as dots under a <function_calls> wrapper:
+ *     <function_calls><invoke name="NAME"><parameter name="k">v</parameter>
+ *     </invoke></function_calls> (#2117: models answering Claude Code's
+ *     prompt copy this shape as text)
  */
 
 export interface RescuedToolCall {
@@ -54,6 +58,7 @@ const DIALECT_MARKERS = [
   '<tool_call>',
   '<function=',
   '<dots_function_call>',
+  '<function_calls>',
 ] as const;
 
 /** Does the (trimmed) text start with a known dialect marker? */
@@ -77,6 +82,55 @@ export function couldBecomeDialectMarker(text: string): boolean {
 /** Anywhere-in-text detection for the non-streaming path. */
 export function containsDialectMarker(text: string): boolean {
   return DIALECT_MARKERS.some(m => text.includes(m));
+}
+
+/**
+ * Streaming hold-window helpers for dialect 4 (#2117): an answer that opens
+ * with `{` or a ```json fence may be a whole tool call written as JSON, which
+ * rescueInlineToolCalls only recognises once the full text is known. Callers
+ * use these only for tool-carrying requests, since they hold the whole answer.
+ */
+const JSON_FENCE_HEAD = /^```(?:json)?\s*/;
+
+export function startsWithJsonToolCallShape(text: string): boolean {
+  const t = text.trimStart();
+  if (t.startsWith('{')) return true;
+  const fence = JSON_FENCE_HEAD.exec(t);
+  return fence !== null && t[fence[0].length] === '{';
+}
+
+export function couldBecomeJsonToolCallShape(text: string): boolean {
+  const t = text.trimStart();
+  if (t.length === 0) return true;
+  if ('```json'.startsWith(t)) return true;
+  const fence = JSON_FENCE_HEAD.exec(t);
+  return fence !== null && fence[0].length === t.length;
+}
+
+/**
+ * Where the first dialect marker starts in `text`, or -1. Lets a stream that
+ * already sent prose ("I'll create the file now.") still hold and rescue a
+ * tool call that comes after it, instead of sending it to the client as text.
+ */
+export function indexOfDialectMarker(text: string): number {
+  let first = -1;
+  for (const m of DIALECT_MARKERS) {
+    const at = text.indexOf(m);
+    if (at !== -1 && (first === -1 || at < first)) first = at;
+  }
+  return first;
+}
+
+/**
+ * Length of the longest tail of `text` that is the start of a dialect marker
+ * (e.g. "<tool_" at the end of a chunk). A stream holds this tail back until
+ * the next chunk shows whether a marker follows.
+ */
+export function partialDialectMarkerTail(text: string): number {
+  const from = text.lastIndexOf('<');
+  if (from === -1) return 0;
+  const tail = text.slice(from);
+  return DIALECT_MARKERS.some(m => m.length > tail.length && m.startsWith(tail)) ? tail.length : 0;
 }
 
 /**
@@ -239,10 +293,10 @@ function dotsParamValue(raw: string): unknown {
   return value;
 }
 
-function parseDotsDialect(text: string, toolNames: Set<string>): { calls: RescuedToolCall[] | null; cleanText: string } {
+function parseDotsDialect(text: string, toolNames: Set<string>, tag: 'dots_function_call' | 'function_calls' = 'dots_function_call'): { calls: RescuedToolCall[] | null; cleanText: string } {
   const calls: RescuedToolCall[] = [];
   let parsedAll = true;
-  const blockRe = /<dots_function_call>([\s\S]*?)<\/dots_function_call>/g;
+  const blockRe = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'g');
   const spans: Array<{ from: number; to: number }> = [];
   let block: RegExpExecArray | null;
   while ((block = blockRe.exec(text)) !== null) {
@@ -269,9 +323,10 @@ function parseDotsDialect(text: string, toolNames: Set<string>): { calls: Rescue
   let clean = text;
   for (const s of [...spans].reverse()) clean = clean.slice(0, s.from) + clean.slice(s.to);
   // An opening tag with no close (truncated stream) is detected-but-broken.
-  if (clean.includes('<dots_function_call>')) {
+  const openTag = `<${tag}>`;
+  if (clean.includes(openTag)) {
     parsedAll = false;
-    clean = clean.replace(/<dots_function_call>[\s\S]*$/, '');
+    clean = clean.slice(0, clean.indexOf(openTag));
   }
   return { calls: parsedAll && calls.length > 0 ? calls : null, cleanText: clean.trim() };
 }
@@ -301,6 +356,10 @@ export function rescueInlineToolCalls(text: string, toolNames: Set<string>): Res
   }
   if (text.includes('<dots_function_call>')) {
     const { calls, cleanText } = parseDotsDialect(text, toolNames);
+    return { detected: true, calls, cleanText };
+  }
+  if (text.includes('<function_calls>')) {
+    const { calls, cleanText } = parseDotsDialect(text, toolNames, 'function_calls');
     return { detected: true, calls, cleanText };
   }
 

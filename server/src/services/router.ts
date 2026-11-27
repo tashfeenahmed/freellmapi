@@ -1,4 +1,4 @@
-import { getDb, getSetting, setSetting } from '../db/index.js';
+import { getDb, getSetting as dbGetSetting, setSetting as dbSetSetting } from '../db/index.js';
 import { getProvider, hasProvider, resolveProvider } from '../providers/index.js';
 import { decrypt } from '../lib/crypto.js';
 import { decryptProxyUrl } from '../lib/key-proxy.js';
@@ -382,6 +382,50 @@ const PEAK_END_KEY = 'routing_peak_end_hour';
 const PEAK_TZ_KEY = 'routing_peak_timezone';
 const COMMUNITY_PRIOR_KEY = 'routing_community_prior';
 const COMMUNITY_PRIOR_ENABLED_KEY = 'routing_community_prior_enabled';
+// ── Routing settings snapshot ─────────────────────────────────────────────────
+// orderChain runs on every failover attempt and used to issue ~10 uncached
+// SELECTs on `settings` each time. Reads in this module now go through a short
+// TTL snapshot (same 1s the chain cache uses); every setter below invalidates it,
+// so a dashboard write is visible to the next read in this process. Writes made
+// by other code paths or processes are picked up within the TTL. Bypassed under
+// NODE_ENV=test for the same reason as the chain cache (suites write settings via
+// raw SQL and route immediately), unless a test opts in.
+const SETTINGS_CACHE_TTL_MS = 1_000;
+let settingsCache: { db: unknown; at: number; map: Map<string, string | undefined> } | null = null;
+let settingsCacheForced = false;
+
+function settingsCacheActive(): boolean {
+  return settingsCacheForced || process.env.NODE_ENV !== 'test';
+}
+
+function invalidateRouterSettingsCache(): void {
+  settingsCache = null;
+}
+
+/** Test hook: turn the settings snapshot on under NODE_ENV=test. */
+export function setRouterSettingsCacheForTests(on: boolean): void {
+  settingsCacheForced = on;
+  settingsCache = null;
+}
+
+function getSetting(key: string): string | undefined {
+  if (!settingsCacheActive()) return dbGetSetting(key);
+  const db = getDb();
+  const now = Date.now();
+  if (!settingsCache || settingsCache.db !== db || now < settingsCache.at || now - settingsCache.at >= SETTINGS_CACHE_TTL_MS) {
+    settingsCache = { db, at: now, map: new Map() };
+  }
+  if (settingsCache.map.has(key)) return settingsCache.map.get(key);
+  const value = dbGetSetting(key);
+  settingsCache.map.set(key, value);
+  return value;
+}
+
+function setSetting(key: string, value: string): void {
+  dbSetSetting(key, value);
+  invalidateRouterSettingsCache();
+}
+
 // Headroom guardrail thresholds (#899): the remaining-budget fraction at which
 // demotion begins and the score floor at 0 remaining. Stored as decimals
 // (0.2 = 20%). Absent/invalid values fall back to the scoring.ts constants so
@@ -406,6 +450,7 @@ export function setHeadroomThresholds(rampStart?: number | null, floor?: number 
     if (value === undefined) return;
     if (value === null) {
       db.prepare('DELETE FROM settings WHERE key = ?').run(key); // back to default
+      invalidateRouterSettingsCache();
       return;
     }
     if (!Number.isFinite(value) || value < 0 || value > 1) {
@@ -437,6 +482,7 @@ export function setMinReliabilityFloor(floor?: number | null): void {
   if (floor === undefined) return;
   if (floor === null) {
     getDb().prepare('DELETE FROM settings WHERE key = ?').run(MIN_RELIABILITY_FLOOR_KEY);
+    invalidateRouterSettingsCache();
     return;
   }
   if (!Number.isFinite(floor) || floor < 0 || floor > 1) {
@@ -470,6 +516,7 @@ export function setProviderMomentAttribution(enabled: boolean): void {
     setSetting(PROVIDER_MOMENT_ATTRIBUTION_KEY, '1');
   } else {
     getDb().prepare('DELETE FROM settings WHERE key = ?').run(PROVIDER_MOMENT_ATTRIBUTION_KEY);
+    invalidateRouterSettingsCache();
   }
   // The stats cache bakes the attribution filter into its SQL, so a toggle
   // must not wait for the cache TTL to change routing.
@@ -503,6 +550,7 @@ export function getTaskWeightShare(): number {
 export function setTaskWeightShare(value: number | null): void {
   if (value === null) {
     getDb().prepare('DELETE FROM settings WHERE key = ?').run(TASK_WEIGHT_SHARE_KEY);
+    invalidateRouterSettingsCache();
     return;
   }
   if (!Number.isFinite(value) || value < 0 || value > 1) {
@@ -2451,8 +2499,13 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
 
   // The aggregate keyless line rides in diagnostics but NOT in the summary's
   // route count: those models were never candidates for this request.
+  // An image request only ever walks vision models, so say so: "All models
+  // exhausted" reads as if text-only models were rate-limited too (#2061).
+  const summary = summarizeExhaustion(diag, getSoonestCooldownExpiry(), Date.now(), keylessSkipped);
   throw new RouteError(
-    summarizeExhaustion(diag, getSoonestCooldownExpiry(), Date.now(), keylessSkipped),
+    requireVision
+      ? summary.replace(/^All models exhausted/, 'All vision-capable models are rate-limited or unavailable for this image request')
+      : summary,
     429,
     keylessLine ? [...diag, keylessLine] : diag,
   );
@@ -2585,6 +2638,40 @@ export function resolveStickyPreference(stickyModelDbId: number | undefined, cha
 export function hasEnabledVisionModel(): boolean {
   const db = getDb();
   return getActiveChain(db).some(entry => entry.enabled === 1 && entry.supports_vision === 1);
+}
+
+/**
+ * Vision capacity for an image request's up-front gate (#2061, #2062).
+ *
+ * `enabledInChain` counts the enabled vision models in the active chain.
+ * `routable` counts enabled vision models anywhere in the catalog that have at
+ * least one key the router could use (enabled, healthy/unknown, in scope, and
+ * of the model's own custom endpoint). It ignores transient gates (cooldowns,
+ * quotas): a vision model that is only rate-limited is still capacity, and
+ * such a request is a genuine 429, not a 422.
+ *
+ * "Enabled" alone is not enough. A fresh install enables dozens of catalog
+ * vision models that have no key, so the old check passed and the router then
+ * skipped every candidate, and the client saw a 429 "All models exhausted"
+ * that read like a quota problem. Catalog-wide (not chain-only) for
+ * `routable`, so a pin or an `auto:<profile>` chain that holds a vision model
+ * is never refused here; a chain with no vision model still gets the 422 at
+ * routing time (routingExhaustionBody).
+ */
+export function visionModelAvailability(): { enabledInChain: number; routable: number } {
+  const db = getDb();
+  const enabledInChain = getActiveChain(db)
+    .filter(entry => entry.enabled === 1 && entry.supports_vision === 1).length;
+  const keyCounts = usableKeyCountsByPlatform(db);
+  const candidates = db.prepare(
+    'SELECT id, platform FROM models WHERE enabled = 1 AND supports_vision = 1',
+  ).all() as { id: number; platform: string }[];
+  let routable = 0;
+  for (const m of candidates) {
+    if ((keyCounts.get(m.platform) ?? 0) === 0) continue;
+    if (routableKeyIdsForModel(m.id).length > 0) routable++;
+  }
+  return { enabledInChain, routable };
 }
 
 // Whether at least one tool-capable model is enabled in the fallback chain.

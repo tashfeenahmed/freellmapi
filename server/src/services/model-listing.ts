@@ -1,7 +1,8 @@
 import type { ModelListRow } from '@freellmapi/shared/types.js';
 import { getDb } from '../db/index.js';
 import { isUnifyEnabled, getModelGroups } from './model-groups.js';
-import { CONTEXT_WINDOW_SAFETY_FACTOR, hasUsableKeyForModel } from './router.js';
+import { CONTEXT_WINDOW_SAFETY_FACTOR, hasUsableKeyForModel, resolveRoutingChain, routableKeyIdsForModel } from './router.js';
+import { passesContextWindowFloor } from '../lib/min-context-window.js';
 
 // Shared catalog-listing logic behind both the OpenAI `GET /v1/models` and the
 // Anthropic `GET /v1/models` endpoints, so the two wire formats list the exact
@@ -85,6 +86,39 @@ export function servableContextWindow(windows: readonly (number | null | undefin
   const known = windows.filter((w): w is number => typeof w === 'number' && w > 0).sort((a, b) => b - a);
   if (known.length === 0) return null;
   return known[Math.floor(known.length / 2)]!;
+}
+
+/**
+ * The largest prompt `auto` can serve for a tool-calling request (#2122,
+ * #2087): the biggest advertised window among the active chain's enabled,
+ * tool-capable models that have a routable key and pass the operator's
+ * context floor, each capped by its per-minute token limit (the router skips a
+ * model whose TPM cannot hold the request). Coding agents are the readers and
+ * always send tools, so a model the router would skip for tools never counts.
+ * This is NOT what `auto` advertises as `context_window` (#1717 chose the
+ * upper median, so sessions stay where most of the pool can serve them); it
+ * is the opt-in ceiling a client may size to when the user asks for the
+ * largest window (`freellmapi setup-claude --context-window max`). Null when
+ * nothing qualifies.
+ */
+export function autoMaxContextWindow(): number | null {
+  let chain;
+  try {
+    chain = resolveRoutingChain('auto').chain;
+  } catch {
+    return null; // no enabled models in the active chain
+  }
+  let best: number | null = null;
+  for (const entry of chain) {
+    if (!entry.enabled || entry.supports_tools !== 1) continue;
+    if (!passesContextWindowFloor(entry.context_window)) continue;
+    const advertised = advertisedContextWindow(entry.context_window);
+    if (advertised == null) continue;
+    if (routableKeyIdsForModel(entry.model_db_id).length === 0) continue;
+    const servable = entry.tpm_limit != null ? Math.min(advertised, entry.tpm_limit) : advertised;
+    if (best == null || servable > best) best = servable;
+  }
+  return best;
 }
 
 export function buildModelListing(): ModelListing {

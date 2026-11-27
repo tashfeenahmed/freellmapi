@@ -60,7 +60,16 @@
     "emailChanged": "An canza imel.",
     "passwordReset": "An sake saita kalmar sirri. Da fatan shiga.",
     "resetCodeDockerHint": "Kana amfani da Docker? Lambar tana cikin tarihin kwantena: docker logs <container>.",
-    "desktopSessionFailed": "Dashboard ɗin bai iya shiga uwar garken gida ba. Rufe FreeLLMAPI ka sake buɗe shi."
+    "desktopSessionFailed": "Dashboard ɗin bai iya shiga uwar garken gida ba. Rufe FreeLLMAPI ka sake buɗe shi.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Ajiye",
@@ -171,7 +180,12 @@
     "updateNow": "Sabunta yanzu",
     "updatingContainer": "Ana jan sabon hoto ana sake farawa. Wannan shafin zai sake lodawa idan FreeLLMAPI ya dawo.",
     "updateNowFailed": "Mai sabuntawa bai karɓi buƙatar ba. Duba ko kwantena watchtower yana aiki.",
-    "updateNowTimeout": "FreeLLMAPI bai sake farawa ba bayan minti 5. Duba bayanan log na kwantena watchtower."
+    "updateNowTimeout": "FreeLLMAPI bai sake farawa ba bayan minti 5. Duba bayanan log na kwantena watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Samfura",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Zaɓi mai bayarwa",
     "addKey": "Ƙara maɓalli",
+    "addAnotherKey": "Ƙara wani maɓallin API",
     "keyAdded": "Key ya kara",
     "endpointKeysShareModels": "Maɓallan matattara ɗaya suna raba samfuranta.",
     "export": "fitarwa",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "na zaɓi",
     "customFamily": "Iyali",
     "customFamilyPlaceholder": "Matsaloli zuwa model id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Maɓallin API",
     "customCapabilities": "Abubuwan iyawa",
     "addModel": "Ƙara samfuri",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Babu samfuran haɗawa tukuna",
     "emptyDesc": "Haɗin iyalai suna bayyana nan da zarar kun ƙara maɓallin mai ba da tallafi wanda ke goyan bayan haɗawa.",
-    "dragToReorder": "Ja don sake yin odar mai bada sabis"
+    "dragToReorder": "Ja don sake yin odar mai bada sabis",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",
@@ -1233,7 +1252,8 @@
       "hermes": "Wakilin Nous Research mai inganta kansa, da ƙwaƙwalwa mai dorewa da ƙwarewa, a cikin terminal ko a manhajojin hira.",
       "pi": "Ƙaramin wakilin terminal da kuke tsara shi da naku ƙarin abubuwa, ƙwarewa da samfuran umarni.",
       "reasonix": "Wakilin rubuta lamba a tasha da aka gina don DeepSeek, bisa ajiyar prefix domin dogayen zama su kasance masu arha.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Wakilin rubuta lamba a tasha na gida mai dogayen zama, izini, da kowane mai bayar da sabis mai dacewa da OpenAI."
     }
   },
   "update": {

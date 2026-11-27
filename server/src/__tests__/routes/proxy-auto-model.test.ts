@@ -184,6 +184,10 @@ describe('Virtual "auto" model', () => {
     expect(auto.context_window).toBe(auto.context_length);
     expect(typeof auto.context_window).toBe('number');
     expect(auto.context_window).toBeGreaterThan(0);
+    // #2122: the opt-in ceiling for coding agents. It can sit below
+    // context_window: it also honors per-minute token limits and tool support.
+    expect(typeof auto.max_context_window).toBe('number');
+    expect(auto.max_context_window).toBeGreaterThan(0);
 
     // Every real model mirrors context_window into context_length.
     const connected = body.data.filter((m: any) => m.id !== 'auto' && m.available);

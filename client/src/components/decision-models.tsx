@@ -114,7 +114,7 @@ function TryDecision({ models }: { models: DecisionModel[] }) {
   const optionList = parseOptions(options || t('decision.tryOptionsPlaceholder'))
   const answer = run.data?.answers?.answer as { choice?: string; confidence?: number; probabilities?: Record<string, number> } | undefined
   // Clairic accepts extraction fields, not this playground's choice question.
-  const enabled = models.filter(m => m.enabled && m.modelId !== '@cf/cloudflare/clairic')
+  const enabled = models.filter(m => m.enabled && !['@cf/cloudflare/clairic', '@cf/cloudflare/clairic-flash'].includes(m.modelId))
 
   return (
     <section className="rounded-3xl border bg-card p-5 space-y-3">

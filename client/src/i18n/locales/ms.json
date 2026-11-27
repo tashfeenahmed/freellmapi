@@ -60,7 +60,16 @@
     "emailChanged": "E-mel berjaya ditukar.",
     "passwordReset": "Kata laluan telah ditetapkan semula. Sila log masuk.",
     "resetCodeDockerHint": "Berjalan dalam Docker? Kod berada dalam log kontena: docker logs <container>.",
-    "desktopSessionFailed": "Papan pemuka tidak dapat log masuk ke pelayan tempatan. Tutup FreeLLMAPI dan buka semula."
+    "desktopSessionFailed": "Papan pemuka tidak dapat log masuk ke pelayan tempatan. Tutup FreeLLMAPI dan buka semula.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Simpan",
@@ -171,7 +180,12 @@
     "updateNow": "Kemas kini sekarang",
     "updatingContainer": "Menarik imej baharu dan memulakan semula. Halaman ini dimuat semula apabila FreeLLMAPI kembali.",
     "updateNowFailed": "Pengemas kini tidak menerima permintaan. Semak bahawa kontena watchtower sedang berjalan.",
-    "updateNowTimeout": "FreeLLMAPI belum bermula semula selepas 5 minit. Semak log kontena watchtower."
+    "updateNowTimeout": "FreeLLMAPI belum bermula semula selepas 5 minit. Semak log kontena watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Model",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Pilih penyedia",
     "addKey": "Tambah kekunci",
+    "addAnotherKey": "Tambah kunci API lain",
     "keyAdded": "Kunci ditambah",
     "endpointKeysShareModels": "Kunci untuk endpoint yang sama berkongsi modelnya.",
     "export": "Eksport",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "pilihan",
     "customFamily": "Keluarga",
     "customFamilyPlaceholder": "lalai kepada id model",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "kunci API",
     "customCapabilities": "Keupayaan",
     "addModel": "Tambah model",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Belum ada model yang disematkan lagi",
     "emptyDesc": "Keluarga penyematan akan muncul di sini apabila anda menambah kunci penyedia yang menyokong penyembatan.",
-    "dragToReorder": "Seret untuk menyusun semula penyedia"
+    "dragToReorder": "Seret untuk menyusun semula penyedia",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusi",
@@ -1233,7 +1252,8 @@
       "hermes": "Ejen Nous Research yang menambah baik dirinya sendiri, dengan memori kekal dan kemahiran, di terminal atau di aplikasi sembang.",
       "pi": "Ejen terminal minimalis yang anda bentuk dengan sambungan, kemahiran dan templat prompt anda sendiri.",
       "reasonix": "Ejen pengekodan terminal yang dibina untuk DeepSeek, berasaskan cache awalan supaya sesi panjang kekal murah.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Ejen pengekodan terminal tempatan dengan sesi kekal, kebenaran, dan mana-mana penyedia yang serasi dengan OpenAI."
     }
   },
   "update": {

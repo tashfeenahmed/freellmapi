@@ -60,7 +60,16 @@
     "emailChanged": "ईमेल सफलतापूर्वक बदला गया।",
     "passwordReset": "पासवर्ड रीसेट हो गया। कृपया साइन इन करें।",
     "resetCodeDockerHint": "Docker में चला रहे हैं? कोड कंटेनर लॉग में है: docker logs <container>।",
-    "desktopSessionFailed": "डैशबोर्ड लोकल सर्वर में साइन इन नहीं कर सका। FreeLLMAPI बंद करके दोबारा खोलें।"
+    "desktopSessionFailed": "डैशबोर्ड लोकल सर्वर में साइन इन नहीं कर सका। FreeLLMAPI बंद करके दोबारा खोलें।",
+    "signInWithSso": "{provider} से साइन इन करें",
+    "orContinueWithPassword": "या ईमेल से जारी रखें",
+    "reverifyWithSso": "{provider} से पुनः सत्यापित करें",
+    "oidcReauthHint": "सादा-टेक्स्ट कुंजियाँ देखने के लिए {provider} से अपनी पहचान सत्यापित करें।",
+    "oidcReauthSuccess": "अगले 5 मिनट के लिए पहचान सत्यापित हो गई है।",
+    "oidcErrorNotAllowed": "आपके खाते को इस डैशबोर्ड में साइन इन करने की अनुमति नहीं है।",
+    "oidcErrorUnverifiedEmail": "साइन इन करने से पहले आपके पहचान प्रदाता द्वारा ईमेल सत्यापित होना आवश्यक है।",
+    "oidcErrorNoAccount": "कोई मिलान खाता मौजूद नहीं है और स्वचालित खाता निर्माण अक्षम है।",
+    "oidcErrorFailed": "सिंगल साइन-ऑन विफल रहा। कृपया पुनः प्रयास करें।"
   },
   "common": {
     "save": "सहेजें",
@@ -171,7 +180,12 @@
     "updateNow": "अभी अपडेट करें",
     "updatingContainer": "नई इमेज खींची जा रही है और रीस्टार्ट हो रहा है। FreeLLMAPI वापस आने पर यह पेज रीलोड होगा।",
     "updateNowFailed": "अपडेटर ने अनुरोध स्वीकार नहीं किया। जाँचें कि watchtower कंटेनर चल रहा है।",
-    "updateNowTimeout": "5 मिनट बाद भी FreeLLMAPI रीस्टार्ट नहीं हुआ। watchtower कंटेनर के लॉग देखें।"
+    "updateNowTimeout": "5 मिनट बाद भी FreeLLMAPI रीस्टार्ट नहीं हुआ। watchtower कंटेनर के लॉग देखें।",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "मॉडल",
@@ -436,6 +450,7 @@
     "familyHaiku": "हाइकु",
     "selectPlatform": "एक प्रदाता चुनें",
     "addKey": "कुंजी जोड़ें",
+    "addAnotherKey": "एक और API कुंजी जोड़ें",
     "keyAdded": "कुंजी जोड़ी गई",
     "endpointKeysShareModels": "एक ही एंडपॉइंट की कुंजियाँ उसके मॉडल साझा करती हैं।",
     "export": "निर्यात करें",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "वैकल्पिक",
     "customFamily": "परिवार",
     "customFamilyPlaceholder": "मॉडल आईडी के लिए डिफ़ॉल्ट",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API कुंजी",
     "customCapabilities": "क्षमताएं",
     "addModel": "मॉडल जोड़ें",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} टोक मैक्स",
     "emptyTitle": "अभी तक कोई एम्बेडिंग मॉडल नहीं है",
     "emptyDesc": "जब आप एम्बेडिंग का समर्थन करने वाली प्रदाता कुंजी जोड़ते हैं तो एम्बेडिंग परिवार यहां दिखाई देते हैं।",
-    "dragToReorder": "प्रदाता को पुनः व्यवस्थित करने के लिए खींचें"
+    "dragToReorder": "प्रदाता को पुनः व्यवस्थित करने के लिए खींचें",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "संलयन",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research का खुद को बेहतर बनाने वाला एजेंट, स्थायी मेमोरी और स्किल्स के साथ, टर्मिनल में या चैट ऐप्स पर।",
       "pi": "एक न्यूनतम टर्मिनल एजेंट, जिसे आप अपने एक्सटेंशन, स्किल्स और प्रॉम्प्ट टेम्पलेट से ढालते हैं।",
       "reasonix": "DeepSeek के लिए बना टर्मिनल कोडिंग एजेंट, प्रीफ़िक्स कैशिंग के इर्द-गिर्द बनाया गया ताकि लंबे सेशन भी सस्ते रहें।",
-      "zcode": "GLM मॉडलों के लिए Z.ai का कोडिंग एजेंट; प्रदाता रजिस्ट्री से किसी भी OpenAI-संगत एंडपॉइंट से जुड़ता है।"
+      "zcode": "GLM मॉडलों के लिए Z.ai का कोडिंग एजेंट; प्रदाता रजिस्ट्री से किसी भी OpenAI-संगत एंडपॉइंट से जुड़ता है।",
+      "zero": "एक स्थानीय टर्मिनल कोडिंग एजेंट जिसमें स्थायी सत्र, अनुमतियाँ और किसी भी OpenAI-संगत प्रदाता का समर्थन है।"
     }
   },
   "update": {

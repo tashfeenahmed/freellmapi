@@ -60,7 +60,16 @@
     "emailChanged": "ઈમેલ સફળતાપૂર્વક બદલાયો.",
     "passwordReset": "પાસવર્ડ રીસેટ થયો. કૃપા કરી સાઇન ઇન કરો.",
     "resetCodeDockerHint": "Docker માં ચલાવો છો? કોડ કન્ટેનર લોગમાં છે: docker logs <container>.",
-    "desktopSessionFailed": "ડેશબોર્ડ લોકલ સર્વરમાં સાઇન ઇન કરી શક્યું નથી. FreeLLMAPI બંધ કરીને ફરીથી ખોલો."
+    "desktopSessionFailed": "ડેશબોર્ડ લોકલ સર્વરમાં સાઇન ઇન કરી શક્યું નથી. FreeLLMAPI બંધ કરીને ફરીથી ખોલો.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "સાચવો",
@@ -171,7 +180,12 @@
     "updateNow": "હમણાં અપડેટ કરો",
     "updatingContainer": "નવી ઇમેજ ખેંચી રહ્યા છીએ અને ફરી શરૂ કરી રહ્યા છીએ. FreeLLMAPI પાછું આવે ત્યારે આ પેજ ફરી લોડ થશે.",
     "updateNowFailed": "અપડેટરે વિનંતી સ્વીકારી નહીં. watchtower કન્ટેનર ચાલુ છે કે નહીં તે તપાસો.",
-    "updateNowTimeout": "5 મિનિટ પછી પણ FreeLLMAPI ફરી શરૂ થયું નથી. watchtower કન્ટેનરના લૉગ તપાસો."
+    "updateNowTimeout": "5 મિનિટ પછી પણ FreeLLMAPI ફરી શરૂ થયું નથી. watchtower કન્ટેનરના લૉગ તપાસો.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "મોડલ્સ",
@@ -436,6 +450,7 @@
     "familyHaiku": "હાઈકુ",
     "selectPlatform": "પ્રદાતા પસંદ કરો",
     "addKey": "કી ઉમેરો",
+    "addAnotherKey": "બીજી API કી ઉમેરો",
     "keyAdded": "કી ઉમેરી",
     "endpointKeysShareModels": "એક જ એન્ડપોઇન્ટની કી તેના મોડેલ વહેંચે છે.",
     "export": "નિકાસ કરો",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "વૈકલ્પિક",
     "customFamily": "કુટુંબ",
     "customFamilyPlaceholder": "મોડલ id માટે ડિફોલ્ટ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API કી",
     "customCapabilities": "ક્ષમતાઓ",
     "addModel": "મોડેલ ઉમેરો",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ટોક મહત્તમ",
     "emptyTitle": "હજી સુધી કોઈ એમ્બેડિંગ મોડલ નથી",
     "emptyDesc": "એકવાર તમે એમ્બેડિંગને સપોર્ટ કરતી પ્રદાતા કી ઉમેર્યા પછી એમ્બેડિંગ પરિવારો અહીં દેખાય છે.",
-    "dragToReorder": "પ્રદાતાને ફરીથી ગોઠવવા માટે ખેંચો"
+    "dragToReorder": "પ્રદાતાને ફરીથી ગોઠવવા માટે ખેંચો",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ફ્યુઝન",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research નો સ્વ-સુધારણા કરતો એજન્ટ, કાયમી મેમરી અને કૌશલ્યો સાથે, ટર્મિનલમાં કે ચેટ એપ્સ પર.",
       "pi": "એક ન્યૂનતમ ટર્મિનલ એજન્ટ, જેને તમે તમારા પોતાના એક્સ્ટેન્શન, કૌશલ્યો અને પ્રોમ્પ્ટ ટેમ્પ્લેટથી ઘડો છો.",
       "reasonix": "DeepSeek માટે બનેલો ટર્મિનલ કોડિંગ એજન્ટ, પ્રિફિક્સ કેશિંગની આસપાસ રચાયેલો જેથી લાંબા સેશન સસ્તા રહે.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "સ્થાયી સત્રો, પરવાનગીઓ અને કોઈપણ OpenAI-સુસંગત પ્રદાતા સાથેનો સ્થાનિક ટર્મિનલ કોડિંગ એજન્ટ."
     }
   },
   "update": {

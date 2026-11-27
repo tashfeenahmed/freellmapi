@@ -34,6 +34,7 @@ dashboard (or the tray popover in the desktop app).
 | `setup-pi` | Pi (`pi`) |
 | `setup-reasonix` | Reasonix (`reasonix`) |
 | `setup-zcode` | ZCode (`zcode`) |
+| `setup-zero` | Zero (`zero`) |
 | `setup-cursor` | Cursor |
 | `setup-generic` | Any OpenAI-compatible client |
 | `launch` | Run Claude Code with credentials injected into the child process |
