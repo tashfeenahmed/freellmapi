@@ -67,7 +67,8 @@ export function registerCustomMediaModel(
              priority = ?,
              enabled = 1,
              quota_label = ?,
-             key_id = ?
+             key_id = ?,
+             source = 'user'
        WHERE id = ?
     `).run(entry.displayName, entry.modality, priority, quotaLabel, bindKeyId, existingModel.id);
     return { modelDbId: existingModel.id, model: modelId, modality: entry.modality, created: false };
@@ -75,8 +76,8 @@ export function registerCustomMediaModel(
 
   const model = db.prepare(`
     INSERT INTO media_models
-      (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id, endpoint_scope)
-    VALUES ('custom', ?, ?, ?, ?, 1, ?, ?, ?)
+      (platform, model_id, display_name, modality, priority, enabled, quota_label, key_id, endpoint_scope, source)
+    VALUES ('custom', ?, ?, ?, ?, 1, ?, ?, ?, 'user')
   `).run(modelId, entry.displayName ?? modelId, entry.modality, priority, quotaLabel, bindKeyId, endpointScope);
   return { modelDbId: Number(model.lastInsertRowid), model: modelId, modality: entry.modality, created: true };
 }
