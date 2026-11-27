@@ -134,6 +134,7 @@ export function inferPoolForPlatform(platform: Platform, modelId?: string | null
   if (platform === 'septor') return 'septor::daily-free';
   if (platform === 'clod') return 'clod::daily-free';
   if (platform === 'speechify') return 'speechify::monthly-characters';
+  if (platform === 'roboflow') return 'roboflow::monthly-credits';
   if (platform === 'blaze') return 'blaze::daily-free';
   if (platform === 'lucidity') return 'lucidity::daily-free';
   if (platform === 'airforce') return 'airforce::daily-free';
@@ -202,7 +203,7 @@ function isSharedPool(platform: Platform): boolean {
   if (platform === 'onomeo') return true;
   if (platform === 'iteracompute') return true;
   if (platform === 'aclide') return true;
-  if (platform === 'speka') return true;
+  if (platform === 'speka' || platform === 'roboflow') return true;
   if (platform === 'plugsky') return true;
   if (platform === 'inferbase' || platform === 'simplellm') return true;
   if (['electronhub', 'experiential', 'router9', 'septor', 'clod', 'speechify', 'blaze', 'lucidity', 'airforce', 'dreamprompting', 'waterfall', 'logfare'].includes(platform)) return true;

@@ -92,6 +92,7 @@ const PLATFORMS = [
   'silvr',
   'freetts',
   'freeinference',
+  'roboflow',
   'freemodel',
   'beatapi',
   'apinex',

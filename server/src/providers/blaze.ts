@@ -3,6 +3,8 @@ import { providerHttpError, type CompletionOptions, type KeyValidationResult } f
 import type { QuotaObservationContext } from '../services/provider-quota.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 
+export const BLAZE_BASE_URL = 'https://api.blazeapi.org/paid/v1';
+
 function checkModel(requested: string, returned: string): void {
   if (!returned || returned !== requested) {
     throw Object.assign(new Error('BlazeAPI returned a different or missing model identity'), { status: 502 });
@@ -20,7 +22,7 @@ export class BlazeProvider extends OpenAICompatProvider {
   constructor() {
     // Despite its name, /paid/v1 is also the documented Free-plan endpoint.
     // Named catalog routes only: no fallback to a paid or automatic route.
-    super({ platform: 'blaze', name: 'BlazeAPI', baseUrl: 'https://api.blazeapi.org/paid/v1',
+    super({ platform: 'blaze', name: 'BlazeAPI', baseUrl: BLAZE_BASE_URL,
       validateUrl: 'https://api.blazeapi.org/paid/v1/usage' });
   }
 

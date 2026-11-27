@@ -41,6 +41,7 @@ const pinned: Record<string,string> = {
   "gemini-4-hydrogen": "google:google/gemini-4-hydrogen",
   "qwen4-max": "alibaba:qwen/qwen4-max",
   "qwen3.8-max": "alibaba:qwen/qwen3.8-max",
+  "qwen3.7-max-2026-05-17": "alibaba:qwen/qwen3.7-max-2026-05-17",
   "qwen3.7-max": "alibaba:qwen/qwen3.7-max",
   "qwen3.7-flash": "alibaba:qwen/qwen3.7-flash",
   "qwen3.6-flash": "alibaba:qwen/qwen3.6-flash",

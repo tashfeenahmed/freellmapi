@@ -133,6 +133,7 @@ export type Platform =
   // Self-hosted TTS: shared 30K tokens/day and 1K API requests/month, no card.
   // Model rows arrive only through the signed, freshness-gated catalog.
   | 'freeai'
+  | 'roboflow'
   | 'blaze'
   // Lucidity Composite, Api.Airforce and DreamPrompting expose daily free
   // allowances; Waterfall and Logfare publish community / fair-use tiers.
