@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Šis teikėjas neleidžia automatinių raktų patikrų. Raktas tampa veikiančiu, kai aptarnauja pirmąją užklausą.",
+    "noAutoCheckQuotaHint": "Šis teikėjas negali patikrinti rakto neišnaudodamas kvotos, todėl raktas lieka nepatikrintas, kol neaptarnauja pirmosios užklausos. Su raktu viskas gerai.",
     "noModelsYetHint": "Jūsų kataloge dar nėra šio teikėjo modelių, todėl nėra ką aptarnauti.",
     "proxyEnvHintBefore": "Taip pat konfigūruojama per",
     "proxyEnvHintAfter": "aplinkos kintamasis (turi pirmenybę). Palikite tuščią vietą, kad išjungtumėte. Pavyzdžiai:",

@@ -579,6 +579,7 @@
     "lastWorkedHint": "Laatst gewerkt: {when}",
     "lastWorkedNever": "Heeft nog geen verzoek dienden lopen noch een controle doorstaan",
     "noAutoCheckHint": "Deze provider staat geen automatische sleutelcontroles toe. De sleutel wordt gezond nadat hij zijn eerste verzoek heeft afgehandeld.",
+    "noAutoCheckQuotaHint": "Deze provider kan een sleutel niet controleren zonder quotum te verbruiken, dus de sleutel blijft ongecontroleerd tot hij zijn eerste verzoek heeft afgehandeld. Er is niets mis met de sleutel.",
     "noModelsYetHint": "Je catalogus heeft nog geen modellen van deze provider, dus er valt niets af te handelen.",
     "proxyEnvHintBefore": "Ook configureerbaar via de",
     "proxyEnvHintAfter": "omgevingsvariabele (heeft voorrang). Laat leeg staan om uit te schakelen. Voorbeelden:",

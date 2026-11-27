@@ -579,6 +579,7 @@
     "lastWorkedHint": "Sidst fungerende: {when}",
     "lastWorkedNever": "Har endnu ikke betjent en anmodning eller bestået et tjek",
     "noAutoCheckHint": "Denne udbyder tillader ikke automatiske nøgletjek. Nøglen bliver sund, når den har betjent sin første forespørgsel.",
+    "noAutoCheckQuotaHint": "Denne udbyder kan ikke kontrollere en nøgle uden at bruge kvote, så nøglen forbliver ukontrolleret, indtil den har betjent sin første anmodning. Der er intet galt med nøglen.",
     "noModelsYetHint": "Dit katalog har endnu ingen modeller fra denne udbyder, så der er intet for den at betjene.",
     "proxyEnvHintBefore": "Også konfigurerbar via",
     "proxyEnvHintAfter": "miljøvariabel (har forrang). Lad det stå tomt for at deaktivere. Eksempler:",

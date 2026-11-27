@@ -579,6 +579,7 @@
     "lastWorkedHint": "Último funcionamento: {when}",
     "lastWorkedNever": "Ainda não serviu nenhum pedido nem passou numa verificação",
     "noAutoCheckHint": "Este fornecedor não permite verificações automáticas de chaves. A chave fica saudável depois de servir o primeiro pedido.",
+    "noAutoCheckQuotaHint": "Este fornecedor não consegue verificar uma chave sem gastar quota, por isso a chave fica por verificar até servir o seu primeiro pedido. Não há nada de errado com a chave.",
     "noModelsYetHint": "O seu catálogo ainda não tem modelos deste fornecedor, por isso não há nada para servir.",
     "proxyEnvHintBefore": "Também configurável através do",
     "proxyEnvHintAfter": "variável de ambiente (tem precedência). Deixe em branco para desativar. Exemplos:",

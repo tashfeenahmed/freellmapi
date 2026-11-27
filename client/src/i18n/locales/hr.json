@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Ovaj pružatelj ne dopušta automatske provjere ključeva. Ključ postaje ispravan nakon što posluži svoj prvi zahtjev.",
+    "noAutoCheckQuotaHint": "Ovaj pružatelj ne može provjeriti ključ bez trošenja kvote, pa ključ ostaje neprovjeren dok ne posluži svoj prvi zahtjev. S ključem je sve u redu.",
     "noModelsYetHint": "Vaš katalog još nema modele ovog pružatelja, pa nema što posluživati.",
     "proxyEnvHintBefore": "Također se može konfigurirati putem",
     "proxyEnvHintAfter": "varijable okoline (ima prednost). Ostavi prazno za isključivanje. Primjeri:",

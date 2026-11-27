@@ -18,6 +18,9 @@ export class SerpSearchProvider extends SearchOnlyProvider {
     return false;
   }
 
+  /** #1545: the provider disallows automated checks, not merely lacks a free one. */
+  override get keyCheckUnavailableReason(): 'forbidden' { return 'forbidden'; }
+
   override get supportsKeyPolling(): boolean {
     return false;
   }

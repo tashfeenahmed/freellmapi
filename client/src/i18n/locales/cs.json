@@ -579,6 +579,7 @@
     "lastWorkedHint": "Naposledy fungoval: {when}",
     "lastWorkedNever": "Zatím neobsloužil žádný požadavek ani neprošel kontrolou",
     "noAutoCheckHint": "Tento poskytovatel nepovoluje automatické kontroly klíčů. Klíč bude v pořádku, jakmile obslouží svůj první požadavek.",
+    "noAutoCheckQuotaHint": "Tento poskytovatel nemůže ověřit klíč, aniž by spotřeboval kvótu, takže klíč zůstane neověřený, dokud neobslouží svůj první požadavek. S klíčem je vše v pořádku.",
     "noModelsYetHint": "Váš katalog zatím neobsahuje žádné modely tohoto poskytovatele, takže nemá co obsluhovat.",
     "proxyEnvHintBefore": "Také konfigurovatelné přes",
     "proxyEnvHintAfter": "proměnné prostředí (má přednost). Nechte prázdné pro deaktivaci. Příklady:",

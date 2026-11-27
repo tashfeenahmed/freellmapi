@@ -579,6 +579,7 @@
     "lastWorkedHint": "Zuletzt funktionsfähig: {when}",
     "lastWorkedNever": "Hat noch keine Anfrage bedient und keine Prüfung bestanden",
     "noAutoCheckHint": "Dieser Anbieter erlaubt keine automatischen Schlüsselprüfungen. Der Schlüssel wird gesund, sobald er seine erste Anfrage bedient hat.",
+    "noAutoCheckQuotaHint": "Dieser Anbieter kann einen Schlüssel nicht prüfen, ohne Kontingent zu verbrauchen. Der Schlüssel bleibt daher ungeprüft, bis er seine erste Anfrage bedient hat. Mit dem Schlüssel ist alles in Ordnung.",
     "noModelsYetHint": "Dein Katalog enthält noch keine Modelle dieses Anbieters, daher gibt es nichts zu bedienen.",
     "proxyEnvHintBefore": "Auch konfigurierbar über die",
     "proxyEnvHintAfter": "Umgebungsvariable (hat Vorrang). Zum Deaktivieren leer lassen. Beispiele:",

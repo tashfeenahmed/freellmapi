@@ -579,6 +579,7 @@
     "lastWorkedHint": "마지막 작동: {when}",
     "lastWorkedNever": "아직 요청을 처리하거나 점검을 통과하지 않았습니다",
     "noAutoCheckHint": "이 공급자는 자동 키 확인을 허용하지 않습니다. 키는 첫 요청을 처리한 뒤 정상 상태가 됩니다.",
+    "noAutoCheckQuotaHint": "이 공급자는 할당량을 쓰지 않고는 키를 확인할 수 없으므로, 키는 첫 요청을 처리할 때까지 미확인 상태로 남습니다. 키에는 아무 문제가 없습니다.",
     "noModelsYetHint": "카탈로그에 아직 이 공급자의 모델이 없어 처리할 요청이 없습니다.",
     "proxyEnvHintBefore": "또한 다음을 통해 구성할 수 있습니다.",
     "proxyEnvHintAfter": "환경 변수(우선순위를 갖습니다). 비활성화하려면 비워 두세요. 예:",

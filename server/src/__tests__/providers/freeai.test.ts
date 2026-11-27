@@ -25,7 +25,7 @@ describe('Free.ai', () => {
     const fetch = vi.spyOn(globalThis, 'fetch');
     const provider = new FreeAiProvider();
     for (const key of ['test-key', 'invalid-freeai-control']) {
-      await expect(provider.validateKey(key)).rejects.toThrow('key validity is unknown');
+      await expect(provider.validateKey(key)).rejects.toThrow('key validity is unknown until it serves its first request');
     }
     expect(fetch).not.toHaveBeenCalled();
   });

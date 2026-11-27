@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Bu provayder açarların avtomatik yoxlanmasına icazə vermir. Açar ilk sorğusuna xidmət etdikdən sonra sağlam olur.",
+    "noAutoCheckQuotaHint": "Bu provayder kvota sərf etmədən açarı yoxlaya bilmir, ona görə də açar ilk sorğusuna xidmət edənə qədər yoxlanılmamış qalır. Açarda heç bir problem yoxdur.",
     "noModelsYetHint": "Kataloqunuzda hələ bu provayderin modeli yoxdur, ona görə də xidmət edəcəyi bir şey yoxdur.",
     "proxyEnvHintBefore": "Həmçinin konfiqurasiya etmək üçün",
     "proxyEnvHintAfter": "mühit dəyişəni (üstünlük təşkil edir). Deaktiv etmək üçün boş qoy. Nümunələr:",

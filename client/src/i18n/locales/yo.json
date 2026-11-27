@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Olùpèsè yìí kò gba àyẹ̀wò kọ́kọ́rọ́ aládàáṣe láàyè. Kọ́kọ́rọ́ náà yóò dára lẹ́yìn tí ó bá sin ìbéèrè àkọ́kọ́ rẹ̀.",
+    "noAutoCheckQuotaHint": "Olùpèsè yìí kò lè ṣàyẹ̀wò kọ́kọ́rọ́ láìná ìpín lílò, nítorí náà kọ́kọ́rọ́ náà yóò wà láìṣàyẹ̀wò títí yóò fi sìn ìbéèrè àkọ́kọ́ rẹ̀. Kò sí ìṣòro kankan pẹ̀lú kọ́kọ́rọ́ náà.",
     "noModelsYetHint": "Àkójọ rẹ kò tíì ní àwòṣe kankan láti ọ̀dọ̀ olùpèsè yìí, nítorí náà kò sí nǹkan tí yóò sìn.",
     "proxyEnvHintBefore": "Tun Configurable nipasẹ awọn",
     "proxyEnvHintAfter": "oniyipada ayika (mu ṣaaju). Fi òfo silẹ lati mu ṣiṣẹ. Awọn apẹẹrẹ:",

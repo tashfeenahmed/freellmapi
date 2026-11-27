@@ -624,6 +624,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "This provider doesn't allow automated key checks. The key turns healthy after it serves its first request.",
+    "noAutoCheckQuotaHint": "This provider can't check a key without spending quota, so the key stays unchecked until it serves its first request. Nothing is wrong with the key.",
     "noModelsYetHint": "Your catalog has no models from this provider yet, so there's nothing for it to serve.",
     "proxyEnvHintBefore": "Also configurable via the ",
     "proxyEnvHintAfter": " environment variable (takes precedence). Leave blank to disable. Examples:",

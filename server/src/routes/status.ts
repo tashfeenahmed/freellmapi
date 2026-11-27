@@ -7,6 +7,7 @@ import { extractApiToken, timingSafeStringEqual } from './proxy.js';
 import { getProvider } from '../providers/index.js';
 import { getSoonestCooldownExpiry } from '../services/ratelimit.js';
 import { getQuotaStateForKeys } from '../services/provider-quota.js';
+import { visibleHealthError } from '../services/health.js';
 import {
   getQuotaForecast,
   LOW_BALANCE_THRESHOLD,
@@ -150,15 +151,17 @@ providersRouter.get('/providers', (req: Request, res: Response) => {
 
   // Most recent probe error per platform (enabled keys, newest first).
   const errorRows = db.prepare(`
-    SELECT platform, last_health_error
+    SELECT platform, base_url, last_health_error
     FROM api_keys
     WHERE enabled = 1 AND last_health_error IS NOT NULL
     ORDER BY last_checked_at DESC
-  `).all() as Array<{ platform: string; last_health_error: string }>;
+  `).all() as Array<{ platform: string; base_url: string | null; last_health_error: string }>;
   const lastErrorByPlatform = new Map<string, string>();
   for (const row of errorRows) {
-    if (!lastErrorByPlatform.has(row.platform)) {
-      lastErrorByPlatform.set(row.platform, row.last_health_error);
+    // #1545: a never-probed provider's stored error is stale, not a failure.
+    const visible = visibleHealthError(row.platform, row.base_url, row.last_health_error);
+    if (visible && !lastErrorByPlatform.has(row.platform)) {
+      lastErrorByPlatform.set(row.platform, visible);
     }
   }
 

@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Onye na-enye ọrụ a anaghị ekwe ka a lelee igodo na-akpaghị aka. Igodo ahụ ga-adị mma mgbe o jesịrị arịrịọ mbụ ya ozi.",
+    "noAutoCheckQuotaHint": "Onye na-enye ọrụ a enweghị ike ịlele igodo na-ejighị oke ojiji, ya mere igodo ahụ ka na-elebaghị anya ruo mgbe ọ jere ozi arịrịọ mbụ ya. Ọ dịghị ihe dị njọ na igodo ahụ.",
     "noModelsYetHint": "Katalọgụ gị enweghị ụdị ọ bụla sitere n'aka onye na-enye ọrụ a ugbu a, ya mere ọ nweghị ihe ọ ga-eje ozi.",
     "proxyEnvHintBefore": "Ọzọkwa configurable site na",
     "proxyEnvHintAfter": "mgbanwe gburugburu ebe obibi (na-ebute ụzọ). Hapụ oghere iji gbanyụọ. Ọmụmaatụ:",

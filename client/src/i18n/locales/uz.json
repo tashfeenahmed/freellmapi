@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Bu provayder kalitlarni avtomatik tekshirishga ruxsat bermaydi. Kalit birinchi so‘roviga xizmat ko‘rsatgach, sog‘lom holatga o‘tadi.",
+    "noAutoCheckQuotaHint": "Bu provayder kvotani sarflamasdan kalitni tekshira olmaydi, shuning uchun kalit birinchi so'roviga xizmat qilmaguncha tekshirilmagan holda qoladi. Kalitda hech qanday muammo yo'q.",
     "noModelsYetHint": "Katalogingizda hali bu provayderning modellari yo‘q, shuning uchun xizmat ko‘rsatadigan narsa yo‘q.",
     "proxyEnvHintBefore": "orqali ham sozlanishi mumkin",
     "proxyEnvHintAfter": "muhit o'zgaruvchisi (ustunlikka ega). O'chirish uchun bo'sh qoldiring. Misollar:",

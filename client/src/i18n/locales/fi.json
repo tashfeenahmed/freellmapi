@@ -579,6 +579,7 @@
     "lastWorkedHint": "Viimeksi toiminnassa: {when}",
     "lastWorkedNever": "Ei ole vielä palvellut pyyntöjä eikä läpäissyt tarkistusta",
     "noAutoCheckHint": "Tämä palveluntarjoaja ei salli avainten automaattisia tarkistuksia. Avain muuttuu terveeksi, kun se on palvellut ensimmäisen pyyntönsä.",
+    "noAutoCheckQuotaHint": "Tämä palveluntarjoaja ei voi tarkistaa avainta kuluttamatta kiintiötä, joten avain pysyy tarkistamattomana, kunnes se palvelee ensimmäisen pyyntönsä. Avaimessa ei ole mitään vikaa.",
     "noModelsYetHint": "Katalogissasi ei ole vielä tämän palveluntarjoajan malleja, joten sillä ei ole mitään palveltavaa.",
     "proxyEnvHintBefore": "Myös konfiguroitavissa",
     "proxyEnvHintAfter": "ympäristömuuttuja (etenee etusijalla). Jätä tyhjä ruutu pois käytöstä varten. Esimerkkejä:",
