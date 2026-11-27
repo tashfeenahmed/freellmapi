@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tools } from './tools.js';
 import { renderFile } from './config-files.js';
@@ -121,6 +122,20 @@ describe('tool generators', () => {
       expect(normalizeGenerationPaths(tool.generate(context))).toMatchSnapshot();
     });
   }
+
+  it('sizes Claude Code to auto\'s window by default and to the largest on --context-window max (#2122)', () => {
+    const pool: GenerateContext = {
+      ...context,
+      models: [{ id: 'auto', name: 'Auto', available: true, context_window: 104_857, max_context_window: 838_860 }, ...context.models],
+    };
+    const claude = tools.find(tool => tool.id === 'claude')!;
+    const standard = claude.generate(pool);
+    expect((standard.files[0].value as { env: Record<string, string> }).env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('104857');
+    expect(standard.notes.join('\n')).toContain('--context-window max');
+    const largest = claude.generate({ ...pool, contextWindow: 'max' });
+    expect((largest.files[0].value as { env: Record<string, string> }).env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('838860');
+    expect(largest.notes.join('\n')).not.toContain('--context-window max');
+  });
 
   it('honours an explicit --model instead of the default-model heuristic', () => {
     // `--model` was parsed into CliOptions and then dropped: it never reached
@@ -326,6 +341,37 @@ describe('tool generators', () => {
       anthropic: { type: 'oauth', refresh: 'r' },
       freellmapi: { type: 'api', key: 'freellmapi-test-key' },
     });
+  });
+
+  it('clears a stale FreeLLMAPI key from the other OpenCode config files', () => {
+    // A key in opencode.jsonc, config.json or a home-folder project config
+    // beats auth.json, so Connect reported success while every request got
+    // "Invalid API key". Those files lose our provider's apiKey/baseURL only;
+    // files that do not set them are not touched.
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'oc-stale-'));
+    try {
+      vi.stubEnv('XDG_CONFIG_HOME', '');
+      vi.stubEnv('XDG_DATA_HOME', '');
+      const dir = path.join(home, '.config', 'opencode');
+      fs.mkdirSync(dir, { recursive: true });
+      const jsonc = path.join(dir, 'opencode.jsonc');
+      fs.writeFileSync(jsonc, '{\n  // mine\n  "theme": "dark",\n  "provider": { "freellmapi": { "options": { "apiKey": "fla_old", "timeout": 5 } } }\n}\n');
+      fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ theme: 'light' }));
+      const project = path.join(home, 'opencode.json');
+      fs.writeFileSync(project, JSON.stringify({ provider: { freellmapi: { options: { apiKey: '{env:FREELLMAPI_API_KEY}', baseURL: 'http://127.0.0.1:3001/v1' } } } }));
+
+      const { files } = tools.find(tool => tool.id === 'opencode')!.generate({ ...context, homeDir: home });
+      expect(files.map(file => file.path).slice(2).sort()).toEqual([project, jsonc].sort());
+
+      const cleanedJsonc = renderFile(files.find(file => file.path === jsonc)!, fs.readFileSync(jsonc, 'utf8'));
+      expect(cleanedJsonc).toContain('// mine');
+      expect(cleanedJsonc).not.toContain('fla_old');
+      expect(cleanedJsonc).toContain('"timeout": 5');
+      const cleanedProject = JSON.parse(renderFile(files.find(file => file.path === project)!, fs.readFileSync(project, 'utf8')));
+      expect(cleanedProject.provider.freellmapi.options).toEqual({});
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it('puts the OpenCode files under XDG_CONFIG_HOME / XDG_DATA_HOME when set', () => {

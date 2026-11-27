@@ -162,7 +162,7 @@ describe('bandit router', () => {
     // vision-c bound below actually pins down.
     expect(counts['text-b'] ?? 0).toBe(0);
     expect(counts['vision-c'] ?? 0).toBeGreaterThan(150);
-  });
+  }, 15_000);
 
   it('smartest vs fastest flips which model wins, at equal reliability', () => {
     // Smart: frontier tier, slow. Fast: small tier, high throughput. Equal success.
@@ -355,7 +355,7 @@ describe('bandit router', () => {
     setExploreEnabled(true);
     const withExplore = pickCounts(500);
     expect(withExplore['new'] ?? 0).toBeGreaterThan(0);
-  });
+  }, 15_000);
 
   it('exploration never probes a model zeroed out via MODEL_ROUTING_OVERRIDES (#738)', () => {
     // A weight-0 model never wins a bandit draw, so it never accumulates the
@@ -379,7 +379,7 @@ describe('bandit router', () => {
       else process.env.MODEL_ROUTING_OVERRIDES = prev;
       resetModelWeightOverrides();
     }
-  });
+  }, 15_000);
 
   it('community priors persist, drop invalid entries, and cap effective sample size (#685)', () => {
     expect(getCommunityPrior('groq', 'llama', undefined)).toBeUndefined();

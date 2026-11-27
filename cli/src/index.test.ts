@@ -136,6 +136,15 @@ describe('CLI arguments and launchers', () => {
     expect(fallback.ANTHROPIC_BASE_URL).toBe('http://localhost:3000');
   });
 
+  it('takes --context-window for setup-claude and launch only (#2122)', async () => {
+    expect(parseArgs(['setup-claude', '--context-window', 'max']).options.contextWindow).toBe('max');
+    expect(parseArgs(['launch', '--context-window=200k']).options.contextWindow).toBe(200_000);
+    expect(() => parseArgs(['launch', '--context-window', 'huge'])).toThrow(/--context-window/);
+    await expect(main(['setup-codex', '--context-window', 'max'])).rejects.toThrow(/only supported by setup-claude and launch/);
+    const env = claudeLaunchEnv({ ...baseOptions, model: 'reasoning-model', contextWindow: 500_000 }, 'unified-key', models, {}, '/home/tester');
+    expect(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('500000');
+  });
+
   it('turns off auto mode server review unless the caller set it (#2011)', () => {
     const defaulted = claudeLaunchEnv(baseOptions, 'unified-key', models, {}, '/home/tester');
     expect(defaulted.CLAUDE_CODE_AUTO_MODE_SERVER).toBe('0');

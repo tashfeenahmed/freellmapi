@@ -10,15 +10,16 @@ import type {
   ChatContentBlock,
 } from '@freellmapi/shared/types.js';
 import { routeRequest, resolveModelGroupCandidates, resolveRoutingChain, resolveStickyPreference, routingReserveTokens, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
-import { getSetting } from '../db/index.js';
-import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
+import { getDb, getSetting } from '../db/index.js';
+import { resolveAuth, prependSystemPrompt, invalidApiKeyMessage, type ResolvedAuth } from '../lib/system-prompt.js';
 import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { contentToString, estimateInputTokens } from '../lib/content.js';
+import { checkVisionCapacity } from '../lib/vision-gate.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
-import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker, startsWithJsonToolCallShape, couldBecomeJsonToolCallShape, indexOfDialectMarker, partialDialectMarkerTail } from '../lib/tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic-documents.js';
 import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
@@ -28,7 +29,7 @@ import { runFallbackLoop, newFallbackState, fallbackRoutingTokens, recordUpstrea
 import { routedViaValue } from '../lib/header-value.js';
 import { startStreamKeepalive, streamKeepaliveMs } from '../lib/stream-keepalive.js';
 import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
-import { resolveAnthropicModel, claudeFamilyDiscoveryEntries } from '../services/anthropic-map.js';
+import { resolveAnthropicModel, classifyClaudeFamily, claudeFamilyDiscoveryEntries } from '../services/anthropic-map.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
 import type { ReasoningEffort } from '../lib/sampling-params.js';
 import { buildModelListing } from '../services/model-listing.js';
@@ -279,9 +280,10 @@ function newMessageId(): string {
 // carries its server-enforced system prompt. A disabled/unknown profile fails
 // like a bad key so a revoked client learns nothing extra.
 function authenticate(req: Request, res: Response): ResolvedAuth | null {
-  const auth = resolveAuth(extractApiToken(req));
+  const token = extractApiToken(req);
+  const auth = resolveAuth(token);
   if (!auth) {
-    sendError(res, 401, 'authentication_error', 'Invalid API key');
+    sendError(res, 401, 'authentication_error', invalidApiKeyMessage(token));
     return null;
   }
   return auth;
@@ -577,6 +579,15 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   // RAW wire body, and normalization mutates urls in place keeping the blocks
   // (and any cache_control on them) intact — neither is disturbed.
   await normalizeMessageImages(messages);
+  // Same up-front vision gate as /v1/chat/completions and /v1/responses: an
+  // image anywhere in the conversation (Claude Code re-sends screenshots in
+  // history on every follow-up turn) needs a routable vision model, else a
+  // clear 422 instead of a 429 "All models exhausted" (#2061, #2062).
+  const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'anthropic messages') : null;
+  if (noVisionMessage) {
+    res.status(422).json({ type: 'error', error: { type: 'invalid_request_error', message: noVisionMessage, code: 'no_vision_model' } });
+    return;
+  }
   const systemHasCacheControl = Array.isArray(body.system)
     && body.system.some(block => block && typeof block === 'object' && 'cache_control' in block);
   const messageHasCacheControl = body.messages.some(message =>
@@ -653,7 +664,28 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   // haiku/default → auto | a pinned catalog model). A concrete catalog id pins
   // directly. `pinned` drives the analytics requested-model label.
   const resolved = resolveAnthropicModel(routedModel);
-  const pinnedModelId = resolved.pinned ? (body.model ?? null) : null;
+
+  // A non-Claude id that resolveAnthropicModel could not pin to an enabled
+  // catalog row used to fall through to plain auto, so an unrelated model
+  // answered with the requested id echoed back (#2090). Resolve it the way
+  // /v1/chat/completions does: a unified group id (canonical slug,
+  // `platform:model_id`) routes strictly over its group, anything else is a
+  // 404. Claude-family aliases keep their auto fallback.
+  const explicitId = routedModel?.trim();
+  let explicitGroupChain: ChainRow[] | undefined;
+  if (!resolved.pinned && explicitId && !isAutoModel(explicitId) && classifyClaudeFamily(explicitId) === null) {
+    const dispatch = isUnifyEnabled() ? resolveRequestedIdForDispatch(explicitId, getModelGroups()) : null;
+    const chain = dispatch?.memberDbIds.length ? resolveModelGroupCandidates(dispatch.memberDbIds, dispatch.demotedDbIds) : [];
+    if (chain.length === 0) {
+      const inCatalog = !!dispatch?.memberDbIds.length
+        || !!getDb().prepare('SELECT 1 FROM models WHERE model_id = ? LIMIT 1').get(explicitId);
+      const reason = inCatalog ? 'is disabled' : 'is not in the catalog';
+      sendError(res, 404, 'not_found_error', `Model '${explicitId}' ${reason}. Use 'auto' (or omit the 'model' field) to auto-route, or call /v1/models for the available list.`);
+      return;
+    }
+    explicitGroupChain = chain;
+  }
+  const pinnedModelId = resolved.pinned || explicitGroupChain ? (body.model ?? null) : null;
 
   // Named `auto:<profile>` chains (and plain `auto`) must go through the same
   // resolver as /v1/chat/completions. resolveAnthropicModel treats unknown ids
@@ -700,11 +732,11 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
   // routes over it as a chain, so the tier acts as a capability band the
   // router scores inside — failover stays within the band instead of falling
   // off to an unrelated model.
-  let groupChain: ChainRow[] | undefined;
+  let groupChain: ChainRow[] | undefined = explicitGroupChain;
   // Sticky scope for a group-pinned request: bucket by the pinned catalog id so
   // the session prefers its last successful provider of THIS model without
   // leaking affinity across groups. Undefined for auto (the global scope).
-  let stickyScope: string | undefined;
+  let stickyScope: string | undefined = explicitGroupChain ? explicitId : undefined;
   if (resolved.modelId) {
     const dispatch = isUnifyEnabled() ? resolveRequestedIdForDispatch(resolved.modelId, getModelGroups()) : null;
     const members = dispatch?.memberDbIds ?? null;
@@ -994,6 +1026,14 @@ async function streamCompletion(
   // committed on the first non-empty text and had no dialect rescue at all).
   let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
   let heldText = '';
+  // #2117: tool requests also hold an answer that opens like a JSON tool call
+  // (dialect 4), and keep watching for a dialect marker after prose has been
+  // streamed. Without this, "I'll create the file.\n<tool_call>…" or a bare
+  // {"name":"Write",…} reached Claude Code as text with stop_reason end_turn,
+  // so it reported the task done and ran nothing.
+  const toolNames = new Set((ctx.tools ?? []).map(t => t.function.name));
+  const hasTools = toolNames.size > 0;
+  let passthroughTail = ''; // possible start of a marker, held until the next chunk
 
   const ensureMessageStart = () => {
     if (messageStarted) return;
@@ -1074,6 +1114,24 @@ async function streamCompletion(
     outputChars += text.length;
   };
 
+  // Passthrough text on a tool request: stream it, but stop at a dialect
+  // marker and hold from there, so the rest can still become tool_use.
+  const emitPassthrough = (text: string) => {
+    if (!hasTools) { emitText(text); return; }
+    const buf = passthroughTail + text;
+    passthroughTail = '';
+    const at = indexOfDialectMarker(buf);
+    if (at !== -1) {
+      if (at > 0) emitText(buf.slice(0, at));
+      heldText = buf.slice(at);
+      dialectMode = 'dialect';
+      return;
+    }
+    const keep = partialDialectMarkerTail(buf);
+    if (buf.length > keep) emitText(buf.slice(0, buf.length - keep));
+    passthroughTail = buf.slice(buf.length - keep);
+  };
+
   try {
     const gen = route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, options);
 
@@ -1107,11 +1165,25 @@ async function streamCompletion(
       if (choice.finish_reason) upstreamFinish = choice.finish_reason;
 
       for (const tc of choice.delta?.tool_calls ?? []) {
-        const idx = (tc as any).index ?? 0;
+        let idx: number = (tc as any).index;
+        if (typeof idx !== 'number') {
+          // #2117: some relays omit `index`. A new id starts a new call; no id
+          // (or the same id) continues the latest one. Merging them all into
+          // slot 0 glued parallel calls' arguments into invalid JSON.
+          const known = tc.id ? [...toolAcc.entries()].find(([, a]) => a.id === tc.id) : undefined;
+          const last = toolAcc.size > 0 ? Math.max(...toolAcc.keys()) : 0;
+          const lastId = toolAcc.get(last)?.id;
+          idx = known ? known[0] : (tc.id && lastId && lastId !== tc.id ? last + 1 : last);
+        }
         if (!toolAcc.has(idx)) toolAcc.set(idx, { id: undefined, name: '', args: '' });
         const acc = toolAcc.get(idx)!;
         if (tc.id && !acc.id) acc.id = tc.id;
-        if (tc.function?.name) acc.name += tc.function.name;
+        if (tc.function?.name) {
+          // #2117: some relays repeat the full name on every delta; appending
+          // turned "Write" into "WriteWrite", a tool Claude Code does not have.
+          const joined = acc.name + tc.function.name;
+          acc.name = toolNames.has(acc.name) && !toolNames.has(joined) ? acc.name : joined;
+        }
         if (tc.function?.arguments) acc.args += tc.function.arguments;
         const thoughtSignature = (tc as any).thought_signature ?? (tc as any).thoughtSignature;
         if (typeof thoughtSignature === 'string' && thoughtSignature.length > 0 && !acc.thought_signature) {
@@ -1134,17 +1206,18 @@ async function streamCompletion(
       if (text.length === 0) continue;
 
       if (dialectMode === 'passthrough') {
-        emitText(text);
+        emitPassthrough(text);
       } else {
         heldText += text;
         if (dialectMode === 'undecided') {
           const probe = heldText.trimStart();
-          if (startsWithDialectMarker(probe)) {
+          if (startsWithDialectMarker(probe) || (hasTools && startsWithJsonToolCallShape(probe))) {
             dialectMode = 'dialect';
-          } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
+          } else if ((!couldBecomeDialectMarker(probe) && !(hasTools && couldBecomeJsonToolCallShape(probe))) || heldText.length > 256) {
             dialectMode = 'passthrough';
-            emitText(heldText);
+            const flush = heldText;
             heldText = '';
+            emitPassthrough(flush);
           }
         }
         // else: still a strict prefix of a marker — keep holding.
@@ -1165,15 +1238,19 @@ async function streamCompletion(
       }))
       .filter(c => { try { JSON.parse(c.arguments); return c.name.length > 0; } catch { return false; } });
 
+    if (passthroughTail.length > 0) { emitText(passthroughTail); passthroughTail = ''; }
+
     // Resolve the dialect hold window now the full text is known. Held text was
-    // never emitted, so a dead dialect turn can still fail over (nothing has been
-    // committed). A rescued dialect becomes tool_use blocks; leftover clean text
-    // is emitted as a text block first.
+    // never emitted, so a dead dialect turn can still fail over when no prose
+    // went out before it. A rescued dialect becomes tool_use blocks; leftover
+    // clean text is emitted as a text block first.
     if (heldText.length > 0) {
-      const rescue = ((ctx.tools?.length ?? 0) > 0 && (dialectMode === 'dialect' || containsDialectMarker(heldText)))
-        ? rescueInlineToolCalls(heldText, new Set((ctx.tools ?? []).map(t => t.function.name)))
+      const rescue = (hasTools && (dialectMode === 'dialect' || containsDialectMarker(heldText)))
+        ? rescueInlineToolCalls(heldText, toolNames)
         : { detected: false as const, calls: null, cleanText: heldText };
-      if (rescue.detected && !rescue.calls) {
+      // After prose was streamed there is no failing over: an unparseable
+      // block is sent as the text it was, as before #2117.
+      if (rescue.detected && !rescue.calls && !textBlockOpen) {
         throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${heldText.slice(0, 120)}`);
       }
       if (rescue.detected && rescue.calls) {

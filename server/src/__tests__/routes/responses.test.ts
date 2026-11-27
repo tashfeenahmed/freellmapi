@@ -12,6 +12,7 @@ import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
 import { setStickyModel } from '../../routes/proxy.js';
+import { encrypt } from '../../lib/crypto.js';
 
 function fakeRoute(provider: any) {
   return { provider, modelId: 'fake-model', modelDbId: 9999, apiKey: 'k', keyId: 1, platform: 'fake', displayName: 'Fake Model' };
@@ -81,6 +82,12 @@ describe('POST /v1/responses (#96)', () => {
   // vision-capable peer). The old unconditional 422 is gone.
   it('routes an image request through requireVision (vision-capable model)', async () => {
     mockRouteRequest.mockClear();
+    // The up-front gate counts only vision models with a usable key (#2061);
+    // routeRequest is mocked, so this key is never sent anywhere.
+    const { encrypted, iv, authTag } = encrypt('AIza-test');
+    getDb().prepare(
+      "INSERT INTO api_keys (platform, label, encrypted_key, iv, auth_tag, status, enabled) VALUES ('google', 'g', ?, ?, ?, 'healthy', 1)",
+    ).run(encrypted, iv, authTag);
     mockRouteRequest.mockReturnValue(fakeRoute({
       async chatCompletion() {
         return {

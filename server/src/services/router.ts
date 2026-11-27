@@ -2499,8 +2499,13 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
 
   // The aggregate keyless line rides in diagnostics but NOT in the summary's
   // route count: those models were never candidates for this request.
+  // An image request only ever walks vision models, so say so: "All models
+  // exhausted" reads as if text-only models were rate-limited too (#2061).
+  const summary = summarizeExhaustion(diag, getSoonestCooldownExpiry(), Date.now(), keylessSkipped);
   throw new RouteError(
-    summarizeExhaustion(diag, getSoonestCooldownExpiry(), Date.now(), keylessSkipped),
+    requireVision
+      ? summary.replace(/^All models exhausted/, 'All vision-capable models are rate-limited or unavailable for this image request')
+      : summary,
     429,
     keylessLine ? [...diag, keylessLine] : diag,
   );
@@ -2633,6 +2638,40 @@ export function resolveStickyPreference(stickyModelDbId: number | undefined, cha
 export function hasEnabledVisionModel(): boolean {
   const db = getDb();
   return getActiveChain(db).some(entry => entry.enabled === 1 && entry.supports_vision === 1);
+}
+
+/**
+ * Vision capacity for an image request's up-front gate (#2061, #2062).
+ *
+ * `enabledInChain` counts the enabled vision models in the active chain.
+ * `routable` counts enabled vision models anywhere in the catalog that have at
+ * least one key the router could use (enabled, healthy/unknown, in scope, and
+ * of the model's own custom endpoint). It ignores transient gates (cooldowns,
+ * quotas): a vision model that is only rate-limited is still capacity, and
+ * such a request is a genuine 429, not a 422.
+ *
+ * "Enabled" alone is not enough. A fresh install enables dozens of catalog
+ * vision models that have no key, so the old check passed and the router then
+ * skipped every candidate, and the client saw a 429 "All models exhausted"
+ * that read like a quota problem. Catalog-wide (not chain-only) for
+ * `routable`, so a pin or an `auto:<profile>` chain that holds a vision model
+ * is never refused here; a chain with no vision model still gets the 422 at
+ * routing time (routingExhaustionBody).
+ */
+export function visionModelAvailability(): { enabledInChain: number; routable: number } {
+  const db = getDb();
+  const enabledInChain = getActiveChain(db)
+    .filter(entry => entry.enabled === 1 && entry.supports_vision === 1).length;
+  const keyCounts = usableKeyCountsByPlatform(db);
+  const candidates = db.prepare(
+    'SELECT id, platform FROM models WHERE enabled = 1 AND supports_vision = 1',
+  ).all() as { id: number; platform: string }[];
+  let routable = 0;
+  for (const m of candidates) {
+    if ((keyCounts.get(m.platform) ?? 0) === 0) continue;
+    if (routableKeyIdsForModel(m.id).length > 0) routable++;
+  }
+  return { enabledInChain, routable };
 }
 
 // Whether at least one tool-capable model is enabled in the fallback chain.

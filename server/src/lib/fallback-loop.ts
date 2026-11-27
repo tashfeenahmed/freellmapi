@@ -20,6 +20,7 @@ import { benchCloudflareAccount } from '../services/cloudflare-daily-quota.js';
 import type { RouteResult } from '../services/router.js';
 import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled } from '../services/router.js';
 import { safeHeaderValue } from './header-value.js';
+import { logVisionBlocked } from './vision-gate.js';
 import {
   recordRequest,
   recordTokens,
@@ -54,6 +55,7 @@ import {
   isContextTooLargeError,
   isTimeoutErrorText,
   isStreamTruncatedError,
+  isHostConnectionError,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
 import { benchForTools, clearToolRejections, noteToolRejection, toolCapabilityKey } from './tool-capability.js';
@@ -157,7 +159,7 @@ function benchKeyAcrossPlatform(
     state.skipKeys.add(`${route.platform}:${modelId}:${route.keyId}`);
     benched++;
   }
-  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${Math.round(durationMs / 60_000)}min`);
+  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${durationMs < 120_000 ? `${Math.round(durationMs / 1000)}s` : `${Math.round(durationMs / 60_000)}min`}`);
 }
 
 // ── Wall-clock retry budget ──────────────────────────────────────────────────
@@ -675,6 +677,21 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
     // different wallet and may well have credits, so only THIS key is out.
     benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state,
       isApinexCheckinRequired(route.platform, err) ? 'requires daily website check-in' : 'is out of credits (402)');
+  } else if (isHostConnectionError(err) && route.platform !== 'custom') {
+    // #2080: a reset / refused / unresolvable connection is the provider's
+    // HOST, and every model of the platform sits behind that host. The platform
+    // is already ruled out for THIS request above (isProviderLevelError), but
+    // the per-route cooldown benches only the model that was tried, so the
+    // next request picked the platform's next model and hit the same dead
+    // connection again: one wasted hop per model per request, which reads as
+    // "it keeps switching models inside the provider instead of switching
+    // provider". Bench this key on the platform's other models for the same
+    // short transient window. setCooldown never shortens a longer hold, and
+    // the cooldown probe lifts the bench early once the host answers again.
+    // Custom relays are exempt like the platform skip above (#2023): every
+    // relay shares the platform id 'custom', so this would bench other hosts.
+    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state,
+      `could not connect (${summarizeAttemptError(err?.message) || 'network error'})`);
   }
   // #1347 (PR 1): a provider-moment failure (429 / 5xx / timeout / transport)
   // is the provider's bad minute, not model evidence. When attribution is
@@ -1229,18 +1246,52 @@ function formatClassBreakdown(attempts: readonly AttemptRecord[]): string {
 //     expiry as retryAtMs.
 //   - anything else (capability filters like vision/tools, mixed reasons) →
 //     the router's status (429) with a generic routing_exhausted code.
-type RoutingDiagClass = 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'other';
+type RoutingDiagClass = 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'no_vision' | 'other';
 
 function classifyRoutingDiagLine(line: string): RoutingDiagClass {
   const l = line.toLowerCase();
+  // First: a model id may itself contain 'rpm'/'tpm'-like substrings.
+  if (l.endsWith(': no vision support')) return 'no_vision';
   // "< estimated" first: the tpm_limit-too-small line also contains 'tpm',
   // which would otherwise misread as a transient window.
   if (l.includes('< estimated')) return 'too_large';
   const monthlyReasons = l.match(/key\(s\) — (.*)$/)?.[1];
   if (monthlyReasons?.split(', ').every(reason => /^monthly-budget-cap:\d+$/.test(reason))) return 'monthly_budget';
+  // A model with one key that cannot serve it (scope, other endpoint) and one
+  // that is only cooling down still has capacity that recovers by itself:
+  // time-bound, not config. Without this, "custom-key-mismatch:1, cooldown:1"
+  // read as config, and an image request whose only vision model was
+  // rate-limited came back as no_vision_model (#2061).
+  if (monthlyReasons?.split(', ').some(reason => TIME_BOUND_REASON.test(reason) && !reason.startsWith('monthly-budget-cap'))) return 'time_bound';
   if (/no provider registered|no enabled\+healthy key|no usable key|decrypt-error|no-resolved-provider|custom-key-mismatch/.test(l)) return 'config';
-  if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency|monthly-budget-cap/.test(l)) return 'time_bound';
+  if (TIME_BOUND_REASON.test(l)) return 'time_bound';
   return 'other';
+}
+const TIME_BOUND_REASON = /cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency|monthly-budget-cap/;
+
+/**
+ * Suffix for an exhaustion that ended because routing ran dry AFTER at least
+ * one attempt (#2080). Without it, "All 1 routed attempt(s) failed" reads as a
+ * failover that never moved to another provider, when in fact no other route
+ * was left: the failed provider was ruled out for the request, and every
+ * remaining candidate was unconfigured, on cooldown or unable to serve it. The
+ * router's own summary says which; a strict pin says why only one model's
+ * providers were eligible.
+ */
+export function failoverDeadEndNote(routeErr: any, strictPinnedModel?: string): string {
+  const raw = typeof routeErr?.message === 'string' ? routeErr.message.trim() : '';
+  // Drop the router's generic advice: the trail before this note already
+  // says what failed, and "add more API keys" is not the point here.
+  const summary = raw
+    .replace(/^All models exhausted[:.]?\s*/i, '')
+    .replace(/\s*Add more API keys or wait for rate limits to reset\.\s*/i, ' ')
+    .trim();
+  const reason = summary ? `: ${/[.!?]$/.test(summary) ? summary : `${summary}.`}` : '.';
+  const pin = strictPinnedModel
+    ? ` The request pinned model '${sanitizeProviderErrorMessage(strictPinnedModel)}', so failover only uses providers ` +
+      `that serve that model; send model "auto" to let a different model take over.`
+    : '';
+  return ` Failover stopped because no other route could take the request${reason}${pin}`;
 }
 
 export function routingExhaustionBody(routeErr: any): ExhaustionBody {
@@ -1269,6 +1320,27 @@ export function routingExhaustionBody(routeErr: any): ExhaustionBody {
       message: diag.length === 0
         ? `No models are enabled/configured to serve this request. Add provider API keys and enable models in the dashboard. ${message}`
         : `No candidate model has a configured, usable provider key. Add provider API keys in the dashboard. ${message}`,
+    };
+  }
+
+  // An image request (in the latest turn or in re-sent history) whose chain
+  // holds no vision model that could be routed to: every candidate was either
+  // text-only or had no usable key. Nothing will recover by waiting, so this is
+  // the 422 the up-front gate gives, not a 429 (#2061). Reached when the gate
+  // passed on catalog-wide capacity but THIS request's chain (a profile, a
+  // model group, a tier alias) has no servable vision model, and on surfaces
+  // without a gate of their own.
+  if (classes.includes('no_vision') && classes.every(c => c === 'no_vision' || c === 'config')) {
+    const skipped = classes.filter(c => c === 'no_vision').length;
+    return {
+      kind: 'bad_request',
+      status: 422,
+      type: 'invalid_request_error',
+      code: 'no_vision_model',
+      message: 'This request includes an image (in the latest message or in earlier conversation history), '
+        + `but no vision-capable model in its routing chain can serve it (${skipped} text-only model${skipped === 1 ? '' : 's'} skipped). `
+        + 'Enable a vision model with a usable API key in the Fallback Chain (or in the profile or model group the request routes to), '
+        + 'or remove the image from the conversation.',
     };
   }
 
@@ -1379,6 +1451,10 @@ export interface FallbackHooks {
   // logRoutingExhaustion). Absent = the line still fires, without identifying
   // the surface or the request.
   logIdentity?: { surface: string; requestId?: string; requestedModel?: string };
+  // The model id the client pinned, set ONLY when that pin routes strictly
+  // over the model's own providers (a unified model group) and never reaches
+  // a different model. Used to explain a failover that ran out of routes.
+  strictPinnedModel?: string;
   // Returns true once the client has hung up. Checked before STARTING each
   // retry: a chain nobody is waiting for must not keep burning provider
   // quota. Surfaces additionally thread a client-disconnect AbortSignal into
@@ -1554,13 +1630,30 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         );
         return;
       }
-      const exhaustion = lastError
+      let exhaustion = lastError
         ? exhaustedRetryError(lastError, undefined, { attempts })
         : routingExhaustionBody(routeErr);
+      // The trail alone reads as "failover never moved to another provider"
+      // (#2080). Say why it stopped: no other route was left to try.
+      if (lastError) {
+        const base = exhaustion.message.trimEnd();
+        const sep = /[.!?]$/.test(base) ? '' : '.';
+        exhaustion = { ...exhaustion, message: base + sep + failoverDeadEndNote(routeErr, hooks.strictPinnedModel) };
+      }
       // Zero attempts ran: log the router's per-candidate disposition, the only
       // record of why the pool was empty. With prior attempts the trail in the
       // exhaustion body already explains the failure.
       if (!lastError) logRoutingExhaustion(routeErr, hooks.logIdentity);
+      if (exhaustion.code === 'no_vision_model') {
+        logVisionBlocked({
+          surface: hooks.logIdentity?.surface ?? 'unidentified surface',
+          stage: 'routing',
+          requestId: hooks.logIdentity?.requestId,
+          candidates: Array.isArray((routeErr as { diagnostics?: unknown })?.diagnostics)
+            ? (routeErr as { diagnostics: unknown[] }).diagnostics.length
+            : undefined,
+        });
+      }
       hooks.onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
       return;
     }
