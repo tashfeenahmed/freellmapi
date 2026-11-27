@@ -266,6 +266,9 @@ function sendExhaustion(res: Response, body: ExhaustionBody): void {
       message: body.message,
       ...(body.code ? { code: body.code } : {}),
       ...(body.retryAtMs != null ? { retryAtMs: body.retryAtMs } : {}),
+      // Same additive block-cause fields the OpenAI-shaped surfaces carry.
+      ...(body.cause ? { cause: body.cause } : {}),
+      ...(body.causeDetail ? { cause_detail: body.causeDetail } : {}),
     },
   });
 }

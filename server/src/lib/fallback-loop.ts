@@ -988,8 +988,9 @@ export interface ExhaustionBody {
   // becomes available again (soonest cooldown expiry). Rendered in the error
   // body and as a Retry-After header (seconds, ceil) by setExhaustionHeaders.
   retryAtMs?: number;
-  // Blocking cause for 429/422 responses. Additive only: existing clients keep
-  // reading the unchanged `code` and `type`.
+  // Blocking cause, set on 429 exhaustions only (never on the 422
+  // no_vision_model gate). Additive only: existing clients keep reading the
+  // unchanged `code` and `type`.
   cause?: BlockCause;
   causeDetail?: BaseBlockCause;
 }

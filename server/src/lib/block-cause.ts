@@ -33,7 +33,12 @@ function reasonFamily(reason: string): Family | undefined {
 }
 
 function attemptFamily(errorClass: AttemptRecord['errorClass']): Family {
-  if (errorClass === 'rate_limited') return 'provider_limit';
+  // An upstream 429 benches that key on a cooldown (cooldownDecisionForError),
+  // so this request's 429 attempt and the next request's `cooldown:N` router
+  // line are the same state. Reporting provider_limit here made the first
+  // request say provider_limit and the retry say cooldown, and turned the
+  // common "one key 429'd, the rest were already cooling" into chain_exhausted.
+  if (errorClass === 'rate_limited') return 'cooldown';
   if (errorClass === 'daily_quota_exhausted' || errorClass === 'out_of_credits' || errorClass === 'forbidden') return 'key_quota';
   return 'other';
 }

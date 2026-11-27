@@ -120,6 +120,31 @@ describe('block cause on 429/422 routes', () => {
     expect(body?.execution_id).toBeDefined();
   });
 
+  it('text with cerebras in cooldown on /v1/messages carries the cause in the Anthropic error body', async () => {
+    const db = getDb();
+    db.prepare("UPDATE models SET enabled = 0 WHERE supports_vision = 1").run();
+    db.prepare("UPDATE models SET enabled = 1 WHERE platform = 'cerebras'").run();
+    const keyId = addKey('cerebras', 'test cerebras messages');
+    const cerebrasModels = db.prepare("SELECT model_id FROM models WHERE platform = 'cerebras' AND enabled = 1").all() as { model_id: string }[];
+    for (const m of cerebrasModels) {
+      setCooldown('cerebras', m.model_id, keyId.id, 600000, 'authoritative');
+    }
+
+    const { status, body, headers } = await post(app, '/v1/messages', {
+      max_tokens: 32,
+      messages: [{ role: 'user', content: 'hello' }],
+    }, key);
+    expect(status).toBe(429);
+    // Existing Anthropic wire fields unchanged.
+    expect(body?.type).toBe('error');
+    expect(body?.error?.type).toBe('rate_limit_error');
+    expect(body?.error?.code).toBe('rate_limit_exceeded');
+    // Additive block cause, same as the OpenAI-shaped surfaces.
+    expect(body?.error?.cause).toBe('cooldown');
+    expect(body?.error?.cause_detail).toBeUndefined();
+    expect(headers.get('X-Block-Cause')).toBe('cooldown');
+  });
+
   // text, cerebras key with tokenCap exhausted
   it('text with cerebras tokenCap exhausted gives key_quota cause', async () => {
     const db = getDb();

@@ -62,7 +62,7 @@ describe('runFallbackLoop block annotation', () => {
     expect(body?.causeDetail).toBe('cooldown');
   });
 
-  it('repeated provider 429 gives cause provider_limit', async () => {
+  it('repeated provider 429 gives cause cooldown (the 429 benched each key)', async () => {
     let body: ExhaustionBody | undefined;
     await runFallbackLoop(hooksSkeleton({
       maxRetries: 2,
@@ -70,6 +70,6 @@ describe('runFallbackLoop block annotation', () => {
       onExhausted: (exhaustion) => { body = exhaustion; },
     }));
     expect(body?.status).toBe(429);
-    expect(body?.cause).toBe('provider_limit');
+    expect(body?.cause).toBe('cooldown');
   });
 });

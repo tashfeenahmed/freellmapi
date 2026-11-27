@@ -47,9 +47,25 @@ describe('baseBlockCause', () => {
   });
 
   it('attempt error classes', () => {
-    expect(baseBlockCause([], [attempt('rate_limited'), attempt('rate_limited')])).toBe('provider_limit');
+    expect(baseBlockCause([], [attempt('rate_limited'), attempt('rate_limited')])).toBe('cooldown');
     expect(baseBlockCause([], [attempt('daily_quota_exhausted'), attempt('out_of_credits')])).toBe('key_quota');
     expect(baseBlockCause([], [attempt('rate_limited'), attempt('timeout')])).toBe('chain_exhausted');
+  });
+
+  it('a key that 429d this request plus siblings already cooling reads as cooldown, not chain_exhausted', () => {
+    // The 429 benched key 1 (cooldown); the router then saw it as already
+    // failed and key 2 as cooling. Same state as the next request's pure
+    // cooldown line, so the same cause.
+    expect(baseBlockCause(['g/x: 2 key(s) — already-failed-this-request:1, cooldown:1'], [attempt('rate_limited')])).toBe('cooldown');
+    expect(baseBlockCause(['g/x: 1 key(s) — cooldown:1'], [])).toBe('cooldown');
+  });
+
+  it('cooling keys mixed with a monthly-capped key stay chain_exhausted (two different causes)', () => {
+    expect(baseBlockCause([
+      'g/x: 1 key(s) — cooldown:1',
+      'g/y: 1 key(s) — monthly-budget-cap:1',
+    ], [])).toBe('chain_exhausted');
+    expect(baseBlockCause(['g/x: 2 key(s) — cooldown:1, monthly-budget-cap:1'], [])).toBe('chain_exhausted');
   });
 
   it('baseBlockCause with vision line and cooldown gives chain_exhausted (base treats vision as filter)', () => {
@@ -89,7 +105,7 @@ describe('blockCause', () => {
 
   it('vision with rate_limited attempts and no diag', () => {
     expect(blockCause({ status: 429, requireVision: true, attempts: [attempt('rate_limited')] }))
-      .toEqual({ cause: 'vision_quota_exhausted', detail: 'provider_limit' });
+      .toEqual({ cause: 'vision_quota_exhausted', detail: 'cooldown' });
   });
 
   it('no vision flag means no vision cause even with no-vision diag', () => {
