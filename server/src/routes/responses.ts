@@ -9,11 +9,13 @@ import type {
   ChatToolChoice,
   Platform,
 } from '@freellmapi/shared/types.js';
-import { routeRequest, hasEnabledVisionModel, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
+import { routeRequest, hasEnabledToolsModel, resolveStickyPreference, routingReserveTokens, resolveModelGroupCandidates, resolveRoutingChain, failureAttributionFor, type RouteResult, type ResolvedChain, type ChainRow } from '../services/router.js';
 import { getDb } from '../db/index.js';
-import { resolveAuth, prependSystemPrompt } from '../lib/system-prompt.js';
+import { resolveAuth, prependSystemPrompt, invalidApiKeyMessage } from '../lib/system-prompt.js';
+import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
 import { contentToString, estimateInputTokens, messageHasImage } from '../lib/content.js';
+import { checkVisionCapacity } from '../lib/vision-gate.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
@@ -38,7 +40,7 @@ import { applyTokenBudget, tokenBudgetMessage } from '../lib/guardrails.js';
 import { samplingParamSchemaFields, pickSamplingParams, type ResponseFormat } from '../lib/sampling-params.js';
 import { enforceJsonContent } from '../lib/structured-output.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
-import { isClientAbortError, newClientAbortError, newHedgeAbortError } from '../lib/error-classify.js';
+import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
 import { maybeServeResponsesWebSearch, webSearchCallToText } from '../lib/responses-web-search.js';
@@ -690,9 +692,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
 
   // Same auth as the proxy (accepts Bearer or x-api-key): unified key, or a
   // client-profile key carrying a server-enforced system prompt (#411).
-  const auth = resolveAuth(extractApiToken(req));
+  const token = extractApiToken(req);
+  const auth = resolveAuth(token);
   if (!auth) {
-    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    res.status(401).json({ error: { message: invalidApiKeyMessage(token), type: 'authentication_error' } });
     return;
   }
 
@@ -780,6 +783,10 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   messages = compressionResult.messages;
   res.setHeader('X-FreeLLM-Compress', formatCompressionHeader(compressionResult));
 
+  // Opt-in system date (#1931): injected after compression and behind any
+  // client-profile enforced prompt.
+  messages = maybeInjectSystemDate(messages, { tools });
+
   // Server-enforced system prompt (#411): after compression so it is never
   // compressed away, first in the list so the caller's own instructions
   // (`instructions` / system input items) follow it and cannot override it.
@@ -799,10 +806,11 @@ export async function handleResponses(req: Request, res: Response): Promise<void
   // a vision-capable peer (#118, #125). A rough per-image token cost keeps
   // budget routing from being skewed by content the text heuristic can't see.
   const hasImage = messageHasImage(messages);
-  if (hasImage && !hasEnabledVisionModel()) {
+  const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'responses', requestGroupId) : null;
+  if (noVisionMessage) {
     res.status(422).json({
       error: {
-        message: 'This request includes an image, but no vision-capable model is enabled. Enable a vision model (e.g. Gemini 2.5 Flash, Llama 4 Scout) in the Fallback Chain.',
+        message: noVisionMessage,
         type: 'invalid_request_error',
         code: 'no_vision_model',
       },
@@ -1450,6 +1458,16 @@ export async function handleResponses(req: Request, res: Response): Promise<void
           // Resolve the dialect hold window now that the full text is known.
           // Held text was never emitted, so a dead dialect turn can still fail
           // over on the same SSE stream (nothing has been committed yet).
+          // #809 / quota notices: a turn whose whole (still-held, never
+          // emitted) text is an upstream classification word or a relay quota
+          // notice is a dead turn — fail over like an empty completion.
+          if (heldText.length > 0 && toolAcc.size === 0 && msgItemId === null
+            && isUpstreamClassificationOutput(heldText, route.platform)) {
+            throw Object.assign(
+              new Error(`empty completion from ${route.displayName} (upstream notice)`),
+              upstreamFinish === 'length' ? { skipBench: true } : {},
+            );
+          }
           if (heldText.length > 0) {
             const rescue = (wantsTools && (dialectMode === 'dialect' || containsDialectMarker(heldText)))
               ? rescueInlineToolCalls(heldText, new Set((tools ?? []).map(t => t.function.name)))
@@ -1662,6 +1680,14 @@ export async function handleResponses(req: Request, res: Response): Promise<void
       if (!text && toolCalls.length === 0) {
         throw Object.assign(
           new Error(`empty completion from ${route.displayName}`),
+          result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
+        );
+      }
+      // #809 / quota notices: an upstream classification word or a relay
+      // quota notice in place of the reply is a dead turn — fail over.
+      if (toolCalls.length === 0 && isUpstreamClassificationOutput(text, route.platform)) {
+        throw Object.assign(
+          new Error(`empty completion from ${route.displayName} (upstream notice)`),
           result.choices[0]?.finish_reason === 'length' ? { skipBench: true } : {},
         );
       }

@@ -7,7 +7,7 @@ export class KeylessDecisionProvider extends BaseProvider {
   keyless = true;
   readonly supportsChat = false;
 
-  constructor(readonly platform: 'halx' | 'aisense', readonly name: string) { super(); }
+  constructor(readonly platform: 'halx' | 'aisense' | 'classifierdev' | 'tanod', readonly name: string) { super(); }
 
   async validateKey(): Promise<KeyValidationResult> { return true; }
 

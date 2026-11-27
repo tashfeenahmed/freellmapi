@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
-import { apiFetch, setToken, UNAUTHORIZED_EVENT, type ApiError } from '@/lib/api'
+import { Loader2, ShieldCheck } from 'lucide-react'
+import { API_BASE, apiFetch, setToken, UNAUTHORIZED_EVENT, type ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
@@ -40,11 +40,52 @@ async function browserDesktopSession(): Promise<string> {
   return res.token
 }
 
-interface AuthStatus {
+export interface PublicOidcStatus {
+  enabled: boolean
+  providerName: string
+  passwordLoginDisabled: boolean
+  autoRedirect: boolean
+  canAutoProvision: boolean
+}
+
+export interface AuthStatus {
   needsSetup: boolean
   authenticated: boolean
   email: string | null
   desktop?: boolean
+  authSource?: 'password' | 'oidc' | 'desktop'
+  hasLocalPassword?: boolean
+  reauthenticatedUntilMs?: number | null
+  oidc?: PublicOidcStatus
+}
+
+interface OidcHashPayload {
+  code: string | null
+  error: string | null
+  reauthOk: boolean
+}
+
+function consumeOidcHash(): OidcHashPayload {
+  if (typeof window === 'undefined') return { code: null, error: null, reauthOk: false }
+  const raw = window.location.hash.replace(/^#/, '')
+  if (!raw) return { code: null, error: null, reauthOk: false }
+  const params = new URLSearchParams(raw)
+  const code = params.get('oidc_code')
+  const error = params.get('oidc_error')
+  const reauthOk = params.get('oidc_reauth') === 'ok'
+  if (code || error || reauthOk) {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+  }
+  return { code, error, reauthOk }
+}
+
+function oidcErrorMessage(t: (key: string, params?: Record<string, string | number>) => string, code: string): string {
+  switch (code) {
+    case 'not_allowed': return t('auth.oidcErrorNotAllowed')
+    case 'unverified_email': return t('auth.oidcErrorUnverifiedEmail')
+    case 'no_account': return t('auth.oidcErrorNoAccount')
+    default: return t('auth.oidcErrorFailed')
+  }
 }
 
 function Centered({ children }: { children: ReactNode }) {
@@ -57,7 +98,17 @@ function Centered({ children }: { children: ReactNode }) {
   )
 }
 
-function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () => void }) {
+function AuthForm({
+  mode,
+  onAuthed,
+  oidc,
+  initialOidcError,
+}: {
+  mode: 'setup' | 'login'
+  onAuthed: () => void
+  oidc?: PublicOidcStatus
+  initialOidcError?: string | null
+}) {
   const { t } = useI18n()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -65,12 +116,22 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
   // Revealed only after the server asks for it (remote first-run setup). A
   // browser on the same machine as the server never sees this field.
   const [codeRequired, setCodeRequired] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialOidcError ?? '')
   const [busy, setBusy] = useState(false)
   const [attempted, setAttempted] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
 
   const isSetup = mode === 'setup'
+  const showSso = Boolean(oidc?.enabled && (!isSetup || oidc.canAutoProvision))
+  const hidePasswordForm = Boolean(showSso && oidc?.passwordLoginDisabled && (!isSetup || oidc.canAutoProvision))
+
+  const redirectedRef = useRef(false)
+  useEffect(() => {
+    if (showSso && oidc?.autoRedirect && !initialOidcError && !redirectedRef.current) {
+      redirectedRef.current = true
+      window.location.assign(`${API_BASE}/api/auth/oidc/login`)
+    }
+  }, [showSso, oidc?.autoRedirect, initialOidcError])
 
   // Inline field feedback; the server stays authoritative. Only the setup form
   // enforces the password minimum client-side (an existing password of any
@@ -140,70 +201,102 @@ function AuthForm({ mode, onAuthed }: { mode: 'setup' | 'login'; onAuthed: () =>
             ? t('auth.setupDescription')
             : t('auth.loginDescription')}
         </p>
-        <form onSubmit={submit} className="space-y-4" noValidate>
-          <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="auth-email">{t('auth.email')}</Label>
-            <Input
-              id="auth-email"
-              type="email"
-              autoComplete="username"
-              autoFocus
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder={t('auth.emailPlaceholder')}
-              aria-invalid={showEmailError}
-              aria-describedby={showEmailError ? 'auth-email-error' : undefined}
-            />
-            {attempted && <FieldError id="auth-email-error" error={emailError} />}
+        {showSso && (
+          <div className={hidePasswordForm ? 'space-y-4' : 'mb-5 space-y-4'}>
+            {hidePasswordForm && error && (
+              <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {error}
+              </p>
+            )}
+            <Button
+              type="button"
+              variant={hidePasswordForm ? 'default' : 'outline'}
+              className="w-full h-10"
+              disabled={busy}
+              onClick={() => window.location.assign(`${API_BASE}/api/auth/oidc/login`)}
+            >
+              <ShieldCheck className="size-4" aria-hidden />
+              {t('auth.signInWithSso', { provider: oidc!.providerName })}
+            </Button>
+            {!hidePasswordForm && (
+              <div className="relative flex items-center py-1">
+                <div className="flex-1 border-t" />
+                <span className="px-3 text-[11px] text-muted-foreground">
+                  {t('auth.orContinueWithPassword')}
+                </span>
+                <div className="flex-1 border-t" />
+              </div>
+            )}
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs" htmlFor="auth-password">{t('auth.password')}</Label>
-            <PasswordInput
-              id="auth-password"
-              autoComplete={isSetup ? 'new-password' : 'current-password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder={isSetup ? t('auth.passwordPlaceholderSetup') : t('auth.passwordPlaceholderLogin')}
-              aria-invalid={showPasswordError}
-              aria-describedby={showPasswordError ? 'auth-password-error' : undefined}
-            />
-            {attempted && <FieldError id="auth-password-error" error={passwordError} />}
-          </div>
-          {isSetup && codeRequired && (
-            <div className="space-y-1.5">
-              <Label className="text-xs" htmlFor="auth-setup-code">{t('auth.setupCode')}</Label>
-              <Input
-                id="auth-setup-code"
-                type="text"
-                autoComplete="off"
-                value={setupCode}
-                onChange={e => setSetupCode(e.target.value)}
-                placeholder={t('auth.setupCodePlaceholder')}
-                aria-describedby="auth-setup-code-hint"
-              />
-              <p id="auth-setup-code-hint" className="text-xs text-muted-foreground">{t('auth.setupCodeHint')}</p>
-            </div>
-          )}
-          {/* A server rejection is the one error nobody can predict; it gets the same
-              announcement and the same visual weight as the inline field errors. */}
-          {error && (
-            <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" className="w-full h-10" disabled={busy}>
-            {busy && <Loader2 className="animate-spin" aria-hidden />}
-            {busy ? (isSetup ? t('auth.creating') : t('auth.signingIn')) : isSetup ? t('auth.createAccount') : t('auth.signIn')}
-          </Button>
-        </form>
-        {!isSetup && (
-          <button
-            type="button"
-            onClick={() => setShowForgot(true)}
-            className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {t('auth.forgotPassword')}
-          </button>
+        )}
+        {!hidePasswordForm && (
+          <>
+            <form onSubmit={submit} className="space-y-4" noValidate>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="auth-email">{t('auth.email')}</Label>
+                <Input
+                  id="auth-email"
+                  type="email"
+                  autoComplete="username"
+                  autoFocus={!showSso}
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder={t('auth.emailPlaceholder')}
+                  aria-invalid={showEmailError}
+                  aria-describedby={showEmailError ? 'auth-email-error' : undefined}
+                />
+                {attempted && <FieldError id="auth-email-error" error={emailError} />}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="auth-password">{t('auth.password')}</Label>
+                <PasswordInput
+                  id="auth-password"
+                  autoComplete={isSetup ? 'new-password' : 'current-password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder={isSetup ? t('auth.passwordPlaceholderSetup') : t('auth.passwordPlaceholderLogin')}
+                  aria-invalid={showPasswordError}
+                  aria-describedby={showPasswordError ? 'auth-password-error' : undefined}
+                />
+                {attempted && <FieldError id="auth-password-error" error={passwordError} />}
+              </div>
+              {isSetup && codeRequired && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs" htmlFor="auth-setup-code">{t('auth.setupCode')}</Label>
+                  <Input
+                    id="auth-setup-code"
+                    type="text"
+                    autoComplete="off"
+                    value={setupCode}
+                    onChange={e => setSetupCode(e.target.value)}
+                    placeholder={t('auth.setupCodePlaceholder')}
+                    aria-describedby="auth-setup-code-hint"
+                  />
+                  <p id="auth-setup-code-hint" className="text-xs text-muted-foreground">{t('auth.setupCodeHint')}</p>
+                </div>
+              )}
+              {/* A server rejection is the one error nobody can predict; it gets the same
+                  announcement and the same visual weight as the inline field errors. */}
+              {error && (
+                <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" className="w-full h-10" disabled={busy}>
+                {busy && <Loader2 className="animate-spin" aria-hidden />}
+                {busy ? (isSetup ? t('auth.creating') : t('auth.signingIn')) : isSetup ? t('auth.createAccount') : t('auth.signIn')}
+              </Button>
+            </form>
+            {!isSetup && (
+              <button
+                type="button"
+                onClick={() => setShowForgot(true)}
+                className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {t('auth.forgotPassword')}
+              </button>
+            )}
+          </>
         )}
       </div>
     </Centered>
@@ -462,11 +555,44 @@ export function ChangeCredentialsModal({ mode, onClose }: ChangeCredentialsModal
 export function AuthGate({ children }: { children: ReactNode }) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
-  const { data, isLoading, isError, refetch } = useQuery<AuthStatus>({
+  const [initialHash] = useState<OidcHashPayload>(() => consumeOidcHash())
+  const [oidcExchanging, setOidcExchanging] = useState<boolean>(() => Boolean(initialHash.code))
+  const [oidcError, setOidcError] = useState<string | null>(() => (
+    initialHash.error ? oidcErrorMessage(t, initialHash.error) : null
+  ))
+  const { data, isPending, isError, refetch } = useQuery<AuthStatus>({
     queryKey: ['auth-status'],
     queryFn: () => apiFetch('/api/auth/status'),
     retry: false,
+    enabled: !oidcExchanging,
   })
+
+  const oidcHandledRef = useRef(false)
+  useEffect(() => {
+    if (oidcHandledRef.current) return
+    if (initialHash.reauthOk) {
+      oidcHandledRef.current = true
+      toast.success(t('auth.oidcReauthSuccess'))
+      void refetch()
+      return
+    }
+    if (!initialHash.code) return
+    oidcHandledRef.current = true
+    ;(async () => {
+      try {
+        const res = await apiFetch<{ token: string }>('/api/auth/oidc/exchange', {
+          method: 'POST',
+          body: JSON.stringify({ code: initialHash.code }),
+        })
+        setToken(res.token)
+        queryClient.invalidateQueries()
+      } catch {
+        setOidcError(t('auth.oidcErrorFailed'))
+      } finally {
+        setOidcExchanging(false)
+      }
+    })()
+  }, [initialHash, queryClient, refetch, t])
 
   useEffect(() => {
     const handler = () => { refetch() }
@@ -507,7 +633,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     refetch()
   }
 
-  if (isLoading) {
+  if (isPending || oidcExchanging) {
     return (
       <Centered>
         <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -539,8 +665,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
     return <Centered><p className="flex items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-3.5 animate-spin" aria-hidden />{t('auth.loading')}</p></Centered>
   }
-  if (data.needsSetup) return <AuthForm mode="setup" onAuthed={onAuthed} />
-  if (!data.authenticated) return <AuthForm mode="login" onAuthed={onAuthed} />
+  if (data.needsSetup) return <AuthForm mode="setup" onAuthed={onAuthed} oidc={data.oidc} initialOidcError={oidcError} />
+  if (!data.authenticated) return <AuthForm mode="login" onAuthed={onAuthed} oidc={data.oidc} initialOidcError={oidcError} />
 
   return <>{children}</>
 }

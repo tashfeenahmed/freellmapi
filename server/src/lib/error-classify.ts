@@ -208,6 +208,44 @@ export function isTransportError(err: any): boolean {
   return false;
 }
 
+// ── Connection-level failures (#2080) ────────────────────────────────────────
+// The subset of transport failures that is about the HOST, not the model: the
+// TCP/TLS connection was reset, refused, never resolved or never opened. One
+// provider serves every model of its platform from the same host (NVIDIA NIM:
+// integrate.api.nvidia.com), so a sibling model on the same key would hit the
+// same dead connection. Deliberately excluded: response-header / body timeouts
+// and a bare "terminated", which can be one slow model on a healthy host.
+const HOST_CONNECTION_ERROR_CODES = new Set([
+  'ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'EPIPE', 'EAI_AGAIN', 'ENOTFOUND',
+  'EHOSTUNREACH', 'ENETUNREACH', 'EADDRNOTAVAIL',
+  'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_CLOSED',
+]);
+
+const HOST_CONNECTION_MESSAGE_HINTS = [
+  'econnreset', 'econnrefused', 'enotfound', 'eai_again', 'ehostunreach', 'enetunreach',
+  'socket hang up', 'other side closed', 'client network socket disconnected',
+];
+
+/** True when the error says the provider's HOST could not be reached or
+ *  dropped the connection (reset, refused, DNS, TLS handshake), as opposed to
+ *  a model being slow. Never true for a response with an HTTP status, or for
+ *  the gateway's own aborts. */
+export function isHostConnectionError(err: any): boolean {
+  if (err == null) return false;
+  if (typeof err.status === 'number' && err.status > 0) return false;
+  if (isClientAbortError(err) || isHedgeAbortError(err)) return false;
+  for (const { code, message } of errorChainLinks(err)) {
+    if (code && HOST_CONNECTION_ERROR_CODES.has(code)) return true;
+    const msg = message.toLowerCase();
+    if (!msg) continue;
+    // undici's wording for a connection that never opened (DNS, TLS, proxy),
+    // with or without the cause code describeFetchFailure appends.
+    if (msg === 'fetch failed' || msg.startsWith('fetch failed (')) return true;
+    if (HOST_CONNECTION_MESSAGE_HINTS.some(hint => msg.includes(hint))) return true;
+  }
+  return false;
+}
+
 // A genuine provider QUOTA signal: a structured 429 or rate-limit/quota wording.
 // Distinct from the much broader isRetryableError: timeouts, 5xx, transport
 // failures and dead-turn classes are retryable but say nothing about quotas.
@@ -472,7 +510,27 @@ export function isProviderMomentFailure(err: any): boolean {
 // injecting a filter verdict in place of the model's reply belong here.
 const CLASSIFICATION_RELAY_PLATFORMS = new Set(['kilo']);
 
+// In-band relay quota notices: HTTP 200 whose entire "completion" is a
+// quota/abuse-prevention message instead of a model reply, with 0 output
+// tokens. Observed from aihubmix `*-free` models (platform 'custom'):
+//   "Sorry, to prevent abuse of free resources, accounts that have not been
+//    recharged can only try 10 times..."
+// Treated like an empty completion so the fallback loop fails over (and the
+// route is benched) instead of serving the notice as the answer. Kept narrow:
+// anchored to the START of the reply (optionally after "Sorry,"), using the
+// relay's own distinctive phrasing, and only for short replies — a real answer
+// that merely quotes or discusses such a notice is never caught.
+const IN_BAND_QUOTA_NOTICE = /^(?:sorry[\s,.!:;-]*)?(?:to prevent abuse of free resources|accounts that have not been recharged)\b/i;
+const IN_BAND_QUOTA_NOTICE_MAX_LEN = 600;
+
+export function isInBandQuotaNotice(text: unknown): boolean {
+  const t = (typeof text === 'string' ? text : '').trim();
+  if (t.length === 0 || t.length > IN_BAND_QUOTA_NOTICE_MAX_LEN) return false;
+  return IN_BAND_QUOTA_NOTICE.test(t);
+}
+
 export function isUpstreamClassificationOutput(text: unknown, platform?: string): boolean {
+  if (isInBandQuotaNotice(text)) return true;
   if (!platform || !CLASSIFICATION_RELAY_PLATFORMS.has(platform.toLowerCase())) return false;
   const t = (typeof text === 'string' ? text : '').trim().toLowerCase();
   return t === 'safe' || t === 'unsafe';
@@ -568,7 +626,11 @@ export function isPaymentRequiredError(err: any): boolean {
   const msg = String(err?.message ?? '').toLowerCase();
   if (msg.includes('payment required')
     || msg.includes('insufficient_quota') || msg.includes('insufficient credit')
-    || msg.includes('insufficient balance')) return true;
+    || msg.includes('insufficient balance')
+    // Zhipu code 1113 arrives as a 429 ("余额不足或无可用资源包,请充值。"), and
+    // new-api relays (Agnes) as a 403; the status alone reads as a rate limit
+    // or a model gate, so the 90s bench retried an empty wallet all day.
+    || msg.includes('insufficient user quota') || msg.includes('余额不足')) return true;
 
   const stated = msg.match(STATED_STATUS);
   const status = typeof err?.status === 'number' ? err.status : Number(stated?.[1] ?? stated?.[2]);

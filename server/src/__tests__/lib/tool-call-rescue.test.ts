@@ -4,6 +4,10 @@ import {
   startsWithDialectMarker,
   couldBecomeDialectMarker,
   containsDialectMarker,
+  startsWithJsonToolCallShape,
+  couldBecomeJsonToolCallShape,
+  indexOfDialectMarker,
+  partialDialectMarkerTail,
 } from '../../lib/tool-call-rescue.js';
 
 const TOOLS = new Set(['Read', 'Write', 'Bash', 'Grep', 'list_dir']);
@@ -182,7 +186,50 @@ describe('inline tool-call dialect rescue', () => {
     });
   });
 
+  describe('Claude-style <function_calls> dialect (#2117)', () => {
+    it('parses an invoke block into a typed call, keeping prose before it', () => {
+      const text = 'Creating it now.\n<function_calls>\n<invoke name="Write">\n<parameter name="file_path">/tmp/hello.txt</parameter>\n<parameter name="content">hi</parameter>\n</invoke>\n</function_calls>';
+      const r = rescueInlineToolCalls(text, TOOLS);
+      expect(r.detected).toBe(true);
+      expect(r.calls).toEqual([{ name: 'Write', arguments: '{"file_path":"/tmp/hello.txt","content":"hi"}' }]);
+      expect(r.cleanText).toBe('Creating it now.');
+    });
+
+    it('treats an unknown tool or a truncated block as a dead turn', () => {
+      expect(rescueInlineToolCalls('<function_calls><invoke name="Nope"><parameter name="x">1</parameter></invoke></function_calls>', TOOLS).calls).toBeNull();
+      const cut = rescueInlineToolCalls('ok <function_calls><invoke name="Bash"><parameter name="command">ls', TOOLS);
+      expect(cut.detected).toBe(true);
+      expect(cut.calls).toBeNull();
+      expect(cut.cleanText).toBe('ok');
+    });
+  });
+
   describe('stream hold-window helpers', () => {
+    it('JSON tool-call shape: holds a leading { or ```json fence, releases other fences (#2117)', () => {
+      expect(startsWithJsonToolCallShape('{"name"')).toBe(true);
+      expect(startsWithJsonToolCallShape('  {')).toBe(true);
+      expect(startsWithJsonToolCallShape('```json\n{"name"')).toBe(true);
+      expect(startsWithJsonToolCallShape('```\n{')).toBe(true);
+      expect(startsWithJsonToolCallShape('```bash\nls')).toBe(false);
+      expect(startsWithJsonToolCallShape('Hello')).toBe(false);
+      expect(couldBecomeJsonToolCallShape('`')).toBe(true);
+      expect(couldBecomeJsonToolCallShape('```js')).toBe(true);
+      expect(couldBecomeJsonToolCallShape('```json\n')).toBe(true);
+      expect(couldBecomeJsonToolCallShape('```bash')).toBe(false);
+      expect(couldBecomeJsonToolCallShape('```json\nx')).toBe(false);
+      expect(couldBecomeJsonToolCallShape('Hi')).toBe(false);
+    });
+
+    it('indexOfDialectMarker and partialDialectMarkerTail find a marker after prose (#2117)', () => {
+      expect(indexOfDialectMarker('Sure.\n<tool_call>{}')).toBe(6);
+      expect(indexOfDialectMarker('a <function_calls> then <tool_call>')).toBe(2);
+      expect(indexOfDialectMarker('no markers <b>here</b>')).toBe(-1);
+      expect(partialDialectMarkerTail('Sure, doing it <tool_')).toBe(6);
+      expect(partialDialectMarkerTail('ends with <')).toBe(1);
+      expect(partialDialectMarkerTail('a <b> tag')).toBe(0);
+      expect(partialDialectMarkerTail('closed <div>')).toBe(0);
+    });
+
     it('startsWithDialectMarker matches all dialects, with leading whitespace', () => {
       expect(startsWithDialectMarker('<|tool_calls_section_begin|>x')).toBe(true);
       expect(startsWithDialectMarker('  <|tool_call_begin|>')).toBe(true);

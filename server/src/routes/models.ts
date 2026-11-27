@@ -26,12 +26,15 @@ import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { recordRequest, recordTokens } from '../services/ratelimit.js';
 import { recordMonthlyUsage } from '../services/key-budget.js';
 import { contentToString } from '../lib/content.js';
+import { providerTimeoutMs } from '../lib/provider-timeout.js';
 
 export const modelsRouter = Router();
 
 // Throttle map for model test endpoint: modelDbId -> lastTestTimestamp
 const modelTestCooldowns = new Map<number, number>();
 const MODEL_TEST_THROTTLE_MS = 5000;
+// Fits ~30 s free providers; PROVIDER_TIMEOUT_<PLATFORM> overrides it like the gateway budget.
+const MODEL_TEST_TIMEOUT_MS = 45_000;
 
 
 const modelUpdateSchema = z.object({
@@ -423,7 +426,9 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
   // Use the same key selection, quota gates and in-flight reservations as
   // inference, pinned to this model so Test cannot silently try another one.
   const inputEstimate = 16;
-  const outputLimit = 4;
+  // Reasoning models spend their first tokens thinking, and OpenAI-family
+  // upstreams reject max_output_tokens below 16, so a tiny cap fails live models.
+  const outputLimit = 256;
   const route = routePinnedModel(id, inputEstimate + outputLimit);
   if (!route) {
     res.json({ success: false, modelId: modelRow.model_id, latencyMs: 0,
@@ -434,7 +439,7 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
   try {
     const response = await withKeyProxy(route.proxyUrl, () => route.provider.chatCompletion(
       route.apiKey, [{ role: 'user', content: 'ping' }], route.modelId,
-      { max_tokens: outputLimit, timeoutMs: 15_000 },
+      { max_tokens: outputLimit, timeoutMs: providerTimeoutMs(route.platform, MODEL_TEST_TIMEOUT_MS) },
     ));
     const latencyMs = Date.now() - startTime;
     const message = response.choices?.[0]?.message;
@@ -444,7 +449,8 @@ modelsRouter.post('/:id/test', async (req: Request, res: Response) => {
     const inputTokens = response.usage?.prompt_tokens ?? Math.max(0, (response.usage?.total_tokens ?? inputEstimate + outputTokens) - outputTokens);
     recordRequest(route.platform, route.modelId, route.keyId);
     recordTokens(route.platform, route.modelId, route.keyId, response.usage?.total_tokens ?? inputTokens + outputTokens);
-    if (!contentToString(message?.content ?? '') && !message?.tool_calls?.length) {
+    // Reasoning text alone still proves the model is served.
+    if (!contentToString(message?.content ?? '') && !message?.reasoning_content && !message?.tool_calls?.length) {
       const error = 'Empty completion; the test output limit may be too small for this model.';
       // The upstream completed a request even though it produced no usable
       // answer. Error rows do not settle the monthly ledger automatically.

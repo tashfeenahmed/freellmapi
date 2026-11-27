@@ -35,6 +35,7 @@ interface CatalogRows {
   videoModels?: { platform: string; enabled?: boolean }[];
   searchEngines?: { platform: string; enabled?: boolean }[];
   decisionModels?: { platform: string; enabled?: boolean }[];
+  specialistTextModels?: { platform: string; enabled?: boolean }[];
 }
 
 function keylessPlatforms(): Map<string, string> {
@@ -53,7 +54,7 @@ export function keylessPlatformsInCatalog(catalog: CatalogRows): string[] {
   const found = new Set<string>();
   const lists = [
     catalog.models, catalog.embeddings, catalog.transcriptionModels,
-    catalog.videoModels, catalog.searchEngines, catalog.decisionModels,
+    catalog.videoModels, catalog.searchEngines, catalog.decisionModels, catalog.specialistTextModels,
   ];
   for (const rows of lists) {
     for (const row of rows ?? []) {

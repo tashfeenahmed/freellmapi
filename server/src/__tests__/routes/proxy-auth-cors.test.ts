@@ -53,6 +53,33 @@ describe('Proxy authentication and CORS', () => {
     expect(body.error.type).toBe('authentication_error');
   });
 
+  // A licence key (fla_...) pasted where the API key belongs is the most common
+  // cause of a 401; the message names the right key on every inference surface.
+  it('says when a licence key was sent instead of the API key', async () => {
+    const chat = await request(app, 'POST', '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'hello' }],
+    }, { Authorization: 'Bearer fla_JF6Rexample1Q4Z' });
+    expect(chat.status).toBe(401);
+    expect(chat.body.error.message).toMatch(/licence key.*Unified API key/s);
+    expect(chat.raw).not.toContain('fla_JF6Rexample1Q4Z');
+
+    const messages = await request(app, 'POST', '/v1/messages', {
+      model: 'auto', max_tokens: 10, messages: [{ role: 'user', content: 'hello' }],
+    }, { 'x-api-key': 'fla_JF6Rexample1Q4Z' });
+    expect(messages.status).toBe(401);
+    expect(messages.body.error.message).toMatch(/licence key/);
+
+    const responses = await request(app, 'POST', '/v1/responses', { model: 'auto', input: 'hello' },
+      { Authorization: 'Bearer fla_JF6Rexample1Q4Z' });
+    expect(responses.status).toBe(401);
+    expect(responses.body.error.message).toMatch(/licence key/);
+
+    const other = await request(app, 'POST', '/v1/chat/completions', {
+      messages: [{ role: 'user', content: 'hello' }],
+    }, { Authorization: 'Bearer freellmapi-wrong-key' });
+    expect(other.body.error.message).toBe('Invalid API key');
+  });
+
   it('accepts the unified key supplied via the x-api-key header', async () => {
     const { status, body } = await request(app, 'POST', '/v1/chat/completions', {
       messages: [{ role: 'user', content: 'hello' }],

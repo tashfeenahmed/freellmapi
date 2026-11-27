@@ -96,6 +96,19 @@ describe('client agent classification', () => {
     }))).not.toBe('reasonix');
   });
 
+  it('recognizes Zero by the UA it sends to every endpoint', () => {
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'zero/0.13.0',
+    }))).toBe('zero');
+    // Builds carry semver build metadata after the version.
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'zero/0.13.0+up.9.ffd7bb21.local',
+    }))).toBe('zero');
+    expect(classifyClientAgent(request('/v1/chat/completions', {
+      'user-agent': 'zeroclaw/1.0',
+    }))).not.toBe('zero');
+  });
+
   it('recognizes ZCode by the headers it sends on every model request', () => {
     // Captured from ZCode runtime 0.16.9 (zcode-app-cli 3.15.3).
     expect(classifyClientAgent(request('/v1/chat/completions', {

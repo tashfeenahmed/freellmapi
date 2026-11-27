@@ -9,6 +9,7 @@ import { isLoopbackRequest } from '../lib/loopback.js';
 import { getSetting, getUnifiedApiKey } from '../db/index.js';
 import { buildModelListing } from '../services/model-listing.js';
 import { extractApiToken, timingSafeStringEqual } from './proxy.js';
+import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { runInboundChat, type InboundChatResult, type InboundChatWire } from '../lib/inbound-chat.js';
 import { runEmbeddings, embeddingsRetryAfterSec, EmbeddingsError } from '../services/embeddings.js';
 import { validateSession } from '../services/auth.js';
@@ -24,6 +25,16 @@ export function getOllamaEmulationMode(): OllamaEmulationMode {
 
 // The nearest proxy's hop decides, not the caller's: see lib/loopback.ts.
 export const isLoopback = (req: Request): boolean => isLoopbackRequest(req);
+
+// Ollama's num_predict defaults to -1 (no limit) and -2 means "fill the context", so
+// only a positive value is a cap. Without one, OLLAMA_DEFAULT_MAX_TOKENS applies
+// (the same default as the Gemini surface) instead of the shared 1024-token one,
+// which would cut long answers.
+const OLLAMA_DEFAULT_MAX_TOKENS = 8192;
+
+function ollamaMaxTokens(numPredict: unknown): number | undefined {
+  return typeof numPredict === 'number' && numPredict > 0 ? numPredict : undefined;
+}
 
 function authorize(req: Request, res: Response): boolean {
   if ((req as Request & { urlTokenAuthenticated?: boolean }).urlTokenAuthenticated) {
@@ -397,18 +408,20 @@ ollamaRouter.post('/api/chat', (req, res) => {
   const options = body.options as Record<string, unknown> | undefined;
   const rawSession = req.headers['x-ollama-session-id'] ?? req.headers['x-session-id'];
   const sessionId = Array.isArray(rawSession) ? rawSession[0] : rawSession;
+  const tools = ollamaTools(body.tools);
   return runInboundChat(req, res, {
     model,
-    messages: ollamaMessages(body.messages),
+    messages: maybeInjectSystemDate(ollamaMessages(body.messages), { tools }),
     stream: body.stream !== false,
-    maxTokens: typeof options?.num_predict === 'number' ? options.num_predict : undefined,
+    maxTokens: ollamaMaxTokens(options?.num_predict),
+    defaultMaxTokens: OLLAMA_DEFAULT_MAX_TOKENS,
     temperature: typeof options?.temperature === 'number' ? options.temperature : undefined,
     topP: typeof options?.top_p === 'number' ? options.top_p : undefined,
     topK: typeof options?.top_k === 'number' ? options.top_k : undefined,
     stop: Array.isArray(options?.stop)
       ? options.stop.filter((value): value is string => typeof value === 'string')
       : undefined,
-    tools: ollamaTools(body.tools),
+    tools,
     responseFormat: body.format
       ? (body.format === 'json'
         ? { type: 'json_object' }
@@ -519,9 +532,10 @@ ollamaRouter.post('/api/generate', (req, res) => {
   });
   return runInboundChat(req, res, {
     model,
-    messages,
+    messages: maybeInjectSystemDate(messages),
     stream: body.stream !== false,
-    maxTokens: typeof options?.num_predict === 'number' ? options.num_predict : undefined,
+    maxTokens: ollamaMaxTokens(options?.num_predict),
+    defaultMaxTokens: OLLAMA_DEFAULT_MAX_TOKENS,
     temperature: typeof options?.temperature === 'number' ? options.temperature : undefined,
     topP: typeof options?.top_p === 'number' ? options.top_p : undefined,
     topK: typeof options?.top_k === 'number' ? options.top_k : undefined,

@@ -4,7 +4,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { ChatMessage, ChatToolCall, TokenUsage } from '@freellmapi/shared/types.js';
-import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, resolveRoutingChain, resolveModelGroupCandidates, resolveStickyPreference, hasEnabledVisionModel, hasEnabledToolsModel, routingReserveTokens, failureAttributionFor } from '../services/router.js';
+import { type RouteResult, type ResolvedChain, type ChainRow, routeRequest, resolveRoutingChain, resolveModelGroupCandidates, resolveStickyPreference, hasEnabledToolsModel, routingReserveTokens, failureAttributionFor } from '../services/router.js';
 import { secondsUntilNextMonth, nextMonthResetAt } from '../services/key-budget.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
 import { runRerank, RerankError, rerankRetryAfterSec } from '../services/rerank.js';
@@ -14,8 +14,10 @@ import { retryAfterSeconds } from '../lib/retry-hint.js';
 import { runImageGeneration, runVideoGeneration, runSpeech, runTranscription, MediaError, MAX_TRANSCRIPTION_BYTES } from '../services/media.js';
 import multer from 'multer';
 import { getDb } from '../db/index.js';
-import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
+import { resolveAuth, prependSystemPrompt, invalidApiKeyMessage, type ResolvedAuth } from '../lib/system-prompt.js';
+import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { contentToString, estimateInputTokens, messageHasImage, normalizeOutboundContent, sanitizeResponse } from '../lib/content.js';
+import { checkVisionCapacity } from '../lib/vision-gate.js';
 import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { normalizeMessageImages } from '../lib/image-normalize.js';
@@ -38,7 +40,7 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { advertisedContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { advertisedContextWindow, autoMaxContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
 import { buildCodexCatalog } from '../services/codex-catalog.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
@@ -70,9 +72,10 @@ export { timingSafeStringEqual } from '../lib/system-prompt.js';
 // valid here — never on the /api dashboard surface. Writes the 401 itself so
 // call sites can simply bail on null.
 function requireInferenceAuth(req: Request, res: Response): ResolvedAuth | null {
-  const auth = resolveAuth(extractApiToken(req));
+  const token = extractApiToken(req);
+  const auth = resolveAuth(token);
   if (!auth) {
-    res.status(401).json({ error: { message: 'Invalid API key', type: 'authentication_error' } });
+    res.status(401).json({ error: { message: invalidApiKeyMessage(token), type: 'authentication_error' } });
     return null;
   }
   return auth;
@@ -509,6 +512,10 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
       // OpenAI-compatible clients read; emit both so whichever a client
       // looks for is populated. Additive — clients ignore unknown fields.
       context_length: autoContextWindow,
+      // The largest prompt auto can still serve for a tool-calling request
+      // (#2122, #2087). Additive and opt-in: clients size to context_window by
+      // default; `freellmapi setup-claude --context-window max` sizes to this.
+      max_context_window: autoMaxContextWindow(),
       available: true,
       unavailable_reason: null,
     },
@@ -2067,6 +2074,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   messages = compressionResult.messages;
   res.setHeader('X-FreeLLM-Compress', formatCompressionHeader(compressionResult));
 
+  // Opt-in system date (#1931): injected after compression (never compressed
+  // away) and right behind any client-profile enforced system prompt.
+  messages = maybeInjectSystemDate(messages, { tools });
+
   // Server-enforced system prompt (#411): injected AFTER compression so it is
   // never compressed away, and FIRST in the list so a caller-supplied system
   // message follows it and cannot override it. Constant per profile, so the
@@ -2092,11 +2103,16 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // or surfacing the generic "all models exhausted" error (#118, #125). Add a
   // rough per-image token cost so budget routing isn't skewed by content the
   // heuristic above (text-only) can't see.
+  // The gate scans EVERY message, so an image re-sent in history on a
+  // follow-up turn is caught too, and it counts only vision models that have a
+  // usable key: "enabled" alone let a keyless default install through to a
+  // misleading 429 (#2061, #2062).
   const hasImage = messageHasImage(messages);
-  if (hasImage && !hasEnabledVisionModel()) {
+  const noVisionMessage = hasImage ? checkVisionCapacity(messages, 'chat completions', requestGroupId) : null;
+  if (noVisionMessage) {
     res.status(422).json({
       error: {
-        message: 'This request includes an image, but no vision-capable model is enabled. Enable a vision model (e.g. Gemini 2.5 Flash, Llama 4 Scout) in the Fallback Chain.',
+        message: noVisionMessage,
         type: 'invalid_request_error',
         code: 'no_vision_model',
       },
@@ -2471,6 +2487,10 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
   // buckets by the canonical id the client sent, so the group prefers its last
   // successful provider without leaking stickiness across groups.
   let stickyStrategyKey: string | undefined = strategyKey;
+  // Set when the client's model id pins routing strictly to one model's
+  // providers (unified group). Lets an exhaustion say why failover never
+  // reached a different model (#2080).
+  let strictPinnedModel: string | undefined;
 
   if (aliasTierChain.length > 0) {
     // A tier-mapped Claude alias routes STRICTLY over its tier's pool. An
@@ -2519,6 +2539,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         return;
       }
       stickyStrategyKey = requestedModel;
+      strictPinnedModel = requestedModel;
       const sticky = getStickyModel(sessionMessages, sessionIdHeader, stickyStrategyKey);
       // Only prefer the sticky member if it's actually IN this group — passing a
       // non-member as preferredModelDbId would make routeRequest inject an
@@ -2582,6 +2603,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     state,
     attemptLog,
     logIdentity: { surface: 'chat completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
+    strictPinnedModel,
     clientGone: () => clientGone,
     abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
     streaming: stream === true,

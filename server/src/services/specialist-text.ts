@@ -2,12 +2,14 @@ import { getDb } from '../db/index.js';
 import { reserveProviderCredential } from './provider-credential.js';
 import { meterCloudflare, roughTokens } from './cloudflare-neurons.js';
 import { proxyFetch } from '../lib/proxy.js';
+import { tanodTranslate, tanodStatus } from '../providers/tanod.js';
 import { z } from 'zod';
 import type { Request, Response } from 'express';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
 const targets: Record<string,Record<string,string>>={
+  tanod:{'argos-translate':'translation'},
   ovh:{'Olala-v1.0-translate':'translation','Olala-v1.0-summarise':'summarization'},
   cloudflare:{'@cf/meta/m2m100-1.2b':'translation','@cf/ai4bharat/indictrans2-en-indic-1B':'translation'},
   xkiro:{'cohere/command-a-translate':'translation','cohere/north-small-translate':'translation'}
@@ -15,7 +17,7 @@ const targets: Record<string,Record<string,string>>={
 export const specialistTask=(id:string,platform='ovh')=>Object.hasOwn(targets,platform)&&Object.hasOwn(targets[platform],id)?targets[platform][id]:undefined;
 export interface SpecialistRow { platform: string; modelId: string; task: string; displayName: string; enabled: boolean; quotaLabel?: string }
 export function listSpecialists() {
-  return getDb().prepare("SELECT model_id AS id, platform, modality AS task FROM media_models WHERE platform IN ('ovh','cloudflare','xkiro') AND modality IN ('translation','summarization') AND enabled=1 ORDER BY model_id").all() as {id:string;platform:string;task:string}[];
+  return getDb().prepare("SELECT model_id AS id, platform, modality AS task FROM media_models WHERE platform IN ('ovh','cloudflare','xkiro','tanod') AND modality IN ('translation','summarization') AND enabled=1 ORDER BY model_id").all() as {id:string;platform:string;task:string}[];
 }
 const language = z.string().regex(/^[a-zA-Z]{2,3}([-_][a-zA-Z0-9]{2,8})*$/).max(35);
 const base = z.object({model:z.string().min(1), input:z.string().trim().min(1).max(32000), stream:z.boolean().optional()}).strict();
@@ -34,6 +36,11 @@ export async function serveSpecialist(task:'translation'|'summarization',req:Req
       const {credential,budgetBlocked}=reserveProviderCredential({platform:row.platform,key_id:null,model_id:model},roughTokens(input));
       if(!credential){res.status(budgetBlocked?429:503).json({error:{message:'No usable translation credential.'}});return;}
       try {
+        if(row.platform==='tanod'){
+          try { const output=await tanodTranslate(input,String(parsed.data.source_language),String(parsed.data.target_language),controller.signal);res.json({model,task,output}); }
+          catch(e){res.status(tanodStatus(e)).json({error:{message:'Tanod free translation unavailable or unsupported.'}});}
+          return;
+        }
         const cf=row.platform==='cloudflare', indic=model.includes('indictrans2');
         const source=String(parsed.data.source_language),target=String(parsed.data.target_language);
         if(indic&&!['en','eng_Latn'].includes(source)){res.status(400).json({error:{message:'This model translates from English only.'}});return;}
