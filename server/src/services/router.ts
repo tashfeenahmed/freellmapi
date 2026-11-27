@@ -642,7 +642,7 @@ export function setPeakHoursConfig(patch: Partial<PeakHoursConfig>): void {
 //                       key first, so the key closest to its cap is held back
 //                       instead of being the next one to 429.
 const KEY_SELECTION_KEY = 'key_selection_strategy';
-const VALID_KEY_SELECTIONS: KeySelectionStrategy[] = ['auto', 'least-remaining'];
+const VALID_KEY_SELECTIONS: KeySelectionStrategy[] = ['auto', 'least-remaining', 'round-robin'];
 export const DEFAULT_KEY_SELECTION: KeySelectionStrategy = 'auto';
 
 export function getKeySelectionStrategy(): KeySelectionStrategy {
@@ -1701,15 +1701,22 @@ function selectKeyForModel(entry: ChainRow, estimatedTokens: number, skipKeys?: 
   // cursor over the platform's key list (#651).
   const rrKey = modelStatsKey(entry.platform, entry.model_id, entry.endpoint_scope);
   let idx = roundRobinIndex.get(rrKey) ?? 0;
-  let ranked = orderKeysByScore(entry, keys);
-
-  // Remaining-quota weighting (#919) layers on top: it re-sorts whatever order
-  // we were going to walk anyway — the bandit ranking when there is per-key
-  // data, otherwise the round-robin rotation starting at the live cursor — so
-  // ties fall back to that order instead of to rowid.
-  if (keys.length > 1 && quotaWeightingApplies(entry)) {
-    const base = ranked ?? Array.from({ length: keys.length }, (_, i) => keys[(idx + i) % keys.length]);
-    ranked = orderKeysByRemainingQuota(entry, base);
+  const keySelection = getKeySelectionStrategy();
+  let ranked: KeyRow[] | null = null;
+  if (keySelection === 'round-robin') {
+    // Under pure round-robin (#2022), ignore per-key bandit scores and walk the
+    // configured keys in cyclic cursor order, keeping gates/cooldowns intact.
+    ranked = Array.from({ length: keys.length }, (_, i) => keys[(idx + i) % keys.length]);
+  } else {
+    ranked = orderKeysByScore(entry, keys);
+    // Remaining-quota weighting (#919) layers on top: it re-sorts whatever order
+    // we were going to walk anyway — the bandit ranking when there is per-key
+    // data, otherwise the round-robin rotation starting at the live cursor — so
+    // ties fall back to that order instead of to rowid.
+    if (keys.length > 1 && quotaWeightingApplies(entry)) {
+      const base = ranked ?? Array.from({ length: keys.length }, (_, i) => keys[(idx + i) % keys.length]);
+      ranked = orderKeysByRemainingQuota(entry, base);
+    }
   }
 
   // A custom model belongs to exactly one endpoint (#212), but an endpoint can

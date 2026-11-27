@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { routeRequest, refreshStatsCache, setRoutingStrategy } from '../../services/router.js';
+import { routeRequest, refreshStatsCache, setRoutingStrategy, setKeySelectionStrategy, getKeySelectionStrategy } from '../../services/router.js';
 import * as ratelimit from '../../services/ratelimit.js';
 import { getDb, initDb } from '../../db/index.js';
 import { addToActiveChain } from '../helpers/chain.js';
@@ -161,5 +161,84 @@ describe('per-key bandit selection', () => {
     const counts = pickKeyCounts(40);
     expect(counts[a]).toBe(20);
     expect(counts[b]).toBe(20);
+  });
+});
+
+// key_selection_strategy = 'round-robin' (#2022): the per-key bandit above stops
+// deciding the ORDER, so near-identical keys share traffic evenly even after
+// they have history; every gate (cooldown, rate limits) still applies.
+describe('round-robin key selection (#2022)', () => {
+  beforeEach(() => {
+    process.env.DEV_MODE = 'true';
+    process.env.NODE_ENV = 'test';
+    initDb(':memory:');
+    getDb().exec('DELETE FROM fallback_config; DELETE FROM api_keys; DELETE FROM models; DELETE FROM requests;');
+    vi.clearAllMocks();
+    (ratelimit.canMakeRequest as any).mockReturnValue(true);
+    (ratelimit.canUseTokens as any).mockReturnValue(true);
+    (ratelimit.isOnCooldown as any).mockReturnValue(false);
+    setRoutingStrategy('balanced');
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_DEV_MODE === undefined) delete process.env.DEV_MODE; else process.env.DEV_MODE = ORIGINAL_DEV_MODE;
+    if (ORIGINAL_NODE_ENV === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+  });
+
+  it('is not the default', () => {
+    expect(getKeySelectionStrategy()).toBe('auto');
+  });
+
+  it('splits traffic evenly even when the bandit would favour one key', () => {
+    addModel({ platform: 'groq', modelId: 'm', name: 'M' });
+    const good = addKey('groq', 'good');
+    const bad = addKey('groq', 'bad');
+    const fresh = addKey('groq', 'fresh');
+    addKeyHistory('groq', 'm', good, { successes: 50, failures: 1 });
+    addKeyHistory('groq', 'm', bad, { successes: 4, failures: 40 });
+    refreshStatsCache(getDb(), true);
+
+    // Control: the bandit (auto) skews traffic towards the good key.
+    const auto = pickKeyCounts(300);
+    expect(auto[good] ?? 0).toBeGreaterThan((auto[bad] ?? 0) * 3);
+
+    setKeySelectionStrategy('round-robin');
+    const rr = pickKeyCounts(300);
+    expect(rr).toEqual({ [good]: 100, [bad]: 100, [fresh]: 100 });
+  });
+
+  it('skips a key on cooldown and keeps rotating over the rest', () => {
+    addModel({ platform: 'groq', modelId: 'm', name: 'M' });
+    const a = addKey('groq', 'a');
+    const benched = addKey('groq', 'benched');
+    const c = addKey('groq', 'c');
+    setKeySelectionStrategy('round-robin');
+    (ratelimit.isOnCooldown as any).mockImplementation(
+      (_p: string, _m: string, keyId: number) => keyId === benched,
+    );
+
+    const counts = pickKeyCounts(60);
+    expect(counts[benched] ?? 0).toBe(0);
+    expect(counts[a]).toBe(30);
+    expect(counts[c]).toBe(30);
+  });
+
+  it('skips a key over its rate limit and never routes a disabled key', () => {
+    addModel({ platform: 'groq', modelId: 'm', name: 'M' });
+    const a = addKey('groq', 'a');
+    const limited = addKey('groq', 'limited');
+    const off = addKey('groq', 'off');
+    const d = addKey('groq', 'd');
+    getDb().prepare('UPDATE api_keys SET enabled = 0 WHERE id = ?').run(off);
+    setKeySelectionStrategy('round-robin');
+    (ratelimit.canMakeRequest as any).mockImplementation(
+      (_p: string, _m: string, keyId: number) => keyId !== limited,
+    );
+
+    const counts = pickKeyCounts(40);
+    expect(counts[limited] ?? 0).toBe(0);
+    expect(counts[off] ?? 0).toBe(0);
+    expect(counts[a]).toBe(20);
+    expect(counts[d]).toBe(20);
   });
 });

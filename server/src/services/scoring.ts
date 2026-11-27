@@ -44,7 +44,8 @@ export type PresetStrategy = 'balanced' | 'smartest' | 'fastest' | 'reliable';
 // would mean switching key policy also switches (or disables) the model bandit.
 // 'auto' is the historical behaviour — per-key bandit score, else round-robin.
 // 'least-remaining' additionally ranks by observed remaining quota (#919).
-export type KeySelectionStrategy = 'auto' | 'least-remaining';
+// 'round-robin' rotates strictly evenly across configured keys (#2022).
+export type KeySelectionStrategy = 'auto' | 'least-remaining' | 'round-robin';
 
 export const BANDIT_PRESETS: Record<PresetStrategy, RoutingWeights> = {
   // Reliability leads; speed and intelligence split the rest evenly.

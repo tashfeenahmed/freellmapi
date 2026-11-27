@@ -348,10 +348,34 @@ describe('key selection by remaining quota (#919)', () => {
     expect(switched.body.keySelectionStrategy).toBe('least-remaining');
     expect(switched.body.strategy).toBe('fastest');
 
+    const rrPut = await request('PUT', '/api/fallback/routing', {
+      strategy: 'balanced',
+      keySelectionStrategy: 'round-robin',
+    });
+    expect(rrPut.status).toBe(200);
+    expect(rrPut.body.keySelectionStrategy).toBe('round-robin');
+
     const rejected = await request('PUT', '/api/fallback/routing', {
       strategy: 'balanced',
       keySelectionStrategy: 'quota-weighted',
     });
     expect(rejected.status).toBe(400);
+  });
+
+  it('rotates evenly across multiple keys under round-robin key selection strategy (#2022)', () => {
+    clearChain();
+    const k1 = addKey('groq', 'key-1');
+    const k2 = addKey('groq', 'key-2');
+    const k3 = addKey('groq', 'key-3');
+    addSyntheticModel('rr-model', 1, true, 'groq');
+    setKeySelectionStrategy('round-robin');
+
+    const picked: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const routed = routeRequest(100);
+      picked.push(routed.keyId);
+      routed.release?.();
+    }
+    expect(picked).toEqual([k1, k2, k3, k1, k2, k3]);
   });
 });

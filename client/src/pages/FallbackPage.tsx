@@ -510,6 +510,7 @@ export default function FallbackPage() {
                 >
                   <option value="auto">{t('strategies.keySelectionAuto')}</option>
                   <option value="least-remaining">{t('strategies.keySelectionLeastRemaining')}</option>
+                  <option value="round-robin">{t('strategies.keySelectionRoundRobin')}</option>
                 </select>
                 <Tooltip text={t('strategies.keySelectionHint')}>
                   <span className="cursor-help underline decoration-dotted underline-offset-2">?</span>

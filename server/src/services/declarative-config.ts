@@ -133,7 +133,7 @@ const declarativeConfigSchema = z.object({
     }).optional(),
     // Which key of a platform to reach for (#919); orthogonal to `strategy`,
     // which ranks models. Omitted leaves the persisted value alone.
-    keySelectionStrategy: z.enum(['auto', 'least-remaining']).optional(),
+    keySelectionStrategy: z.enum(['auto', 'least-remaining', 'round-robin']).optional(),
   }).optional(),
 }).strict();
 
