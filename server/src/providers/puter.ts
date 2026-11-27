@@ -4,6 +4,29 @@ import { BaseProvider, providerHttpError, type CompletionOptions } from './base.
 
 // Wire IDs only. No route is discovered or enabled without the signed catalog.
 const pinned: Record<string,string> = {
+  "qwen-max": "alibaba:qwen/qwen-max",
+  "qwen3-omni-flash": "alibaba:qwen/qwen3-omni-flash",
+  "qwen3.5-omni-plus": "alibaba:qwen/qwen3.5-omni-plus",
+  "qwen-plus-2025-12-01": "alibaba:qwen/qwen-plus-2025-12-01",
+  "glm-5.2-fast-preview": "alibaba:zhipu/glm-5.2-fast-preview",
+  "glm-4.6": "z-ai:z-ai/glm-4.6",
+  "glm-4.7": "z-ai:z-ai/glm-4.7",
+  "glm-5": "z-ai:z-ai/glm-5",
+  "glm-5.1": "z-ai:z-ai/glm-5.1",
+  "glm-5.3": "z-ai:z-ai/glm-5.3",
+  "gemini-2.5-flash": "google:google/gemini-2.5-flash",
+  "gemini-3-flash-preview": "google:google/gemini-3-flash-preview",
+  "mistral-large-4": "mistralai:mistralai/mistral-large-4",
+  "mistral-large-2512": "mistralai:mistralai/mistral-large-2512",
+  "codestral-2508": "mistralai:mistralai/codestral-2508",
+  "qwen-plus-2025-01-25": "alibaba:qwen/qwen-plus-2025-01-25",
+  "qwen-plus-2025-04-28": "alibaba:qwen/qwen-plus-2025-04-28",
+  "qwen3.5-plus-2026-02-15": "alibaba:qwen/qwen3.5-plus-2026-02-15",
+  "qwen3.5-plus-2026-04-20": "alibaba:qwen/qwen3.5-plus-2026-04-20",
+  "gpt-6-luna": "openai:openai/gpt-6-luna",
+  "gpt-4.1": "openai:openai/gpt-4.1",
+  "gemini-4-neon": "google:google/gemini-4-neon",
+  "gpt-4o-2024-11-20": "openai:openai/gpt-4o-2024-11-20",
   "qwen3-vl-plus": "alibaba:qwen/qwen3-vl-plus",
   "glm-5.3-flashx": "z-ai:z-ai/glm-5.3-flashx",
   "qwen-plus": "alibaba:qwen/qwen-plus",
@@ -106,6 +129,7 @@ export class PuterProvider extends BaseProvider {
         if(buf.length>2_000_000)throw new Error('Oversized Puter stream frame');
         for(const raw of lines){
           const line=raw.trim();if(!line)continue;
+          if(line.length>2_000_000)throw new Error('Oversized Puter stream frame');
           const e=JSON.parse(line);
           if(e.error||e.type==='error'||e.type==='refusal_fallback'||e.usageDetails?.fallbackModel)throw new Error('Puter returned an error or substituted stream');
           if(e.type==='text'&&typeof e.text==='string' && e.text){sawText=true;yield {id,created,object:'chat.completion.chunk',model,choices:[{index:0,delta:{content:e.text},finish_reason:null}]};}

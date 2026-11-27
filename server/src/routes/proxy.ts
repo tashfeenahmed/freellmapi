@@ -40,7 +40,7 @@ import { enforceJsonContent } from '../lib/structured-output.js';
 import type { Platform } from '@freellmapi/shared/types.js';
 import { inferQuotaPoolKey, type QuotaObservationContext } from '../services/provider-quota.js';
 import { isUnifyEnabled, getModelGroups, resolveRequestedIdForDispatch } from '../services/model-groups.js';
-import { advertisedContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
+import { advertisedContextWindow, autoMaxContextWindow, buildModelListing, servableContextWindow, type NormalizedModel } from '../services/model-listing.js';
 import { buildCodexCatalog } from '../services/codex-catalog.js';
 import { claudeFamilyDiscoveryEntries, resolveListedClaudeAlias } from '../services/anthropic-map.js';
 import { compressRequest, formatCompressionHeader } from '../services/compression/pipeline.js';
@@ -512,6 +512,10 @@ function buildCatalogEntries(filters: { onlyAvailable?: boolean; executionStatus
       // OpenAI-compatible clients read; emit both so whichever a client
       // looks for is populated. Additive — clients ignore unknown fields.
       context_length: autoContextWindow,
+      // The largest prompt auto can still serve for a tool-calling request
+      // (#2122, #2087). Additive and opt-in: clients size to context_window by
+      // default; `freellmapi setup-claude --context-window max` sizes to this.
+      max_context_window: autoMaxContextWindow(),
       available: true,
       unavailable_reason: null,
     },
