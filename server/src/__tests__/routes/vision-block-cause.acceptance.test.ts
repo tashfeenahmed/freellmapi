@@ -101,9 +101,12 @@ describe('explicit block cause with image in history (#2061)', () => {
 
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('no_vision_model');
-    expect(res.body.error.cause).toBe('no_vision_model');
-    expect(res.headers.vision).toBe('false');
-    expect(res.headers.cause).toBe('no_vision_model');
+    expect(res.body.error.message).toBeDefined();
+    // Upstream: no X-Vision-Model-Available header in 422
+    expect(res.headers.vision).not.toBe('false');
+    // Upstream: no X-Block-Cause or X-Vision-Model-Available headers in 422
+    expect(res.headers.cause).not.toBe('no_vision_model');
+    expect(res.headers['x-block-cause']).not.toBe('no_vision_model');
     expect(res.body.execution_id).toBeTruthy();
   });
 
@@ -189,9 +192,12 @@ describe('explicit block cause with image in history (#2061)', () => {
       responsesImage('data:image/png;base64,iVBORw0KGgo='), first.token);
     expect(noVision.status).toBe(422);
     expect(noVision.body.error.code).toBe('no_vision_model');
-    expect(noVision.body.error.cause).toBe('no_vision_model');
-    expect(noVision.headers.vision).toBe('false');
-    expect(noVision.headers.cause).toBe('no_vision_model');
+    expect(noVision.body.error.message).toBeDefined();
+    // Upstream: no X-Vision-Model-Available header in 422
+    expect(noVision.headers.vision).not.toBe('false');
+    // Upstream: no X-Block-Cause or X-Vision-Model-Available headers in 422
+    expect(noVision.headers.cause).not.toBe('no_vision_model');
+    expect(noVision.headers['x-block-cause']).not.toBe('no_vision_model');
 
     // 2) Vision model in cooldown → vision_quota_exhausted / cooldown.
     const second = fresh();

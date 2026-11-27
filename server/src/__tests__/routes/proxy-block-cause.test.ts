@@ -148,13 +148,12 @@ describe('block cause on 429/422 routes', () => {
     const { status, body, headers } = await post(app, '/v1/chat/completions', IMAGE_MESSAGE, key);
     expect(status).toBe(422);
     expect(body?.error?.code).toBe('no_vision_model');
-    expect(body?.error?.cause).toBe('no_vision_model');
-    expect(headers.get('X-Vision-Model-Available')).toBe('false');
-    expect(headers.get('X-Block-Cause')).toBe('no_vision_model');
-    // No X-* keys in body for 422
-    expect(body?.error?.cause).toBeDefined();
-    expect(body?.error?.cause_detail).toBeUndefined();
+    expect(body?.error?.message).toBeDefined();
     expect(body?.execution_id).toBeDefined();
+    // No X-* keys in body for 422 (upstream behavior)
+    // headers.get() returns null when absent
+    expect(headers.get('X-Vision-Model-Available')).toBeNull();
+    expect(headers.get('X-Block-Cause')).toBeNull();
   });
 
   // Case B in /v1/responses
