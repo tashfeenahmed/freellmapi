@@ -110,11 +110,42 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
   return { command, options };
 }
 
+async function readStdin(): Promise<string> {
+  // A stdin that is not a TTY but never sends anything (an inherited pipe, or
+  // Git Bash/mintty on Windows, where the console is a pipe) would wait here
+  // with no output. Say what is happening once input is late; piped keys
+  // arrive well before this fires.
+  const hint = setTimeout(() => {
+    process.stderr.write(
+      'Waiting for the provider key on stdin (input is not hidden). End it with Ctrl+D (Ctrl+Z, Enter on Windows), '
+      + 'or pass --key / FREELLMAPI_PROVIDER_KEY instead.\n',
+    );
+  }, 1000);
+  hint.unref?.();
+  const chunks: Buffer[] = [];
+  try {
+    for await (const chunk of process.stdin) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+  } finally {
+    clearTimeout(hint);
+  }
+  const text = Buffer.concat(chunks).toString('utf8').trim();
+  // A key is one line. Several lines means something else was piped in (an
+  // .env file, say); refuse rather than store it as the key.
+  if (/[\r\n]/.test(text)) throw new Error('stdin had more than one line; pipe only the provider key');
+  return text;
+}
+
+// A provider key may come from FREELLMAPI_PROVIDER_KEY or piped stdin, so scripts
+// never put it in argv.
 async function promptForKey(provider = false): Promise<string> {
+  if (provider) {
+    const supplied = process.env.FREELLMAPI_PROVIDER_KEY?.trim() || (process.stdin.isTTY ? '' : await readStdin());
+    if (supplied) return supplied;
+  }
   if (!process.stdin.isTTY) {
     throw new Error(
       provider
-        ? 'No provider key supplied. Pass --key or use an interactive terminal for hidden input.'
+        ? 'No provider key supplied. Pass --key, set FREELLMAPI_PROVIDER_KEY, pipe it on stdin, or use an interactive terminal for hidden input.'
         : 'No API key supplied. Pass --api-key or set FREELLMAPI_API_KEY.',
     );
   }

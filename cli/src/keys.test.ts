@@ -1,3 +1,4 @@
+import { PassThrough, Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { main, parseArgs } from './index.js';
 
@@ -108,16 +109,94 @@ describe('provider key commands', () => {
     expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'kilo', key: '' });
   });
 
+  async function withStdin(text: string, run: () => Promise<void>): Promise<void> {
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'stdin');
+    Object.defineProperty(process, 'stdin', { configurable: true, value: Object.assign(Readable.from(text ? [text] : []), { isTTY: false }) });
+    try { await run(); } finally { if (descriptor) Object.defineProperty(process, 'stdin', descriptor); }
+  }
+
   it('rejects a missing provider key in a non-interactive terminal without adding one', async () => {
-    const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
-    Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: false });
-    try {
+    await withStdin('', async () => {
       await expect(main(['keys', 'add', 'groq'])).rejects.toThrow('Pass --key');
-      expect(calls.some(c => c.init.method === 'POST')).toBe(false);
+    });
+    expect(calls.some(c => c.init.method === 'POST')).toBe(false);
+  });
+
+  it('reads the provider key from piped stdin', async () => {
+    await withStdin(`${secret}
+`, async () => {
+      expect(await main(['keys', 'add', 'groq'])).toBe(0);
+    });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+    expect(output).not.toContain(secret);
+  });
+
+  it('prefers FREELLMAPI_PROVIDER_KEY over stdin and never reads it as a flag', async () => {
+    vi.stubEnv('FREELLMAPI_PROVIDER_KEY', ` ${secret}
+`);
+    await withStdin('ignored', async () => {
+      expect(await main(['keys', 'add', 'groq'])).toBe(0);
+    });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+    expect(output).not.toContain(secret);
+  });
+
+  it('refuses a multi-line stdin instead of storing it as the key', async () => {
+    await withStdin(`GROQ_API_KEY=${secret}\nOTHER=1\n`, async () => {
+      await expect(main(['keys', 'add', 'groq'])).rejects.toThrow('more than one line');
+    });
+    expect(calls.some(c => c.init.method === 'POST')).toBe(false);
+  });
+
+  it('--key wins over FREELLMAPI_PROVIDER_KEY and stdin', async () => {
+    vi.stubEnv('FREELLMAPI_PROVIDER_KEY', 'from-env');
+    await withStdin('from-stdin', async () => {
+      expect(await main(['keys', 'add', 'groq', '--key', secret])).toBe(0);
+    });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+  });
+
+  it('a whitespace-only FREELLMAPI_PROVIDER_KEY falls through to stdin', async () => {
+    vi.stubEnv('FREELLMAPI_PROVIDER_KEY', ' \n ');
+    await withStdin(`\r\n${secret}\r\n`, async () => {
+      expect(await main(['keys', 'add', 'groq'])).toBe(0);
+    });
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+  });
+
+  it('uses the env key in a TTY without touching stdin', async () => {
+    vi.stubEnv('FREELLMAPI_PROVIDER_KEY', secret);
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'stdin');
+    const tty = { isTTY: true, [Symbol.asyncIterator]: () => { throw new Error('stdin was read'); } };
+    Object.defineProperty(process, 'stdin', { configurable: true, value: tty });
+    try {
+      expect(await main(['keys', 'add', 'groq'])).toBe(0);
     } finally {
-      if (descriptor) Object.defineProperty(process.stdin, 'isTTY', descriptor);
-      else Reflect.deleteProperty(process.stdin, 'isTTY');
+      if (descriptor) Object.defineProperty(process, 'stdin', descriptor);
     }
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+  });
+
+  it('explains a stdin that sends nothing, and never echoes the key', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let stderr = '';
+    vi.spyOn(process.stderr, 'write').mockImplementation(chunk => { stderr += String(chunk); return true; });
+    const stream = new PassThrough();
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'stdin');
+    Object.defineProperty(process, 'stdin', { configurable: true, value: Object.assign(stream, { isTTY: false }) });
+    try {
+      const run = main(['keys', 'add', 'groq']);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(stderr).toContain('Waiting for the provider key on stdin');
+      stream.end(`${secret}\n`);
+      expect(await run).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      if (descriptor) Object.defineProperty(process, 'stdin', descriptor);
+    }
+    expect(JSON.parse(calls[1].init.body as string)).toEqual({ platform: 'groq', key: secret });
+    expect(stderr).not.toContain(secret);
+    expect(output).not.toContain(secret);
   });
 
   it('does not treat a failed health probe as success when the stored status is healthy', async () => {
