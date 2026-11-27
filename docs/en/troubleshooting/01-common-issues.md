@@ -76,6 +76,24 @@ The Store package is built by `npm --prefix desktop run dist:store` on Windows a
 
 **Fix:** `TRUST_PROXY=1` for single reverse proxy (Caddy/nginx/Traefik on same host), or CIDR list (`TRUST_PROXY=100.64.0.0/10,192.168.1.10`). See `env/01-variables.md` `TRUST_PROXY` + `server/src/lib/config.ts:95-110` `parseTrustProxy()`.
 
+## Claude Code compacts near 105k tokens
+
+**Symptom:** Claude Code through FreeLLMAPI shows a context of about 105k (`/context` shows `… / 104.9k`). On a large project it compacts on the first or second prompt. (#2122, #2087)
+
+**Cause:** Connect and `setup-claude` set `CLAUDE_CODE_AUTO_COMPACT_WINDOW` to the `context_window` of `auto`. That value is the window that most of your models hold (the upper median, #1717), divided by the router's 1.25 safety margin. Many free models have 131,072 tokens, so the value is 131,072 / 1.25 = 104,857. Claude Code then keeps about 33k free for its answer and a buffer, so it compacts at about 72k. A few 1M models in the pool do not change the median.
+
+**Why not always the largest window:** Above the median, only your large-window models can serve the request. When they are rate limited (for example a Gemini free tier with 20 requests a day), the request fails, and a compaction of that long conversation fails too. Compaction at the median keeps the session on models that you have many of.
+
+**Fix:** If your large-window models have enough quota, size Claude Code to them:
+
+```bash
+npx freellmapi setup-claude --url http://localhost:3001 --context-window max
+# or for one session:
+npx freellmapi launch --context-window max
+```
+
+`max` uses `max_context_window` on the `auto` entry of `GET /v1/models`: the largest window among the active chain's enabled, tool-capable models that have a key, after the 1.25 margin and the model's per-minute token limit. It can be lower than the default when the large models have no tool support or a small per-minute token limit. `setup-claude` prints the window it wrote, and the larger one when there is one. You can also give a number (`--context-window 400k`). Claude Code does not accept values below 100k. Prompts above the median window then go only to the models that can hold them. Run the command again after you add or remove keys for large-window models.
+
 ## Related
 
 - [Desktop](../desktop/OVERVIEW.md) — `freeapi.log` rotation.

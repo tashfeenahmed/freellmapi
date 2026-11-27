@@ -123,6 +123,20 @@ describe('tool generators', () => {
     });
   }
 
+  it('sizes Claude Code to auto\'s window by default and to the largest on --context-window max (#2122)', () => {
+    const pool: GenerateContext = {
+      ...context,
+      models: [{ id: 'auto', name: 'Auto', available: true, context_window: 104_857, max_context_window: 838_860 }, ...context.models],
+    };
+    const claude = tools.find(tool => tool.id === 'claude')!;
+    const standard = claude.generate(pool);
+    expect((standard.files[0].value as { env: Record<string, string> }).env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('104857');
+    expect(standard.notes.join('\n')).toContain('--context-window max');
+    const largest = claude.generate({ ...pool, contextWindow: 'max' });
+    expect((largest.files[0].value as { env: Record<string, string> }).env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('838860');
+    expect(largest.notes.join('\n')).not.toContain('--context-window max');
+  });
+
   it('honours an explicit --model instead of the default-model heuristic', () => {
     // `--model` was parsed into CliOptions and then dropped: it never reached
     // GenerateContext, so `setup-claude --model X` wrote whatever
