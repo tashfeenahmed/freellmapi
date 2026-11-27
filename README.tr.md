@@ -20,6 +20,7 @@ Onlarca sağlayıcının ücretsiz kullanım kotalarını ve özel OpenAI uyumlu
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos-tr.svg" height="48" alt="macOS için indir"></a>
   <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store-tr.svg" height="48" alt="Microsoft Store’dan edinin"></a>
+  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows-tr.svg" height="48" alt="Windows için indirin"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker-tr.svg" height="48" alt="Docker ile kendi ortamınızda çalıştırın"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store-tr.svg" height="48" alt="Google Play’den edinin"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store-tr.svg" height="48" alt="App Store’dan indirin"></a>
@@ -197,6 +198,8 @@ Docker Compose, yerel geliştirme, bildirimsel başlangıç yapılandırması, �
 ![FreeLLMAPI masaüstü uygulaması](repo-assets/desktop.png)
 
 **[Releases bölümünden indirin](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — her sürüme macOS `.dmg` ve Windows `.exe` yükleyicileri eklenir. Windows’ta **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** sürümünü tercih edin: imzalı olduğu için Smart App Control engellemez ve Store onu güncel tutar. Hesap veya parola oluşturmanız gerekmez; ihtiyacınız olan tek kimlik bilgisi tepsi panelindeki birleşik API anahtarıdır. Kaynaktan derleme adımları ve veri konumları: [masaüstü uygulaması rehberi](docs/en/install/01-install.md#desktop-app).
+
+**Store olmadan Windows:** Store uygulamayı yükleyemiyorsa (örneğin "Bir sorun oluştu"), [en son sürümü](https://github.com/tashfeenahmed/freellmapi/releases/latest) açın ve `FreeLLMAPI-Setup-<version>.exe` (yükleyici, kendini günceller) ya da `FreeLLMAPI-<version>-win.zip` (taşınabilir: arşivi açıp `FreeLLMAPI.exe` dosyasını çalıştırın) indirin. İkisi de imzasızdır; SmartScreen "Windows bilgisayarınızı korudu" derse **Ek bilgi → Yine de çalıştır**’a tıklayın. Smart App Control’de uygulama bazında istisna yoktur: engellerse Store sürümünü veya [Docker](docs/en/install/01-install.md#docker-compose) kullanın.
 
 macOS 12 Monterey ve sonrası için **arm64 (Apple Silicon)** veya **x64 (Intel)** sürümünü seçin. Her iki Mac derlemesinin ZIP paketi de sunulur.
 

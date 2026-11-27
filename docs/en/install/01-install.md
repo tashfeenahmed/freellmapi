@@ -290,7 +290,7 @@ request stats.
 
 ![FreeLLMAPI desktop app](../../../repo-assets/desktop.png)
 
-**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** on Windows, or **[download from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — the macOS `.dmg` and the Windows `.exe` installer are built and attached to every release by the [`desktop-release`](../../../.github/workflows/desktop-release.yml) workflow. Or build it from this repo in a few minutes:
+**[Get it from the Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** on Windows, or **[download from Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — the macOS `.dmg`, the Windows `FreeLLMAPI-Setup-<version>.exe` installer and the portable `FreeLLMAPI-<version>-win.zip` are built and attached to every release by the [`desktop-release`](../../../.github/workflows/desktop-release.yml) workflow. If the Store won't install it, use the `.exe` or the `.zip` (unzip and run `FreeLLMAPI.exe`); both are unsigned, so on a SmartScreen warning click **More info → Run anyway** ([Smart App Control](../troubleshooting/01-common-issues.md#windows-smart-app-control-blocked-an-app-that-may-be-unsafe) can't be bypassed per app). Or build it from this repo in a few minutes:
 
 **Mac downloads:** choose `arm64` for Apple Silicon or `x64` for Intel. Both require macOS 12 Monterey or later and include DMG and ZIP downloads.
 

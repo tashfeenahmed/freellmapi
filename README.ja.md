@@ -22,6 +22,7 @@
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="macOS 版をダウンロード"></a>
   <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store.svg" height="48" alt="Microsoft Store から入手"></a>
+  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows.svg" height="48" alt="Windows 版をダウンロード"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker.svg" height="48" alt="Docker でセルフホスト"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store.svg" height="48" alt="Google Play で手に入れよう"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store.svg" height="48" alt="App Store でダウンロード"></a>
@@ -186,6 +187,8 @@ Windows では、**[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2
 ![FreeLLMAPI デスクトップアプリ](repo-assets/desktop.png)
 
 **[Releases からダウンロード](https://github.com/tashfeenahmed/freellmapi/releases/latest)** — macOS の `.dmg` と Windows の `.exe` インストーラーが、すべてのリリースに添付されています。Windows では **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** 版をお勧めします。署名済みなので Smart App Control にブロックされず、Store が自動で更新します。アカウントもパスワードも設定不要で、必要な認証情報はトレイのポップオーバーにある統合 API キーだけです。ソースからのビルド手順とデータの保存場所は [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app) をご覧ください。
+
+**Store を使わずに Windows に入れる:** Store でインストールできない場合(「問題が発生しました」など)は、[最新リリース](https://github.com/tashfeenahmed/freellmapi/releases/latest)から `FreeLLMAPI-Setup-<version>.exe`(インストーラー、自動更新あり)または `FreeLLMAPI-<version>-win.zip`(ポータブル版。展開して `FreeLLMAPI.exe` を実行)をダウンロードしてください。どちらも未署名のため、SmartScreen に「Windows によって PC が保護されました」と表示されたら **詳細情報 → 実行** をクリックします。Smart App Control にはアプリ単位の例外がないため、ブロックされる場合は Store 版か [Docker](docs/en/install/01-install.md#docker-compose) を使ってください。
 
 macOS 12 Monterey 以降では、**arm64 (Apple Silicon)** か **x64 (Intel)** を選んでください。どちらの Mac 向けビルドにも ZIP のダウンロードがあります。
 
