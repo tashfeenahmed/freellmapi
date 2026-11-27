@@ -117,6 +117,40 @@ describe('405 classification', () => {
     expect(isMethodNotAllowedError(new Error('connect ECONNREFUSED 127.0.0.1:405'))).toBe(false);
     expect(isMethodNotAllowedError(Object.assign(new Error('API error 400: bad params'), { status: 400 }))).toBe(false);
   });
+
+  it('a structured non-405 status wins over 405 wording in the body', () => {
+    // A 400 that quotes "Method Not Allowed" (a tool/parameter rule, an
+    // upstream's own phrasing) is still a 400: no 405 class, no relay skip.
+    const quoted400 = Object.assign(new Error('API error 400: tool_choice "required": method not allowed for this model'), { status: 400 });
+    expect(isMethodNotAllowedError(quoted400)).toBe(false);
+    expect(classifyAttemptError(quoted400)).not.toBe('method_not_allowed');
+    const state = newFallbackState();
+    recordRetryableFailure(fakeRoute({ platform: 'unorouter' }), quoted400, state);
+    expect(state.skipPlatforms.has('unorouter')).toBe(false);
+  });
+
+  it('a route that keeps answering 405 cannot loop forever: the ladder stops at maxRetries with the 405 body', async () => {
+    const dispatch = vi.fn().mockRejectedValue(html405());
+    const onExhausted = vi.fn();
+    await runFallbackLoop(hooksSkeleton({
+      maxRetries: 4,
+      route: () => fakeRoute({ platform: 'unorouter', modelId: 'genuine-405' }),
+      dispatch,
+      onExhausted,
+    }));
+    expect(dispatch).toHaveBeenCalledTimes(4);
+    expect(onExhausted).toHaveBeenCalledTimes(1);
+    expect(onExhausted.mock.calls[0][0]).toMatchObject({ status: 502, code: 'upstream_failed' });
+  });
+
+  it('a catalog 405 never benches the key (no cooldown row)', () => {
+    const route = fakeRoute({ platform: 'unorouter', modelId: 'genuine-405' });
+    recordRetryableFailure(route, html405(), newFallbackState());
+    const cooldown = getDb().prepare(
+      'SELECT 1 FROM rate_limit_cooldowns WHERE platform = ? AND model_id = ? AND key_id = ?',
+    ).get(route.platform, route.modelId, route.keyId);
+    expect(cooldown).toBeUndefined();
+  });
 });
 
 describe('405 terminal body', () => {
@@ -241,16 +275,17 @@ describe('405 failover + bookkeeping', () => {
   });
 });
 
-// #1901 will narrow custom 5xx to endpoint scope. This test pins the CURRENT
-// platform-wide behaviour so that change has to be an explicit decision, not an
-// accident of the 405 branch sitting next to it.
+// #2023 (now on main) stopped a custom relay's 5xx from ruling out the shared
+// 'custom' platform: its isolation stays key-scoped. This test pins that
+// adjacent behaviour so the 405 branch next to it cannot change it by accident.
 describe('5xx regression (adjacent branch unchanged)', () => {
-  it('a custom 5xx still rules out the whole platform and is not exempt', () => {
+  it('a custom 5xx stays key-scoped: no platform or model skip, not exempt', () => {
     const route = fakeRoute({ platform: 'custom', modelId: 'glm-5.3', endpointScope: 'https://relay.example/v1' });
     const state = newFallbackState();
 
     expect(recordRetryableFailure(route, html500(), state)).toBe(false);
-    expect(state.skipPlatforms.has('custom')).toBe(true);
+    expect(state.skipPlatforms.has('custom')).toBe(false);
     expect(state.skipModels.size).toBe(0);
+    expect(state.skipKeys.size).toBe(1);
   });
 });

@@ -128,6 +128,10 @@ export function isRetryableError(err: any): boolean {
  */
 export function isMethodNotAllowedError(err: any): boolean {
   if (typeof err?.status === 'number' && err.status === 405) return true;
+  // A structured status other than 405 is authoritative: a 400/422 whose body
+  // happens to quote "method not allowed" (a tool or parameter name, an
+  // upstream's own wording) must keep its own classification.
+  if (typeof err?.status === 'number' && err.status !== 0) return false;
   const msg = String(err?.message ?? '');
   return /(?:api error|status|http)\s*:?\s*405\b/i.test(msg) || /method not allowed/i.test(msg);
 }
