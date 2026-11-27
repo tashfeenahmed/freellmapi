@@ -456,6 +456,7 @@ export const platformColors: Record<string, string> = {
   clod:         '#16a34a',
   speechify:    '#7c3aed',
   freeai:       '#16a34a',
+  roboflow:    '#6d28d9',
   blaze:        '#f97316',
   lucidity:     '#6366f1',
   airforce:     '#0ea5e9',

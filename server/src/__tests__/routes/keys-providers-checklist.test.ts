@@ -63,7 +63,7 @@ describe('GET /api/keys/providers — provider checklist (#543)', () => {
       .toMatchObject({ platform: 'typhoon', name: 'Typhoon', configured: false, keyless: false });
     expect(body.providers.find((p: { platform: string }) => p.platform === 'plugsky'))
       .toMatchObject({ platform: 'plugsky', name: 'Plugsky', configured: false, keyless: false });
-    for (const [platform, name] of [['gizmo', 'Gizmo'], ['blockrun', 'BlockRun']]) {
+    for (const [platform, name] of [['gizmo', 'Gizmo'], ['blockrun', 'BlockRun'], ['roboflow', 'Roboflow']]) {
       expect(body.providers.find((p: { platform: string }) => p.platform === platform))
         .toMatchObject({ platform, name, configured: false, keyless: false });
     }

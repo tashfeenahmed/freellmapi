@@ -53,6 +53,7 @@ import { TypecastProvider, CartesiaProvider } from './voice-gateways.js';
 import { SilvrProvider } from './silvr.js';
 import { FreeTtsProvider } from './freetts.js';
 import { FreeAiProvider } from './freeai.js';
+import { RoboflowProvider } from './roboflow.js';
 import { BlazeProvider } from './blaze.js';
 import { LucidityProvider } from './lucidity.js';
 import { AirforceProvider } from './airforce.js';
@@ -152,6 +153,7 @@ register(new SilvrProvider());
 register(new FreeTtsProvider());
 register(new FreeAiProvider());
 register(new BlazeProvider());
+register(new RoboflowProvider());
 // Five more OpenAI-compatible gateways. Each pins the response model to the
 // requested route (502 on substitution); rows stay in the hosted catalog.
 register(new LucidityProvider());

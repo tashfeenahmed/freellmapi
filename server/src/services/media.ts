@@ -22,6 +22,7 @@ import { isOnCooldown, setCooldown } from './ratelimit.js';
 import { markKeyHealthyFromRequest } from './health.js';
 import { SPEECHIFY_BASE_URL, SPEECHIFY_VERSION } from '../providers/speechify.js';
 import { TYPHOON_BASE_URL } from '../providers/typhoon.js';
+import { BLAZE_BASE_URL } from '../providers/blaze.js';
 import { ELECTRONHUB_BASE_URL } from '../providers/electronhub.js';
 import { SILVR_BASE_URL } from '../providers/silvr.js';
 import { FREEAI_BASE_URL, freeAiAudioUrl } from '../providers/freeai.js';
@@ -39,7 +40,7 @@ import { meterCloudflare, type CloudflareNeuronCapError } from './cloudflare-neu
 
 /** Platforms with a media adapter below. catalog-sync gates media rows on this
  *  (decoupled from the chat provider registry — e.g. SiliconFlow is media-only). */
-export const MEDIA_PLATFORMS = new Set(['aihorde', 'xkiro', 'nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia', 'silvr']);
+export const MEDIA_PLATFORMS = new Set(['blaze', 'aihorde', 'xkiro', 'nvidia', 'pollinations', 'cloudflare', 'siliconflow', 'google', 'speechify', 'electronhub', 'freeai', 'kenari', 'plugsky', 'ovh', 'mistral', 'novai', 'varosity', 'rime', 'groq', 'freetts', 'typecast', 'cartesia', 'silvr']);
 
 /** Video uses a dedicated optional catalog registry so binaries that predate
  *  this modality ignore the rows instead of accidentally ingesting them as
@@ -282,7 +283,7 @@ async function mediaFetch(
     timeoutMs,
   );
   if (!r.ok) {
-    if (platform === 'xkiro' || platform === 'aihorde' || platform === 'silvr' || platform === 'electronhub' || platform === 'speechflow') {
+    if (platform === 'blaze' || platform === 'xkiro' || platform === 'aihorde' || platform === 'silvr' || platform === 'electronhub' || platform === 'speechflow') {
       await r.body?.cancel();
       throw new MediaError(`${platform} ${modality} request failed (${r.status})`, r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
     }
@@ -465,34 +466,44 @@ async function callImageProvider(
     case 'aihorde':
     case 'xkiro':
       return queuedImage(row.platform, row.model_id, key, p);
+    case 'blaze':
     case 'electronhub': {
-      if (!key) throw new MediaError('ElectronHub API key required', 401);
-      if (!['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0', 'flux-2-klein-base-4b'].includes(row.model_id)) throw new MediaError('Unknown ElectronHub image model', 400);
-      if (!cpuCanRunSharp()) throw new MediaError('ElectronHub images require a compatible image decoder', 502);
+      const blaze = row.platform === 'blaze';
+      const label = blaze ? 'BlazeAPI' : 'ElectronHub';
+      const models = blaze
+        ? ['free/gpt-image-2','free/nano-banana','free/nano-banana-2','free/nano-banana-2-lite','free/nano-banana-2.1','free/nano-banana-pro']
+        : ['qwen-image-2512', 'flux-2-flex', 'realvisxl-5.0', 'flux-2-klein-base-4b'];
+      if (blaze && (p.n ?? 1) !== 1) throw new MediaError('BlazeAPI supports one image per request', 400);
+      if (!key) throw new MediaError(label + ' API key required', 401);
+      if (!models.includes(row.model_id)) throw new MediaError('Unknown ' + label + ' image model', 400);
+      if (!cpuCanRunSharp()) throw new MediaError(label + ' images require a compatible image decoder', 502);
       let sharp: typeof import('sharp').default;
       try { sharp = (await import('sharp')).default; }
-      catch { throw new MediaError('ElectronHub images require the optional image decoder', 502); }
-      const r = await mediaFetch(`${ELECTRONHUB_BASE_URL}/images/generations`, 'electronhub', 'image', {
+      catch { throw new MediaError(label + ' images require the optional image decoder', 502); }
+      const r = await mediaFetch(`${blaze ? BLAZE_BASE_URL : ELECTRONHUB_BASE_URL}/images/generations`, row.platform, 'image', {
         method: 'POST', redirect: 'error',
         headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
-        body: JSON.stringify({ model: row.model_id, prompt: p.prompt, n: p.n ?? 1, size: p.size ?? '1024x1024', response_format: 'b64_json' }),
+        body: JSON.stringify({ model: row.model_id, prompt: p.prompt, n: p.n ?? 1, ...(blaze ? (p.size ? { size: p.size } : {}) : { size: p.size ?? '1024x1024' }), response_format: 'b64_json' }),
       }, 180_000);
       // Request inline images only: never fetch an untrusted or expiring URL
       // or forward credentials to a provider-supplied download location.
       const body = await boundedMediaJson(r, 32 * 1024 * 1024) as { model?: unknown; data?: { b64_json?: unknown }[]; error?: unknown } | null;
-      if (!body || body.error || body.model !== undefined && body.model !== row.model_id || !Array.isArray(body.data) || body.data.length !== (p.n ?? 1)) {
-        throw new MediaError('ElectronHub returned an invalid or substituted image response', 502);
+      // Blaze can echo the exact image ID without its free/ billing namespace.
+      // Only the allowlisted, prefixed ID is ever sent upstream.
+      const substituted = body?.model !== undefined && body.model !== row.model_id && !(blaze && body.model === row.model_id.slice(5));
+      if (!body || body.error || substituted || !Array.isArray(body.data) || body.data.length !== (p.n ?? 1)) {
+        throw new MediaError(label + ' returned an invalid or substituted image response', 502);
       }
       const images: Array<{ b64_json: string }> = [];
       for (const image of body.data) {
-        if (!image || typeof image.b64_json !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.b64_json)) throw new MediaError('ElectronHub returned no inline image', 502);
+        if (!image || typeof image.b64_json !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.b64_json)) throw new MediaError(label + ' returned no inline image', 502);
         const bytes = Buffer.from(image.b64_json, 'base64');
         const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
         const jpeg = bytes.length > 4 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 && bytes[bytes.length - 2] === 255 && bytes[bytes.length - 1] === 217;
         const webp = bytes.length > 12 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
-        if (!png && !jpeg && !webp) throw new MediaError('ElectronHub returned no recognized image', 502);
+        if (!png && !jpeg && !webp) throw new MediaError(label + ' returned no recognized image', 502);
         try { await sharp(bytes, { limitInputPixels: 16 * 1024 * 1024, failOn: 'warning' }).stats(); }
-        catch { throw new MediaError('ElectronHub returned an invalid or oversized image', 502); }
+        catch { throw new MediaError(label + ' returned an invalid or oversized image', 502); }
         images.push({ b64_json: image.b64_json });
       }
       return images;

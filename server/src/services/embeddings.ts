@@ -7,6 +7,7 @@
 // `model: "auto"` (or empty) routes to the configured default family — so auto
 // always works: with one provider it just uses that one, with several it gets
 // cross-provider redundancy for free.
+import { randomUUID } from 'node:crypto';
 import { getDb, getSetting } from '../db/index.js';
 import { secondsUntilNextMonth } from './key-budget.js';
 import { noteBudgetAlerts } from './budget-alerts.js';
@@ -33,6 +34,12 @@ import { FREEINFERENCE_BASE_URL } from '../providers/freeinference.js';
 import { FREEAI_BASE_URL } from '../providers/freeai.js';
 import { SILVR_BASE_URL } from '../providers/silvr.js';
 import { tanodEmbed, tanodStatus } from '../providers/tanod.js';
+
+const ROBOFLOW_CLIP_DIMS = new Map<string, number>([
+  ['clip/ViT-B-16', 512], ['clip/ViT-B-32', 512], ['clip/RN50', 1024], ['clip/RN101', 512],
+  ['clip/RN50x4', 640], ['clip/RN50x16', 768], ['clip/RN50x64', 1024],
+  ['clip/ViT-L-14', 768], ['clip/ViT-L-14-336px', 768],
+]);
 
 export interface EmbeddingModelRow {
   id: number;
@@ -181,6 +188,7 @@ const FETCH_TIMEOUT_MS = 30_000;
 
 /** Provider adapters that can safely receive catalog-managed embedding rows. */
 export const EMBEDDING_PLATFORMS = new Set([
+  'roboflow',
   'tanod',
   'freeinference',
   'jamai',
@@ -505,6 +513,27 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
 async function callProvider(row: EmbeddingModelRow, credential: ProviderCredential, inputs: string[], dimensions?: number): Promise<ProviderCallResult> {
   const { key } = credential;
   switch (row.platform) {
+    case 'roboflow': {
+      const checkpoint = row.model_id;
+      const expected = ROBOFLOW_CLIP_DIMS.get(checkpoint);
+      if (!key || key === 'no-key') throw new EmbeddingsError('Roboflow API key required', 401);
+      if (!expected || expected !== row.dimensions || (dimensions !== undefined && dimensions !== expected))
+        throw new EmbeddingsError('Roboflow requires a named CLIP checkpoint and its native dimensions', 400);
+      const r = await proxyFetch('https://serverless.roboflow.com/clip/embed_text', {
+        method: 'POST', redirect: 'error', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        headers: { 'Content-Type': 'application/json', ...bearerAuthHeader(key) },
+        body: JSON.stringify({ id: randomUUID(), model_id: checkpoint, clip_version_id: checkpoint.slice(5), text: inputs }),
+      }, 'roboflow', 'embedding', FETCH_TIMEOUT_MS);
+      if (!r.ok) {
+        await r.body?.cancel();
+        throw new EmbeddingsError('Roboflow embeddings error (HTTP ' + r.status + ')', r.status, undefined, parseRetryAfterMs(r.headers.get('retry-after')));
+      }
+      const body = await r.json().catch(() => null) as { resolved_model?: { model_id?: string }; embeddings?: number[][] } | null;
+      if (body?.resolved_model?.model_id !== checkpoint || !Array.isArray(body.embeddings) || body.embeddings.length !== inputs.length ||
+          body.embeddings.some(v => !Array.isArray(v) || v.length !== expected || !v.every(Number.isFinite) || !v.some(n => n !== 0)))
+        throw new EmbeddingsError('Roboflow returned different or malformed CLIP embeddings', 502);
+      return { vectors: body.embeddings, inputTokens: null };
+    }
     case 'tanod':
       try { return await tanodEmbed(row.model_id, inputs, dimensions ?? row.dimensions); }
       catch(e) { throw new EmbeddingsError(e instanceof Error ? e.message : 'Tanod failed', tanodStatus(e)); }
