@@ -19,7 +19,7 @@ import { routeOutputBudget } from '../lib/output-cap.js';
 import { resolveTaskType } from '../lib/task-type.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
-import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker, startsWithJsonToolCallShape, couldBecomeJsonToolCallShape, indexOfDialectMarker, partialDialectMarkerTail } from '../lib/tool-call-rescue.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { convertDocumentBlock, documentRejectionMessage } from '../lib/anthropic-documents.js';
 import { isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
@@ -1026,6 +1026,14 @@ async function streamCompletion(
   // committed on the first non-empty text and had no dialect rescue at all).
   let dialectMode: 'undecided' | 'passthrough' | 'dialect' = 'undecided';
   let heldText = '';
+  // #2117: tool requests also hold an answer that opens like a JSON tool call
+  // (dialect 4), and keep watching for a dialect marker after prose has been
+  // streamed. Without this, "I'll create the file.\n<tool_call>…" or a bare
+  // {"name":"Write",…} reached Claude Code as text with stop_reason end_turn,
+  // so it reported the task done and ran nothing.
+  const toolNames = new Set((ctx.tools ?? []).map(t => t.function.name));
+  const hasTools = toolNames.size > 0;
+  let passthroughTail = ''; // possible start of a marker, held until the next chunk
 
   const ensureMessageStart = () => {
     if (messageStarted) return;
@@ -1106,6 +1114,24 @@ async function streamCompletion(
     outputChars += text.length;
   };
 
+  // Passthrough text on a tool request: stream it, but stop at a dialect
+  // marker and hold from there, so the rest can still become tool_use.
+  const emitPassthrough = (text: string) => {
+    if (!hasTools) { emitText(text); return; }
+    const buf = passthroughTail + text;
+    passthroughTail = '';
+    const at = indexOfDialectMarker(buf);
+    if (at !== -1) {
+      if (at > 0) emitText(buf.slice(0, at));
+      heldText = buf.slice(at);
+      dialectMode = 'dialect';
+      return;
+    }
+    const keep = partialDialectMarkerTail(buf);
+    if (buf.length > keep) emitText(buf.slice(0, buf.length - keep));
+    passthroughTail = buf.slice(buf.length - keep);
+  };
+
   try {
     const gen = route.provider.streamChatCompletion(route.apiKey, messages, route.modelId, options);
 
@@ -1139,11 +1165,25 @@ async function streamCompletion(
       if (choice.finish_reason) upstreamFinish = choice.finish_reason;
 
       for (const tc of choice.delta?.tool_calls ?? []) {
-        const idx = (tc as any).index ?? 0;
+        let idx: number = (tc as any).index;
+        if (typeof idx !== 'number') {
+          // #2117: some relays omit `index`. A new id starts a new call; no id
+          // (or the same id) continues the latest one. Merging them all into
+          // slot 0 glued parallel calls' arguments into invalid JSON.
+          const known = tc.id ? [...toolAcc.entries()].find(([, a]) => a.id === tc.id) : undefined;
+          const last = toolAcc.size > 0 ? Math.max(...toolAcc.keys()) : 0;
+          const lastId = toolAcc.get(last)?.id;
+          idx = known ? known[0] : (tc.id && lastId && lastId !== tc.id ? last + 1 : last);
+        }
         if (!toolAcc.has(idx)) toolAcc.set(idx, { id: undefined, name: '', args: '' });
         const acc = toolAcc.get(idx)!;
         if (tc.id && !acc.id) acc.id = tc.id;
-        if (tc.function?.name) acc.name += tc.function.name;
+        if (tc.function?.name) {
+          // #2117: some relays repeat the full name on every delta; appending
+          // turned "Write" into "WriteWrite", a tool Claude Code does not have.
+          const joined = acc.name + tc.function.name;
+          acc.name = toolNames.has(acc.name) && !toolNames.has(joined) ? acc.name : joined;
+        }
         if (tc.function?.arguments) acc.args += tc.function.arguments;
         const thoughtSignature = (tc as any).thought_signature ?? (tc as any).thoughtSignature;
         if (typeof thoughtSignature === 'string' && thoughtSignature.length > 0 && !acc.thought_signature) {
@@ -1166,17 +1206,18 @@ async function streamCompletion(
       if (text.length === 0) continue;
 
       if (dialectMode === 'passthrough') {
-        emitText(text);
+        emitPassthrough(text);
       } else {
         heldText += text;
         if (dialectMode === 'undecided') {
           const probe = heldText.trimStart();
-          if (startsWithDialectMarker(probe)) {
+          if (startsWithDialectMarker(probe) || (hasTools && startsWithJsonToolCallShape(probe))) {
             dialectMode = 'dialect';
-          } else if (!couldBecomeDialectMarker(probe) || heldText.length > 256) {
+          } else if ((!couldBecomeDialectMarker(probe) && !(hasTools && couldBecomeJsonToolCallShape(probe))) || heldText.length > 256) {
             dialectMode = 'passthrough';
-            emitText(heldText);
+            const flush = heldText;
             heldText = '';
+            emitPassthrough(flush);
           }
         }
         // else: still a strict prefix of a marker — keep holding.
@@ -1197,15 +1238,19 @@ async function streamCompletion(
       }))
       .filter(c => { try { JSON.parse(c.arguments); return c.name.length > 0; } catch { return false; } });
 
+    if (passthroughTail.length > 0) { emitText(passthroughTail); passthroughTail = ''; }
+
     // Resolve the dialect hold window now the full text is known. Held text was
-    // never emitted, so a dead dialect turn can still fail over (nothing has been
-    // committed). A rescued dialect becomes tool_use blocks; leftover clean text
-    // is emitted as a text block first.
+    // never emitted, so a dead dialect turn can still fail over when no prose
+    // went out before it. A rescued dialect becomes tool_use blocks; leftover
+    // clean text is emitted as a text block first.
     if (heldText.length > 0) {
-      const rescue = ((ctx.tools?.length ?? 0) > 0 && (dialectMode === 'dialect' || containsDialectMarker(heldText)))
-        ? rescueInlineToolCalls(heldText, new Set((ctx.tools ?? []).map(t => t.function.name)))
+      const rescue = (hasTools && (dialectMode === 'dialect' || containsDialectMarker(heldText)))
+        ? rescueInlineToolCalls(heldText, toolNames)
         : { detected: false as const, calls: null, cleanText: heldText };
-      if (rescue.detected && !rescue.calls) {
+      // After prose was streamed there is no failing over: an unparseable
+      // block is sent as the text it was, as before #2117.
+      if (rescue.detected && !rescue.calls && !textBlockOpen) {
         throw new Error(`unparseable inline tool-call dialect from ${route.displayName}: ${heldText.slice(0, 120)}`);
       }
       if (rescue.detected && rescue.calls) {
