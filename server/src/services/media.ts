@@ -488,7 +488,10 @@ async function callImageProvider(
       // Request inline images only: never fetch an untrusted or expiring URL
       // or forward credentials to a provider-supplied download location.
       const body = await boundedMediaJson(r, 32 * 1024 * 1024) as { model?: unknown; data?: { b64_json?: unknown }[]; error?: unknown } | null;
-      if (!body || body.error || body.model !== undefined && body.model !== row.model_id || !Array.isArray(body.data) || body.data.length !== (p.n ?? 1)) {
+      // Blaze can echo the exact image ID without its free/ billing namespace.
+      // Only the allowlisted, prefixed ID is ever sent upstream.
+      const substituted = body?.model !== undefined && body.model !== row.model_id && !(blaze && body.model === row.model_id.slice(5));
+      if (!body || body.error || substituted || !Array.isArray(body.data) || body.data.length !== (p.n ?? 1)) {
         throw new MediaError(label + ' returned an invalid or substituted image response', 502);
       }
       const images: Array<{ b64_json: string }> = [];

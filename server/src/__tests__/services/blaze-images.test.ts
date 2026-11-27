@@ -21,6 +21,12 @@ describe('BlazeAPI image dispatch', () => {
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer blaze-synthetic-key');
     expect(JSON.parse(String(init?.body))).toEqual({ model, prompt: 'A blue circle', n: 1, response_format: 'b64_json' });
   });
+  it('accepts the matching bare response ID but never requests an unprefixed route', async () => {
+    seed('free/nano-banana');
+    const fetch = vi.spyOn(global, 'fetch').mockResolvedValue(Response.json({ model: 'nano-banana', data: [{ b64_json: image }] }));
+    expect(await runImageGeneration('free/nano-banana', { prompt: 'blue' })).toMatchObject({ modelId: 'free/nano-banana' });
+    expect(JSON.parse(String(fetch.mock.calls[0][1]?.body)).model).toBe('free/nano-banana');
+  });
   it('does not send an untested premium image route upstream', async () => {
     seed('gpt-image-2'); const fetch = vi.spyOn(global, 'fetch');
     await expect(runImageGeneration('gpt-image-2', { prompt: 'circle' })).rejects.toMatchObject({ status: 400 });
