@@ -469,7 +469,14 @@ export interface ApiKey {
   /** Only sent when autoHealthCheck is false: how many of the provider's
    *  models this install can route to (0 = nothing to serve yet). */
   modelsAvailable?: number;
+  /** Only sent when autoHealthCheck is false: why the key is never probed
+   *  (#1545). 'forbidden' = the provider disallows automated checks (LLMTR,
+   *  SerpSearch); 'quota' = no check exists that spends nothing (Free.ai). */
+  keyCheckUnavailable?: KeyCheckUnavailableReason;
 }
+
+/** Why a provider's keys are never probed by the health checker (#1545). */
+export type KeyCheckUnavailableReason = 'forbidden' | 'quota';
 
 // ---- Fallback Config ----
 

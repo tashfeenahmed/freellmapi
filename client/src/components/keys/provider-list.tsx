@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { Check, ChevronDown, CircleAlert, Copy, ExternalLink, FlaskConical, Info, KeyRound, Layers, Link2, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Zap } from 'lucide-react'
+import { Check, ChevronDown, Copy, ExternalLink, FlaskConical, KeyRound, Layers, Link2, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Zap } from 'lucide-react'
 import type { ApiKey, ApiKeyModel, Platform } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -35,6 +35,8 @@ import {
 } from './shared'
 import { balanceByKey } from './quota-balance'
 import { ApinexCheckinNotice } from './apinex-checkin-notice'
+import { KeyCheckNotice } from './key-check-notice'
+import { noAutoCheckHintKey } from './key-check-hint'
 import type { HealthData } from './shared'
 import { DiscoverModelsDialog } from './discover-models-dialog'
 import { AddEndpointKeyDialog } from './add-endpoint-key-dialog'
@@ -180,7 +182,8 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
     onSuccess: (_data, keyId) => {
       // #1459: the server sends no probe for these keys, so say why instead
       // of letting the button look broken.
-      if (keys.find(k => k.id === keyId)?.autoHealthCheck === false) toast.info(t('keys.noAutoCheckHint'))
+      const checked = keys.find(k => k.id === keyId)
+      if (checked?.autoHealthCheck === false) toast.info(t(noAutoCheckHintKey(checked.keyCheckUnavailable)))
       queryClient.invalidateQueries({ queryKey: ['health'] })
       queryClient.invalidateQueries({ queryKey: ['keys'] })
       invalidateSearchQueries(queryClient)
@@ -967,15 +970,6 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                               </ConfirmButton>
                             </div>
                           </div>
-                          {k.autoHealthCheck === false && status === 'unknown' && !lastHealthError && (
-                            <div className="flex items-start gap-2 px-4 pb-3 pl-8 text-xs text-muted-foreground" role="status">
-                              <Info className="mt-0.5 size-3.5 flex-shrink-0" />
-                              <span>
-                                {t('keys.noAutoCheckHint')}
-                                {k.modelsAvailable === 0 && <> {t('keys.noModelsYetHint')}</>}
-                              </span>
-                            </div>
-                          )}
                           {checkinRequired && (
                             <ApinexCheckinNotice
                               disabled={resumeCheckinKey.isPending}
@@ -983,12 +977,15 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                               onResume={() => resumeCheckinKey.mutate(k.id)}
                             />
                           )}
-                          {lastHealthError && (
-                            <div className="flex items-start gap-2 px-4 pb-3 pl-8 text-xs text-destructive" role="status">
-                              <CircleAlert className="mt-0.5 size-3.5 flex-shrink-0" />
-                              <span className="break-words" title={lastHealthError}>{lastHealthError}</span>
-                            </div>
-                          )}
+                          {/* #1545: unknown validity on a never-probed provider is grey
+                              information; only a real probe failure is red. */}
+                          <KeyCheckNotice
+                            autoHealthCheck={k.autoHealthCheck}
+                            keyCheckUnavailable={k.keyCheckUnavailable}
+                            status={status}
+                            lastHealthError={lastHealthError}
+                            modelsAvailable={k.modelsAvailable}
+                          />
                           {hasCustomModels && isExpanded && (
                             <div className="border-t bg-muted/20 px-4 py-3 pl-12">
                               {/* #1504: batch bar for the model chips of THIS key —

@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Tento poskytovateľ nepovoľuje automatické kontroly kľúčov. Kľúč bude v poriadku, keď obslúži svoju prvú požiadavku.",
+    "noAutoCheckQuotaHint": "Tento poskytovateľ nemôže overiť kľúč bez spotreby kvóty, takže kľúč zostane neoverený, kým neobslúži svoju prvú požiadavku. S kľúčom je všetko v poriadku.",
     "noModelsYetHint": "Váš katalóg zatiaľ neobsahuje žiadne modely tohto poskytovateľa, takže nemá čo obsluhovať.",
     "proxyEnvHintBefore": "Tiež konfigurovateľné cez",
     "proxyEnvHintAfter": "premenná prostredia (má prednosť). Nechajte prázdne na deaktiváciu. Príklady:",

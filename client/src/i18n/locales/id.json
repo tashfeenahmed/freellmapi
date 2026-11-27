@@ -579,6 +579,7 @@
     "lastWorkedHint": "Terakhir berfungsi: {when}",
     "lastWorkedNever": "Belum pernah melayani permintaan atau lolos pemeriksaan",
     "noAutoCheckHint": "Penyedia ini tidak mengizinkan pemeriksaan kunci otomatis. Kunci menjadi sehat setelah melayani permintaan pertamanya.",
+    "noAutoCheckQuotaHint": "Penyedia ini tidak dapat memeriksa kunci tanpa memakai kuota, jadi kunci tetap belum diperiksa sampai melayani permintaan pertamanya. Tidak ada masalah dengan kunci ini.",
     "noModelsYetHint": "Katalog Anda belum memiliki model dari penyedia ini, jadi belum ada yang bisa dilayani.",
     "proxyEnvHintBefore": "Juga dapat dikonfigurasi melalui",
     "proxyEnvHintAfter": "variabel lingkungan (diutamakan). Biarkan kosong untuk menonaktifkan. Contoh:",

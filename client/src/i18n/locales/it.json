@@ -579,6 +579,7 @@
     "lastWorkedHint": "Ultimo funzionamento: {when}",
     "lastWorkedNever": "Non ha ancora servito richieste né superato un controllo",
     "noAutoCheckHint": "Questo provider non consente controlli automatici delle chiavi. La chiave diventa sana dopo aver servito la sua prima richiesta.",
+    "noAutoCheckQuotaHint": "Questo provider non può verificare una chiave senza consumare quota, quindi la chiave resta non verificata finché non serve la sua prima richiesta. La chiave non ha alcun problema.",
     "noModelsYetHint": "Il tuo catalogo non ha ancora modelli di questo provider, quindi non ha nulla da servire.",
     "proxyEnvHintBefore": "Configurabile anche tramite la variabile d'ambiente ",
     "proxyEnvHintAfter": " (ha precedenza). Lascia vuoto per disabilitare. Esempi:",

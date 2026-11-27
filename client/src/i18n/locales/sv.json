@@ -579,6 +579,7 @@
     "lastWorkedHint": "Senast fungerande: {when}",
     "lastWorkedNever": "Har ännu inte betjänat någon förfrågan eller klarat en kontroll",
     "noAutoCheckHint": "Den här leverantören tillåter inte automatiska nyckelkontroller. Nyckeln blir frisk när den har betjänat sin första förfrågan.",
+    "noAutoCheckQuotaHint": "Den här leverantören kan inte kontrollera en nyckel utan att förbruka kvot, så nyckeln förblir okontrollerad tills den har betjänat sin första begäran. Det är inget fel på nyckeln.",
     "noModelsYetHint": "Din katalog har ännu inga modeller från den här leverantören, så det finns inget för den att betjäna.",
     "proxyEnvHintBefore": "Kan också konfigureras via",
     "proxyEnvHintAfter": "miljövariabel (har företräde). Lämna tomt för att inaktivera. Exempel:",

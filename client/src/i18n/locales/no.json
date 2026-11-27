@@ -579,6 +579,7 @@
     "lastWorkedHint": "Sist funksjonsdyktig: {when}",
     "lastWorkedNever": "Har ennå ikke betjent en forespørsel eller bestått en sjekk",
     "noAutoCheckHint": "Denne leverandøren tillater ikke automatiske nøkkelsjekker. Nøkkelen blir frisk etter at den har betjent sin første forespørsel.",
+    "noAutoCheckQuotaHint": "Denne leverandøren kan ikke sjekke en nøkkel uten å bruke kvote, så nøkkelen forblir usjekket til den har betjent sin første forespørsel. Det er ingenting galt med nøkkelen.",
     "noModelsYetHint": "Katalogen din har ennå ingen modeller fra denne leverandøren, så det er ingenting for den å betjene.",
     "proxyEnvHintBefore": "Også konfigurerbar via",
     "proxyEnvHintAfter": "miljøvariabel (har forrang). La det stå tomt for å deaktivere. Eksempler:",

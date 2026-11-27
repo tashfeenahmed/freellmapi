@@ -583,6 +583,7 @@
     "lastWorkedHint": "上次可用：{when}",
     "lastWorkedNever": "尚未處理請求，也尚未通過檢查",
     "noAutoCheckHint": "此供應商不允許自動檢查金鑰。金鑰在處理完第一個請求後會變為正常。",
+    "noAutoCheckQuotaHint": "此供應商無法在不消耗配額的情況下檢查金鑰，因此在金鑰處理第一個請求之前，它會一直顯示為未檢查。金鑰本身沒有任何問題。",
     "noModelsYetHint": "你的目錄中還沒有此供應商的模型，因此暫時沒有可處理的請求。",
     "proxyEnvHintBefore": "也可透過 ",
     "proxyEnvHintAfter": " 環境變數設定（優先生效）。留空則停用。範例：",

@@ -579,6 +579,7 @@
     "lastWorkedHint": "Lần hoạt động gần nhất: {when}",
     "lastWorkedNever": "Chưa phục vụ yêu cầu nào và chưa qua lần kiểm tra nào",
     "noAutoCheckHint": "Nhà cung cấp này không cho phép kiểm tra khóa tự động. Khóa sẽ chuyển sang trạng thái tốt sau khi phục vụ yêu cầu đầu tiên.",
+    "noAutoCheckQuotaHint": "Nhà cung cấp này không thể kiểm tra khóa mà không tiêu tốn hạn mức, nên khóa vẫn ở trạng thái chưa kiểm tra cho đến khi phục vụ yêu cầu đầu tiên. Khóa không có vấn đề gì.",
     "noModelsYetHint": "Danh mục của bạn chưa có mô hình nào từ nhà cung cấp này, nên chưa có gì để phục vụ.",
     "proxyEnvHintBefore": "Cũng có thể cấu hình thông qua",
     "proxyEnvHintAfter": "biến môi trường (được ưu tiên). Để trống để vô hiệu hóa. Ví dụ:",

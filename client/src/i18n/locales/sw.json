@@ -579,6 +579,7 @@
     "lastWorkedHint": "Ilifanya kazi mara ya mwisho: {when}",
     "lastWorkedNever": "Haijatumika kwa ombi wala kupitia ukaguzi bado",
     "noAutoCheckHint": "Mtoa huduma huyu haruhusu ukaguzi wa funguo wa kiotomatiki. Ufunguo unakuwa mzima baada ya kuhudumia ombi lake la kwanza.",
+    "noAutoCheckQuotaHint": "Mtoa huduma huyu hawezi kukagua ufunguo bila kutumia kiwango cha matumizi, kwa hivyo ufunguo unabaki bila kukaguliwa hadi utakapohudumia ombi lake la kwanza. Hakuna tatizo lolote kwenye ufunguo.",
     "noModelsYetHint": "Katalogi yako bado haina modeli kutoka kwa mtoa huduma huyu, kwa hivyo hakuna cha kuhudumia.",
     "proxyEnvHintBefore": "Pia inaweza kusanidiwa kupitia",
     "proxyEnvHintAfter": "kutofautisha kwa mazingira (huchukua nafasi ya kwanza). Acha wazi ili kuzima. Mifano:",

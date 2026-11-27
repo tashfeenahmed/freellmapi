@@ -579,6 +579,7 @@
     "lastWorkedHint": "Son çalışma: {when}",
     "lastWorkedNever": "Henüz bir istek karşılamadı ve kontrolden geçmedi",
     "noAutoCheckHint": "Bu sağlayıcı otomatik anahtar kontrollerine izin vermiyor. Anahtar ilk isteğini karşıladıktan sonra sağlıklı olur.",
+    "noAutoCheckQuotaHint": "Bu sağlayıcı kota harcamadan bir anahtarı kontrol edemez; bu yüzden anahtar ilk isteğini karşılayana kadar kontrol edilmemiş olarak kalır. Anahtarda bir sorun yok.",
     "noModelsYetHint": "Kataloğunuzda henüz bu sağlayıcıdan model yok, bu yüzden karşılayacağı bir istek yok.",
     "proxyEnvHintBefore": "Ayrıca ",
     "proxyEnvHintAfter": " ortam değişkeniyle yapılandırılabilir (önceliklidir). Devre dışı bırakmak için boş bırakın. Örnekler:",

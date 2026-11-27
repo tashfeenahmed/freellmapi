@@ -579,6 +579,7 @@
     "lastWorkedHint": "Last worked: {when}",
     "lastWorkedNever": "Has not served a request or passed a check yet",
     "noAutoCheckHint": "Wannan mai bayarwa ba ya ba da izinin duba maɓalli ta atomatik. Maɓallin zai zama lafiya bayan ya yi hidimar buƙatarsa ta farko.",
+    "noAutoCheckQuotaHint": "Wannan mai bayarwa ba zai iya duba maɓalli ba tare da kashe adadin amfani ba, don haka maɓallin zai kasance ba a duba ba har sai ya yi hidimar buƙatarsa ta farko. Babu matsala a maɓallin.",
     "noModelsYetHint": "Kasidarka ba ta da samfura daga wannan mai bayarwa tukuna, don haka babu abin da zai yi wa hidima.",
     "proxyEnvHintBefore": "Hakanan ana iya daidaitawa ta hanyar",
     "proxyEnvHintAfter": "canjin yanayi (yana ɗaukar fifiko). Bar komai don kashewa. Misalai:",

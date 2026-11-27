@@ -83,6 +83,9 @@ export class LlmtrProvider extends OpenAICompatProvider {
     return false;
   }
 
+  /** #1545: the provider disallows automated checks, not merely lacks a free one. */
+  override get keyCheckUnavailableReason(): 'forbidden' { return 'forbidden'; }
+
   constructor(opts: LlmtrProviderOptions = {}) {
     super({ platform: 'llmtr', name: 'LLMTR', baseUrl: LLMTR_BASE_URL });
     this.validationMinGapMs = opts.validationMinGapMs ?? validationMinGapMs();

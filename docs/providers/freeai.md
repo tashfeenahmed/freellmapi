@@ -32,6 +32,10 @@ and `healthy` key states remain usable for inference; their status is not proof
 that the credential is valid. The supplied key is still sent on actual
 generation requests; this integration does not advertise anonymous access.
 
+On the Keys page a new Free.ai key shows as `unchecked` with a grey note that
+Free.ai can't check a key without spending quota. That is not an error: the key
+routes normally and turns `healthy` after it serves its first request.
+
 Kokoro generated valid WAV files during live testing. Two tested Qwen aliases
 returned the same backend identity under conflicting advertised names; the other
 chat, image, translation and transcription candidates failed or timed out. None

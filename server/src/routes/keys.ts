@@ -21,6 +21,7 @@ import {
 } from '../services/auth.js';
 import { getActiveCooldownsForKeys, clearCooldownsForKey, clearApinexCheckinCooldownsForKey } from '../services/ratelimit.js';
 import { getMonthlyBudgetCaps, getMonthlyUsage, nextMonthResetAt } from '../services/key-budget.js';
+import { visibleHealthError } from '../services/health.js';
 import { resolveCustomEndpointKey, customEndpointKeyIds, siblingEndpointKeyId, endpointHasCredential, normalizeGroupLabel, setCustomEndpointGroup } from '../services/custom-endpoint.js';
 import { registerCustomModels, registerCustomChatModels } from '../services/custom-model-register.js';
 import { registerCustomMediaModel } from '../services/custom-media-register.js';
@@ -532,6 +533,11 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       // unexplained "unchecked". modelsAvailable says whether this install has
       // any of the provider's models to serve that first request with.
       autoHealthCheck: resolveProvider(row.platform)?.supportsKeyValidation !== false,
+      // #1545: why it is never checked, so the dashboard can explain it in
+      // neutral copy ("can't check without spending quota") instead of red.
+      ...(resolveProvider(row.platform)?.keyCheckUnavailableReason
+        ? { keyCheckUnavailable: resolveProvider(row.platform)!.keyCheckUnavailableReason! }
+        : {}),
       // Search keys serve engines, not models, so they never count as missing models.
       ...(resolveProvider(row.platform)?.supportsKeyValidation === false && !isSearchPlatform(row.platform)
         ? { modelsAvailable: modelCountFor(row.platform) }
@@ -549,7 +555,8 @@ keysRouter.get('/', (_req: Request, res: Response) => {
       // Null = never verified. Exposed so the dashboard can say which it is;
       // it changes no routing.
       verificationBasis: row.verification_basis ?? null,
-      lastHealthError: row.last_health_error ?? null,
+      // #1545: never a stale probe error for a provider that is not probed.
+      lastHealthError: visibleHealthError(row.platform, row.base_url, row.last_health_error),
       // The model_id list this key is limited to; null = serves everything (#657).
       modelScope: scope ? [...scope] : null,
       // The per-key proxy override with its password masked (#590). '' = no

@@ -36,7 +36,8 @@ export class FreeAiProvider extends BaseProvider {
     // None proves authentication. Do not burn quota or mark a bogus key valid.
     // The existing health service preserves unknown/healthy state on an
     // inconclusive probe, so a configured key can still serve normal requests.
-    throw new Error('Free.ai has no verified credential-validation endpoint; key validity is unknown (no quota spent)');
+    // #1545: worded as information, not as a fault with the key.
+    throw new Error("Free.ai can't check a key without spending quota, so key validity is unknown until it serves its first request (no quota spent)");
   }
 
   async chatCompletion(): Promise<ChatCompletionResponse> {

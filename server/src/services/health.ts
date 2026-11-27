@@ -264,6 +264,20 @@ export async function maybePollKeyQuota(keyId: number): Promise<boolean> {
   }
 }
 
+/**
+ * The probe error the dashboard may show for a key, or null (#1545). A
+ * provider that is never probed (supportsKeyValidation === false) can only
+ * hold an error left by a probe from before that switch: an older release
+ * stored "Free.ai has no verified credential-validation endpoint" as if the
+ * key were broken. checkKeyHealth clears it on the next pass, but a disabled
+ * key is never in a pass, so the read side drops it too. Unknown validity is
+ * not an error, and the status already says the key is unchecked.
+ */
+export function visibleHealthError(platform: string, baseUrl: string | null | undefined, lastError: string | null | undefined): string | null {
+  if (lastError == null) return null;
+  return resolveProvider(platform as Platform, baseUrl)?.supportsKeyValidation === false ? null : lastError;
+}
+
 export async function checkKeyHealth(keyId: number): Promise<KeyStatus> {
   const db = getDb();
   const row = db.prepare('SELECT * FROM api_keys WHERE id = ?').get(keyId) as any;

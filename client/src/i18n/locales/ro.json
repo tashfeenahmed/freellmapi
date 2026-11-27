@@ -579,6 +579,7 @@
     "lastWorkedHint": "Ultima funcționare: {when}",
     "lastWorkedNever": "Nu a servit încă nicio cerere și nu a trecut nicio verificare",
     "noAutoCheckHint": "Acest furnizor nu permite verificări automate ale cheilor. Cheia devine funcțională după ce servește prima cerere.",
+    "noAutoCheckQuotaHint": "Acest furnizor nu poate verifica o cheie fără a consuma cotă, așa că cheia rămâne neverificată până când servește prima cerere. Cheia nu are nicio problemă.",
     "noModelsYetHint": "Catalogul tău nu are încă modele de la acest furnizor, așa că nu are ce servi.",
     "proxyEnvHintBefore": "De asemenea, configurabil prin",
     "proxyEnvHintAfter": "variabila de mediu (are prioritate). Lasă gol pentru a dezactiva. Exemple:",

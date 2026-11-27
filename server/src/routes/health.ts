@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { getDb, isKeyStoreDecryptable } from '../db/index.js';
-import { checkKeyHealth, checkAllKeys, pollKeyQuota, supportsQuotaPolling } from '../services/health.js';
+import { checkKeyHealth, checkAllKeys, pollKeyQuota, supportsQuotaPolling, visibleHealthError } from '../services/health.js';
 import { getDegradationStatus } from '../services/degradation.js';
 import { runModelProbePass } from '../services/model-probe.js';
 import { hasProvider, resolveProvider } from '../providers/index.js';
@@ -29,7 +29,7 @@ healthRouter.get('/', (_req: Request, res: Response) => {
   `).all() as any[];
 
   const keys = db.prepare(`
-    SELECT id, platform, label, status, enabled, created_at, last_checked_at, last_healthy_at, last_health_error
+    SELECT id, platform, base_url, label, status, enabled, created_at, last_checked_at, last_healthy_at, last_health_error
     FROM api_keys
     ORDER BY platform, created_at DESC
   `).all() as any[];
@@ -55,7 +55,7 @@ healthRouter.get('/', (_req: Request, res: Response) => {
       createdAt: k.created_at,
       lastCheckedAt: k.last_checked_at,
       lastHealthyAt: k.last_healthy_at ?? null,
-      lastHealthError: k.last_health_error,
+      lastHealthError: visibleHealthError(k.platform, k.base_url, k.last_health_error),
     })),
     quotaStates: getQuotaStateForKeys(),
     degradation: getDegradationStatus(),
