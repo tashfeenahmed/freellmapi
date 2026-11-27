@@ -235,6 +235,18 @@ function averageOutputTokens(day: string, account: string, modelId: string): num
 }
 
 let lastPruneDay = '';
+
+// The part of in-flight calls' reservations above their likely cost, per
+// `${day}|${account}`. A reservation is the call's max_tokens and most of it
+// comes back on settle: it may refuse a call for now, but must not decide the
+// account is spent (and bench it until midnight).
+const inFlight = new Map<string, number>();
+function addInFlight(day: string, account: string, neurons: number): void {
+  const k = `${day}|${account}`;
+  const v = (inFlight.get(k) ?? 0) + neurons;
+  if (v > 1e-9) inFlight.set(k, v);
+  else inFlight.delete(k);
+}
 function pruneOldRows(now: number): void {
   const day = utcDay(now);
   if (day === lastPruneDay) return;
@@ -268,6 +280,27 @@ export class CloudflareNeuronCapError extends Error {
   }
 }
 
+/** One call that would not fit in what is left of today's cap, on an account
+ *  that still has room for smaller ones. A fact about the request: the
+ *  failover loop skips this model for this request only (providerRejection),
+ *  with no cooldown. Deliberately not worded as Cloudflare's "daily free
+ *  allocation" 429, which would bench the whole account. */
+export class CloudflareRequestTooLargeError extends Error {
+  // status 400 + providerRejection 'request' is the shape providerRequestError
+  // (providers/base.ts) gives an adapter's own "cannot serve this request":
+  // the failover loop treats it as retryable and skips this model for this
+  // request only. Without a status it read as fatal and 502'd the client.
+  readonly status = 400;
+  readonly providerRejection = 'request' as const;
+  constructor(estimated: number, left: number) {
+    super(
+      `Cloudflare neuron budget: this call may use up to ${Math.round(estimated)} neurons and `
+      + `${Math.max(0, Math.round(left))} are left under today's cap. Lower max_tokens or the prompt size to use Cloudflare for it.`,
+    );
+    this.name = 'CloudflareRequestTooLargeError';
+  }
+}
+
 // ── Metering ────────────────────────────────────────────────────────────────
 
 export interface CloudflareCallEstimate extends NeuronUsage {
@@ -276,11 +309,11 @@ export interface CloudflareCallEstimate extends NeuronUsage {
 }
 
 export interface CloudflareNeuronCall {
-  /** The call completed: replace the estimate with what it really used. Pass
-   *  null when the real usage is unknown (the estimate stays). */
+  /** The call completed: replace the reservation with what it really used.
+   *  Pass null when the real usage is unknown (its likely cost stays). */
   settle(actual: NeuronUsage | null): void;
   /** The call was cut short: charge what it used so far, but never less than
-   *  the estimate (Cloudflare may have kept generating after we hung up). */
+   *  its likely cost (Cloudflare may have kept generating after we hung up). */
   settleAtLeast(partial: NeuronUsage): void;
   /** Cloudflare refused the call before running it (an HTTP error answer):
    *  nothing was billed, so take the estimate back. */
@@ -290,9 +323,11 @@ export interface CloudflareNeuronCall {
 const NOOP_CALL: CloudflareNeuronCall = { settle() {}, settleAtLeast() {}, refund() {} };
 
 /**
- * Charge a Cloudflare call's estimated neurons before it is dispatched. Throws
- * CloudflareNeuronCapError when the account has no room left today (and
- * benches the account until midnight UTC so the router stops offering it).
+ * Reserve a Cloudflare call's neurons (its max_tokens) before it is
+ * dispatched. Throws CloudflareNeuronCapError when the account has no room left
+ * today (and benches the account until midnight UTC so the router stops
+ * offering it), or CloudflareRequestTooLargeError when room is left but not for
+ * this call (nothing is benched).
  */
 export function startCloudflareCall(
   apiKey: string,
@@ -306,29 +341,63 @@ export function startCloudflareCall(
   pruneOldRows(now);
 
   const usage: NeuronUsage = { ...estimate };
+  // What a call that is cut short or reports no usage is assumed to have cost:
+  // the learned average output (or 1,024), bounded by max_tokens.
+  const likely: NeuronUsage = { ...estimate };
+  // The smallest ordinary call of this model (no prompt, the default output,
+  // or one default-sized image / audio minute): when even that does not fit,
+  // the account is spent for the day.
+  const smallest: NeuronUsage = {};
   if (generatesTokens(modelId) && estimate.outputTokens === undefined) {
-    const max = n(estimate.maxOutputTokens) || Infinity;
-    usage.outputTokens = Math.min(averageOutputTokens(day, account, modelId) ?? DEFAULT_OUTPUT_ESTIMATE, max);
+    // Charge the most the call may generate. The average is no bound: a
+    // reasoning model that writes its whole max_tokens costs several times it,
+    // and on Workers Paid that overshoot past the free 10K is billed. settle()
+    // gives back what the call did not use.
+    const max = n(estimate.maxOutputTokens);
+    const average = averageOutputTokens(day, account, modelId) ?? DEFAULT_OUTPUT_ESTIMATE;
+    usage.outputTokens = max || average;
+    likely.outputTokens = max ? Math.min(average, max) : average;
+    smallest.outputTokens = max ? Math.min(DEFAULT_OUTPUT_ESTIMATE, max) : DEFAULT_OUTPUT_ESTIMATE;
   }
   const estimated = neuronsFor(modelId, usage);
+  const likelyNeurons = neuronsFor(modelId, likely);
 
   const cap = getCloudflareDailyNeuronCap();
   if (cap !== null) {
     maybeRefreshRemote(apiKey, account, now);
     const used = cloudflareNeuronsUsedToday(account, now);
-    if (used + estimated > cap) {
+    // Spent: at the cap, or too close to it for even the smallest call of
+    // this model. Without the second test an account a few neurons short of
+    // the cap was never benched: every call was refused one by one, each a
+    // wasted failover hop, until midnight.
+    const smallestNeurons = neuronsFor(modelId, smallest);
+    const committed = Math.max(
+      localNeuronsToday(account, now) - (inFlight.get(`${day}|${account}`) ?? 0),
+      remoteNeuronsToday(account, now) ?? 0,
+    );
+    if (committed >= cap || (used + estimated > cap && committed + smallestNeurons > cap)) {
       benchCloudflareAccountId(account, msUntilUtcMidnight(now), 'authoritative');
       throw new CloudflareNeuronCapError(used, cap, now);
     }
+    // Room is left, just not for THIS call: refuse it alone. Benching the
+    // account here took every Cloudflare route down until midnight for one
+    // large prompt while most of the day's allowance was still unused.
+    if (used + estimated > cap) throw new CloudflareRequestTooLargeError(estimated, cap - used);
   }
 
   charge(day, account, modelId, { calls: 1, neurons: estimated });
+  addInFlight(day, account, estimated - likelyNeurons);
   let done = false;
   return {
     settle(actual) {
       if (done) return;
       done = true;
-      if (!actual) return;
+      addInFlight(day, account, likelyNeurons - estimated);
+      if (!actual) {
+        // Usage unknown: keep the likely cost, not the max_tokens reservation.
+        if (likelyNeurons < estimated) charge(day, account, modelId, { neurons: likelyNeurons - estimated });
+        return;
+      }
       const real = neuronsFor(modelId, actual);
       charge(day, account, modelId, {
         settled: 1, input: n(actual.inputTokens), output: n(actual.outputTokens), neurons: real - estimated,
@@ -337,12 +406,17 @@ export function startCloudflareCall(
     settleAtLeast(partial) {
       if (done) return;
       done = true;
-      const real = neuronsFor(modelId, partial);
-      if (real > estimated) charge(day, account, modelId, { neurons: real - estimated });
+      addInFlight(day, account, likelyNeurons - estimated);
+      // Keep what it used so far, or its likely cost when that is more (the
+      // same charge as before max_tokens was reserved). Keeping the whole
+      // reservation would bench the account after a few aborted streams.
+      const kept = Math.max(neuronsFor(modelId, partial), likelyNeurons);
+      if (kept !== estimated) charge(day, account, modelId, { neurons: kept - estimated });
     },
     refund() {
       if (done) return;
       done = true;
+      addInFlight(day, account, likelyNeurons - estimated);
       charge(day, account, modelId, { neurons: -estimated });
     },
   };
@@ -417,6 +491,7 @@ export async function refreshRemoteNeurons(apiKey: string, now = Date.now()): Pr
 export function resetCloudflareNeuronMeter(): void {
   remoteNextCheck.clear();
   remoteInFlight.clear();
+  inFlight.clear();
   lastPruneDay = '';
 }
 
