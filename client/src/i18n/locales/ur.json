@@ -60,7 +60,16 @@
     "emailChanged": "ای میل کامیابی سے تبدیل ہوگئی۔",
     "passwordReset": "پاس ورڈ ری سیٹ ہوگیا۔ براہ کرم سائن اِن کریں۔",
     "resetCodeDockerHint": "Docker میں چلا رہے ہیں؟ کوڈ کنٹینر لاگ میں ہے: docker logs <container>۔",
-    "desktopSessionFailed": "ڈیش بورڈ لوکل سرور میں سائن اِن نہیں کر سکا۔ FreeLLMAPI بند کر کے دوبارہ کھولیں۔"
+    "desktopSessionFailed": "ڈیش بورڈ لوکل سرور میں سائن اِن نہیں کر سکا۔ FreeLLMAPI بند کر کے دوبارہ کھولیں۔",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "محفوظ کریں۔",
@@ -171,7 +180,12 @@
     "updateNow": "ابھی اپ ڈیٹ کریں",
     "updatingContainer": "نئی امیج کھینچی جا رہی ہے اور دوبارہ شروع ہو رہا ہے۔ FreeLLMAPI واپس آنے پر یہ صفحہ دوبارہ لوڈ ہوگا۔",
     "updateNowFailed": "اپ ڈیٹر نے درخواست قبول نہیں کی۔ چیک کریں کہ watchtower کنٹینر چل رہا ہے۔",
-    "updateNowTimeout": "5 منٹ بعد بھی FreeLLMAPI دوبارہ شروع نہیں ہوا۔ watchtower کنٹینر کے لاگز دیکھیں۔"
+    "updateNowTimeout": "5 منٹ بعد بھی FreeLLMAPI دوبارہ شروع نہیں ہوا۔ watchtower کنٹینر کے لاگز دیکھیں۔",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ماڈلز",
@@ -436,6 +450,7 @@
     "familyHaiku": "ہائیکو",
     "selectPlatform": "ایک فراہم کنندہ کو منتخب کریں۔",
     "addKey": "کلید شامل کریں۔",
+    "addAnotherKey": "ایک اور API کلید شامل کریں",
     "keyAdded": "کلید شامل کی گئی۔",
     "endpointKeysShareModels": "ایک ہی اینڈ پوائنٹ کی کلیدیں اس کے ماڈلز میں شریک ہوتی ہیں۔",
     "export": "برآمد کریں۔",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "اختیاری",
     "customFamily": "خاندان",
     "customFamilyPlaceholder": "ماڈل آئی ڈی کے لیے ڈیفالٹس",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API کلید",
     "customCapabilities": "صلاحیتیں",
     "addModel": "ماڈل شامل کریں۔",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ٹوک زیادہ سے زیادہ",
     "emptyTitle": "ابھی تک کوئی سرایت کرنے والا ماڈل نہیں ہے۔",
     "emptyDesc": "سرایت کرنے والے خاندان یہاں ظاہر ہوتے ہیں جب آپ ایک فراہم کنندہ کلید شامل کرتے ہیں جو سرایت کرنے کو سپورٹ کرتی ہے۔",
-    "dragToReorder": "فراہم کنندہ کو دوبارہ ترتیب دینے کے لیے گھسیٹیں۔"
+    "dragToReorder": "فراہم کنندہ کو دوبارہ ترتیب دینے کے لیے گھسیٹیں۔",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "فیوژن",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research کا خود کو بہتر بنانے والا ایجنٹ، مستقل میموری اور مہارتوں کے ساتھ، ٹرمینل میں یا چیٹ ایپس پر۔",
       "pi": "ایک سادہ ٹرمینل ایجنٹ، جسے آپ اپنی ایکسٹینشنز، مہارتوں اور پرامپٹ ٹیمپلیٹس سے ڈھالتے ہیں۔",
       "reasonix": "DeepSeek کے لیے بنایا گیا ٹرمینل کوڈنگ ایجنٹ، جو پریفکس کیشنگ کے گرد بنا ہے تاکہ لمبے سیشن بھی سستے رہیں۔",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "پائیدار سیشنز، اجازتوں اور کسی بھی OpenAI مطابقت پذیر فراہم کنندہ کے ساتھ ایک مقامی ٹرمینل کوڈنگ ایجنٹ۔"
     }
   },
   "update": {

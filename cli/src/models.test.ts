@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UnknownModelError, contextWindowOf, defaultModelId, resolveLaunchModel } from './models.js';
+import { UnknownModelError, chosenContextWindow, contextWindowOf, defaultModelId, parseContextWindow, resolveLaunchModel } from './models.js';
 import type { CatalogModel } from './types.js';
 
 // The distinction this module exists for: the CLI's catalog() fetches
@@ -77,5 +77,38 @@ describe('contextWindowOf', () => {
     expect(contextWindowOf({ id: 'b', context_length: 2000 })).toBe(2000);
     expect(contextWindowOf({ id: 'c' })).toBeUndefined();
     expect(contextWindowOf({ id: 'd', context_window: null })).toBeUndefined();
+  });
+});
+
+// #2122, #2087: `--context-window` for Claude Code.
+describe('chosenContextWindow / parseContextWindow', () => {
+  const auto: CatalogModel = { id: 'auto', context_window: 104_857, max_context_window: 838_860 };
+
+  it('defaults to the advertised window, not the largest one', () => {
+    expect(chosenContextWindow(auto)).toBe(104_857);
+  });
+
+  it('uses max_context_window for max, and the window itself when there is none', () => {
+    expect(chosenContextWindow(auto, 'max')).toBe(838_860);
+    expect(chosenContextWindow({ id: 'fast-coder', context_window: 131_072 }, 'max')).toBe(131_072);
+  });
+
+  it('takes an explicit token count as given', () => {
+    expect(chosenContextWindow(auto, 200_000)).toBe(200_000);
+  });
+
+  it('parses max, plain counts and k/m suffixes, and rejects the rest', () => {
+    expect(parseContextWindow('max')).toBe('max');
+    expect(parseContextWindow('MAX')).toBe('max');
+    expect(parseContextWindow('200000')).toBe(200_000);
+    expect(parseContextWindow('200k')).toBe(200_000);
+    expect(parseContextWindow('1m')).toBe(1_000_000);
+    expect(() => parseContextWindow('0')).toThrow(/--context-window/);
+    expect(() => parseContextWindow('big')).toThrow(/--context-window/);
+  });
+
+  it('resolveLaunchModel applies the choice', () => {
+    expect(resolveLaunchModel('auto', [auto], [auto], 'max').contextWindow).toBe(838_860);
+    expect(resolveLaunchModel('auto', [auto], [auto]).contextWindow).toBe(104_857);
   });
 });

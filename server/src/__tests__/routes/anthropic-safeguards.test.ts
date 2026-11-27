@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import type { Express } from 'express';
 import { createApp } from '../../app.js';
 import { initDb, getDb, getUnifiedApiKey } from '../../db/index.js';
-import { extractAnthropicCompat } from '../../routes/anthropic.js';
+import { extractAnthropicCompat, requestsAutoModeReview, safeguardResultsFor } from '../../routes/anthropic.js';
 import { mintDashboardToken } from '../helpers/auth.js';
 
 // Upstream safeguard response metadata compatibility (related to #1589).
@@ -205,7 +205,9 @@ describe('Anthropic safeguards passthrough (#1589)', () => {
 
     expect(status).toBe(200);
     const msgDelta = sseEvents(text).find(e => e.event === 'message_delta');
-    expect(msgDelta!.data.safeguard_results).toEqual(SAFEGUARD_RESULTS);
+    // Inside `delta`, where Claude Code reads it (#2011).
+    expect(msgDelta!.data.delta.safeguard_results).toEqual(SAFEGUARD_RESULTS);
+    expect(msgDelta!.data).not.toHaveProperty('safeguard_results');
   });
 
   it('keeps safeguard_results from a choice-less final metadata frame', async () => {
@@ -222,7 +224,7 @@ describe('Anthropic safeguards passthrough (#1589)', () => {
     expect(status).toBe(200);
     const deltas = sseEvents(text).filter(e => e.event === 'message_delta');
     expect(deltas).toHaveLength(1);
-    expect(deltas[0].data.safeguard_results).toEqual(SAFEGUARD_RESULTS);
+    expect(deltas[0].data.delta.safeguard_results).toEqual(SAFEGUARD_RESULTS);
     expect(deltas[0].data.usage).toEqual({ input_tokens: 11, output_tokens: 7 });
   });
 
@@ -242,6 +244,7 @@ describe('Anthropic safeguards passthrough (#1589)', () => {
     expect(deltas).toHaveLength(1);
     for (const event of sseEvents(text)) {
       expect(event.data).not.toHaveProperty('safeguard_results');
+      if (event.data.delta) expect(event.data.delta).not.toHaveProperty('safeguard_results');
     }
   });
 
@@ -280,5 +283,99 @@ describe('Anthropic safeguards passthrough (#1589)', () => {
     expect(assistant.tool_calls[0].id).toBe('toolu_client_9');
     const toolMsg = captured.body.messages.find((m: any) => m.role === 'tool');
     expect(toolMsg.tool_call_id).toBe('toolu_client_9');
+  });
+
+  // #2011: the request shape Claude Code 2.1.330 sends in auto mode (captured
+  // from a real run against a local mock; classifier_context trimmed).
+  const AUTO_MODE_SAFEGUARDS = [{ type: 'dangerous_tool_use', classifier_context: { rules: 'trimmed' } }];
+  const UNSUPPORTED = [{ type: 'dangerous_tool_use', status: { type: 'unsupported' } }];
+
+  it('requestsAutoModeReview only matches the dangerous_tool_use safeguard', () => {
+    expect(requestsAutoModeReview({ safeguards: AUTO_MODE_SAFEGUARDS })).toBe(true);
+    expect(requestsAutoModeReview({ safeguards: [{ type: 'other' }, { type: 'dangerous_tool_use' }] })).toBe(true);
+    expect(requestsAutoModeReview({ safeguards: SAFEGUARDS_REQUEST })).toBe(false);
+    expect(requestsAutoModeReview({ safeguards: 'dangerous_tool_use' })).toBe(false);
+    expect(requestsAutoModeReview({ safeguards: [null, 3] })).toBe(false);
+    expect(requestsAutoModeReview({})).toBe(false);
+    expect(requestsAutoModeReview(undefined)).toBe(false);
+  });
+
+  it('safeguardResultsFor: upstream results win, else unsupported when asked, else nothing', () => {
+    const asked = { safeguards: AUTO_MODE_SAFEGUARDS };
+    expect(safeguardResultsFor(asked, SAFEGUARD_RESULTS)).toBe(SAFEGUARD_RESULTS);
+    expect(safeguardResultsFor(asked, undefined)).toEqual(UNSUPPORTED);
+    expect(safeguardResultsFor({}, undefined)).toBeUndefined();
+    expect(safeguardResultsFor(undefined, undefined)).toBeUndefined();
+    // Never a verdict: no `available` status, no tool_uses map.
+    expect(JSON.stringify(safeguardResultsFor(asked, undefined))).not.toMatch(/available|evaluated|tool_uses/);
+  });
+
+  it('answers an auto-mode review request with the unsupported status (JSON)', async () => {
+    const captured = mockJson(textCompletion('Hello.'));
+    const { status, body } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-5', max_tokens: 64,
+      messages: [{ role: 'user', content: 'hi' }],
+      safeguards: AUTO_MODE_SAFEGUARDS,
+    }, anthropicHeaders({ 'anthropic-beta': 'test-beta-fixture' }));
+
+    expect(status).toBe(200);
+    expect(body.safeguard_results).toEqual(UNSUPPORTED);
+    // Still never forwarded to the OpenAI-compatible upstream.
+    expect(captured.body).not.toHaveProperty('safeguards');
+    expect(new Headers(captured.headers).has('anthropic-beta')).toBe(false);
+  });
+
+  it('answers an auto-mode review request with the unsupported status in message_delta.delta (SSE)', async () => {
+    mockStream(sse(
+      { id: 'c1', choices: [{ index: 0, delta: { content: 'Hello' }, finish_reason: 'stop' }] },
+      '[DONE]',
+    ));
+    const { status, text } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'hi' }],
+      safeguards: AUTO_MODE_SAFEGUARDS,
+    }, anthropicHeaders({ 'anthropic-beta': 'test-beta-fixture' }));
+
+    expect(status).toBe(200);
+    const events = sseEvents(text);
+    const deltas = events.filter(e => e.event === 'message_delta');
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0].data.delta).toEqual({ stop_reason: 'end_turn', stop_sequence: null, safeguard_results: UNSUPPORTED });
+    expect(deltas[0].data).not.toHaveProperty('safeguard_results');
+    // The full event sequence still ends with message_stop.
+    expect(events.at(-1)!.event).toBe('message_stop');
+  });
+
+  it('answers unsupported on a tool_use turn too, without touching the tool_use id', async () => {
+    mockStream(sse(
+      { id: 'c1', choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'call_up_7', type: 'function', function: { name: 'get_weather', arguments: '{"city":"Lahore"}' } }] }, finish_reason: 'tool_calls' }] },
+      '[DONE]',
+    ));
+    const { status, text } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-5', max_tokens: 64, stream: true,
+      messages: [{ role: 'user', content: 'weather in Lahore?' }],
+      tools: [WEATHER_TOOL],
+      safeguards: AUTO_MODE_SAFEGUARDS,
+    }, anthropicHeaders({ 'anthropic-beta': 'test-beta-fixture' }));
+
+    expect(status).toBe(200);
+    const events = sseEvents(text);
+    const start = events.find(e => e.event === 'content_block_start' && e.data.content_block.type === 'tool_use');
+    expect(start!.data.content_block.id).toBe('call_up_7');
+    const delta = events.find(e => e.event === 'message_delta')!.data.delta;
+    expect(delta.stop_reason).toBe('tool_use');
+    expect(delta.safeguard_results).toEqual(UNSUPPORTED);
+  });
+
+  it('prefers upstream safeguard_results over the unsupported status', async () => {
+    mockJson({ ...textCompletion('Hello.'), safeguard_results: SAFEGUARD_RESULTS });
+    const { status, body } = await request(app, '/v1/messages', {
+      model: 'claude-sonnet-5', max_tokens: 64,
+      messages: [{ role: 'user', content: 'hi' }],
+      safeguards: AUTO_MODE_SAFEGUARDS,
+    }, anthropicHeaders());
+
+    expect(status).toBe(200);
+    expect(body.safeguard_results).toEqual(SAFEGUARD_RESULTS);
   });
 });

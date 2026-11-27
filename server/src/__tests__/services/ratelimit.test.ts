@@ -420,6 +420,11 @@ describe('parseRetryAfterMs', () => {
     expect(parseRetryAfterMs('0')).toBe(0);
   });
 
+  it('parses fractional delta-seconds instead of reading them as a date', () => {
+    expect(parseRetryAfterMs('1.5')).toBe(1_500);
+    expect(parseRetryAfterMs('0.25')).toBe(250);
+  });
+
   it('parses an HTTP-date into a positive future delay', () => {
     const ms = parseRetryAfterMs(new Date(Date.now() + 60_000).toUTCString());
     expect(ms).toBeGreaterThan(50_000);

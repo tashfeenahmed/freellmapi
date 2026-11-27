@@ -60,7 +60,16 @@
     "emailChanged": "ಇಮೇಲ್ ಯಶಸ್ವಿಯಾಗಿ ಬದಲಾಯಿಸಲಾಗಿದೆ.",
     "passwordReset": "ಪಾಸ್‌ವರ್ಡ್ ಮರುಹೊಂದಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಸೈನ್ ಇನ್ ಮಾಡಿ.",
     "resetCodeDockerHint": "Docker ನಲ್ಲಿ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ? ಕೋಡ್ ಕಂಟೈನರ್ ಲಾಗ್‌ನಲ್ಲಿದೆ: docker logs <container>.",
-    "desktopSessionFailed": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಸ್ಥಳೀಯ ಸರ್ವರ್‌ಗೆ ಸೈನ್ ಇನ್ ಆಗಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. FreeLLMAPI ಅನ್ನು ಮುಚ್ಚಿ ಮತ್ತೆ ತೆರೆಯಿರಿ."
+    "desktopSessionFailed": "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಸ್ಥಳೀಯ ಸರ್ವರ್‌ಗೆ ಸೈನ್ ಇನ್ ಆಗಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. FreeLLMAPI ಅನ್ನು ಮುಚ್ಚಿ ಮತ್ತೆ ತೆರೆಯಿರಿ.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "ಉಳಿಸಿ",
@@ -171,7 +180,12 @@
     "updateNow": "ಈಗಲೇ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ",
     "updatingContainer": "ಹೊಸ ಇಮೇಜ್ ಎಳೆಯಲಾಗುತ್ತಿದೆ ಮತ್ತು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ. FreeLLMAPI ಮರಳಿದಾಗ ಈ ಪುಟ ಮರುಲೋಡ್ ಆಗುತ್ತದೆ.",
     "updateNowFailed": "ಅಪ್‌ಡೇಟರ್ ವಿನಂತಿಯನ್ನು ಸ್ವೀಕರಿಸಲಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಚಾಲನೆಯಲ್ಲಿದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ.",
-    "updateNowTimeout": "5 ನಿಮಿಷಗಳ ನಂತರವೂ FreeLLMAPI ಮರುಪ್ರಾರಂಭವಾಗಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಲಾಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ."
+    "updateNowTimeout": "5 ನಿಮಿಷಗಳ ನಂತರವೂ FreeLLMAPI ಮರುಪ್ರಾರಂಭವಾಗಿಲ್ಲ. watchtower ಕಂಟೇನರ್ ಲಾಗ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ಮಾದರಿಗಳು",
@@ -436,6 +450,7 @@
     "familyHaiku": "ಹೈಕು",
     "selectPlatform": "ಒದಗಿಸುವವರನ್ನು ಆಯ್ಕೆಮಾಡಿ",
     "addKey": "ಕೀ ಸೇರಿಸಿ",
+    "addAnotherKey": "ಮತ್ತೊಂದು API ಕೀ ಸೇರಿಸಿ",
     "keyAdded": "ಕೀ ಸೇರಿಸಲಾಗಿದೆ",
     "endpointKeysShareModels": "ಒಂದೇ ಎಂಡ್‌ಪಾಯಿಂಟ್‌ನ ಕೀಗಳು ಅದರ ಮಾದರಿಗಳನ್ನು ಹಂಚಿಕೊಳ್ಳುತ್ತವೆ.",
     "export": "ರಫ್ತು ಮಾಡಿ",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ಐಚ್ಛಿಕ",
     "customFamily": "ಕುಟುಂಬ",
     "customFamilyPlaceholder": "ಮಾದರಿ ಐಡಿಗೆ ಡಿಫಾಲ್ಟ್",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ಕೀ",
     "customCapabilities": "ಸಾಮರ್ಥ್ಯಗಳು",
     "addModel": "ಮಾದರಿಯನ್ನು ಸೇರಿಸಿ",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "ಇನ್ನೂ ಎಂಬೆಡಿಂಗ್ ಮಾಡೆಲ್‌ಗಳಿಲ್ಲ",
     "emptyDesc": "ಎಂಬೆಡಿಂಗ್‌ಗಳನ್ನು ಬೆಂಬಲಿಸುವ ಪ್ರೊವೈಡರ್ ಕೀಯನ್ನು ಒಮ್ಮೆ ನೀವು ಸೇರಿಸಿದಾಗ ಎಂಬೆಡಿಂಗ್ ಕುಟುಂಬಗಳು ಇಲ್ಲಿ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತವೆ.",
-    "dragToReorder": "ಪೂರೈಕೆದಾರರನ್ನು ಮರುಕ್ರಮಗೊಳಿಸಲು ಎಳೆಯಿರಿ"
+    "dragToReorder": "ಪೂರೈಕೆದಾರರನ್ನು ಮರುಕ್ರಮಗೊಳಿಸಲು ಎಳೆಯಿರಿ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ಫ್ಯೂಷನ್",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research ನ ಸ್ವಯಂ-ಸುಧಾರಣಾ ಏಜೆಂಟ್, ಶಾಶ್ವತ ಮೆಮೊರಿ ಮತ್ತು ಕೌಶಲ್ಯಗಳೊಂದಿಗೆ, ಟರ್ಮಿನಲ್‌ನಲ್ಲಿ ಅಥವಾ ಚಾಟ್ ಆ್ಯಪ್‌ಗಳಲ್ಲಿ.",
       "pi": "ನಿಮ್ಮದೇ ಎಕ್ಸ್‌ಟೆನ್ಶನ್‌ಗಳು, ಕೌಶಲ್ಯಗಳು ಮತ್ತು ಪ್ರಾಂಪ್ಟ್ ಟೆಂಪ್ಲೇಟ್‌ಗಳಿಂದ ರೂಪಿಸುವ ಕನಿಷ್ಠ ಟರ್ಮಿನಲ್ ಏಜೆಂಟ್.",
       "reasonix": "DeepSeekಗಾಗಿ ನಿರ್ಮಿಸಿದ ಟರ್ಮಿನಲ್ ಕೋಡಿಂಗ್ ಏಜೆಂಟ್, ದೀರ್ಘ ಸೆಷನ್‌ಗಳೂ ಅಗ್ಗವಾಗಿರಲು ಪ್ರಿಫಿಕ್ಸ್ ಕ್ಯಾಶಿಂಗ್ ಸುತ್ತ ರೂಪಿಸಲಾಗಿದೆ.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "ಸ್ಥಿರ ಸೆಷನ್‌ಗಳು, ಅನುಮತಿಗಳು ಮತ್ತು ಯಾವುದೇ OpenAI-ಹೊಂದಾಣಿಕೆಯ ಪೂರೈಕೆದಾರರೊಂದಿಗೆ ಸ್ಥಳೀಯ ಟರ್ಮಿನಲ್ ಕೋಡಿಂಗ್ ಏಜೆಂಟ್."
     }
   },
   "update": {

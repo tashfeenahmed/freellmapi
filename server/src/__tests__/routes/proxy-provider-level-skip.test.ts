@@ -151,4 +151,45 @@ describe('provider-level failures skip the whole platform (#788)', () => {
     const [first, second] = keysUsed();
     expect(second).not.toBe(first); // the sibling key, not a retry of the dead one
   });
+
+  it('a 503 on custom relay A fails over to custom relay B rather than skipping all custom endpoints (#2023)', async () => {
+    const db = getDb();
+    const { encrypted: encA, iv: ivA, authTag: tagA } = encrypt('custom-key-a');
+    const { encrypted: encB, iv: ivB, authTag: tagB } = encrypt('custom-key-b');
+
+    const keyAId = db.prepare(`
+      INSERT INTO api_keys (platform, label, base_url, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES ('custom', 'relay-a', 'http://127.0.0.1:18091/v1', ?, ?, ?, 'healthy', 1)
+    `).run(encA, ivA, tagA).lastInsertRowid;
+
+    const keyBId = db.prepare(`
+      INSERT INTO api_keys (platform, label, base_url, encrypted_key, iv, auth_tag, status, enabled)
+      VALUES ('custom', 'relay-b', 'http://127.0.0.1:18092/v1', ?, ?, ?, 'healthy', 1)
+    `).run(encB, ivB, tagB).lastInsertRowid;
+
+    const m1Id = db.prepare(`
+      INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, key_id, endpoint_scope, enabled)
+      VALUES ('custom', 'relay-model', 'Relay Model A', 1, 1, ?, 'http://127.0.0.1:18091/v1', 1)
+    `).run(keyAId).lastInsertRowid;
+
+    const m2Id = db.prepare(`
+      INSERT INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, key_id, endpoint_scope, enabled)
+      VALUES ('custom', 'relay-model', 'Relay Model B', 1, 1, ?, 'http://127.0.0.1:18092/v1', 1)
+    `).run(keyBId).lastInsertRowid;
+
+    db.prepare('UPDATE fallback_config SET priority = priority + 10').run();
+    db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, 1, 1)').run(m1Id);
+    db.prepare('INSERT INTO fallback_config (model_db_id, priority, enabled) VALUES (?, 2, 1)').run(m2Id);
+
+    chatCompletion
+      .mockRejectedValueOnce(err503())
+      .mockResolvedValueOnce(GOOD_RESULT);
+
+    const { status } = await post(app, { messages: [{ role: 'user', content: 'hi' }] }, key);
+
+    expect(status).toBe(200);
+    expect(chatCompletion).toHaveBeenCalledTimes(2);
+    expect(platformsUsed()).toEqual(['custom', 'custom']);
+    expect(keysUsed()).toEqual(['custom-key-a', 'custom-key-b']);
+  });
 });

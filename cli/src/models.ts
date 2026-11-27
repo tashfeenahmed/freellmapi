@@ -7,7 +7,7 @@
 // typo the moment its provider hits a rate limit. Only the UNFILTERED roster
 // can tell those apart, so `--model` is validated against that.
 
-import type { CatalogModel } from './types.js';
+import type { CatalogModel, ContextWindowChoice } from './types.js';
 
 export interface ResolvedModel {
   id: string;
@@ -23,6 +23,33 @@ export class UnknownModelError extends Error {}
 
 export function contextWindowOf(model: CatalogModel): number | undefined {
   return model.context_window ?? model.context_length ?? undefined;
+}
+
+/**
+ * The window to size a client to (#2122, #2087). By default the advertised
+ * context_window: for `auto` that is the window most of the pool holds
+ * (#1717), so a session stays where many models can serve it. `max` asks for
+ * the largest window the gateway can still serve this model at — for `auto`
+ * its max_context_window, the biggest tool-capable model with a key — and a
+ * number is taken as given.
+ */
+export function chosenContextWindow(model: CatalogModel, choice?: ContextWindowChoice): number | undefined {
+  if (typeof choice === 'number') return choice;
+  if (choice === 'max') return model.max_context_window ?? contextWindowOf(model);
+  return contextWindowOf(model);
+}
+
+/** Parse `--context-window`: `max`, a token count, or a count with a k/m
+ *  suffix (`200k`, `1m`). */
+export function parseContextWindow(value: string): ContextWindowChoice {
+  const text = value.trim().toLowerCase();
+  if (text === 'max') return 'max';
+  const match = /^(\d+(?:\.\d+)?)([km]?)$/.exec(text);
+  const tokens = match ? Math.round(Number(match[1]) * (match[2] === 'm' ? 1_000_000 : match[2] === 'k' ? 1_000 : 1)) : NaN;
+  if (!Number.isSafeInteger(tokens) || tokens <= 0) {
+    throw new Error(`--context-window must be 'max' or a token count such as 200000 or 200k, got '${value}'`);
+  }
+  return tokens;
 }
 
 /**
@@ -53,13 +80,14 @@ export function resolveLaunchModel(
   requested: string | undefined,
   available: CatalogModel[],
   full: CatalogModel[] = available,
+  window?: ContextWindowChoice,
 ): ResolvedModel {
   const id = requested ?? defaultModelId(available);
   const known = full.find(model => model.id === id) ?? available.find(model => model.id === id);
 
   if (!known) {
     // `auto` is served by the router itself and need not appear in any roster.
-    if (id === 'auto') return { id, unavailable: false };
+    if (id === 'auto') return { id, contextWindow: typeof window === 'number' ? window : undefined, unavailable: false };
     const suggestions = full
       .map(model => model.id)
       .filter(candidate => candidate.includes(id) || id.includes(candidate))
@@ -73,7 +101,7 @@ export function resolveLaunchModel(
 
   return {
     id,
-    contextWindow: contextWindowOf(known),
+    contextWindow: chosenContextWindow(known, window),
     // Absent from the filtered roster but present in the full one = registered
     // but not servable right now (quota, cooldown, a disabled key).
     unavailable: known.available === false || !available.some(model => model.id === id),

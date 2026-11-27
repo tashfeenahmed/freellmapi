@@ -20,6 +20,7 @@ import { benchCloudflareAccount } from '../services/cloudflare-daily-quota.js';
 import type { RouteResult } from '../services/router.js';
 import { recordRateLimitHit, recordModelFailure, recordSuccess, hasOtherUsableKey, routableKeyIdsForModel, formatResetEta, isProviderMomentAttributionEnabled } from '../services/router.js';
 import { safeHeaderValue } from './header-value.js';
+import { logVisionBlocked } from './vision-gate.js';
 import {
   recordRequest,
   recordTokens,
@@ -31,6 +32,7 @@ import {
   getModelForbiddenCooldownMs,
   learnLimitFromError,
   learnContextWindowFromError,
+  pacificMidnight,
   type CooldownDecision,
   type CooldownSource,
 } from '../services/ratelimit.js';
@@ -54,6 +56,7 @@ import {
   isTimeoutErrorText,
   isStreamTruncatedError,
   isMethodNotAllowedError,
+  isHostConnectionError,
 } from './error-classify.js';
 import { sanitizeProviderErrorMessage, summarizeAttemptError } from './error-redaction.js';
 import { benchForTools, clearToolRejections, noteToolRejection, toolCapabilityKey } from './tool-capability.js';
@@ -65,6 +68,7 @@ import { newBreaker, recordBreakerFailure } from './guardrails.js';
 import { getRequestTrace, newRequestTrace, runWithRequestTrace, type AttemptOutcome, type AttemptTraceRecord, type RequestTrace } from './attempt-trace.js';
 import { logRequest, persistRequestAttempts } from './request-log.js';
 import { withKeyProxy } from './proxy.js';
+import { runWithUpstreamWatch, type UpstreamStreamWatch } from './upstream-watch.js';
 import { getEndpointTimeBudgetMs } from './ttfb-budget.js';
 import { learnOutputCapFromError, learnedOutputCap } from './output-cap.js';
 
@@ -156,7 +160,7 @@ function benchKeyAcrossPlatform(
     state.skipKeys.add(`${route.platform}:${modelId}:${route.keyId}`);
     benched++;
   }
-  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${Math.round(durationMs / 60_000)}min`);
+  console.warn(`[FallbackLoop] ${route.platform} key ${route.keyId} ${reason}; benched it on ${benched + 1} model(s) for ${durationMs < 120_000 ? `${Math.round(durationMs / 1000)}s` : `${Math.round(durationMs / 60_000)}min`}`);
 }
 
 // ── Wall-clock retry budget ──────────────────────────────────────────────────
@@ -205,6 +209,52 @@ export function getFallbackTimeBudgetMs(): number {
     if (Number.isFinite(n) && n >= 0) return n;
   }
   return DEFAULT_FALLBACK_TIME_BUDGET_MS;
+}
+
+// #1960: per-attempt silent window. A streaming upstream that answers with
+// SSE headers and then sends NOTHING was bounded only by the provider's
+// first-byte watchdog (max(chat timeout, 90s stall), #584), so one dead route
+// could eat the whole retry budget. A streaming attempt whose open upstream
+// stream sends no bytes at all within this window is aborted and treated as a
+// retryable stall (benched lightly, like any timeout); the loop then moves to
+// the next route while budget remains.
+//
+// Slow is not stalled, so the cap is deliberately narrow (lib/upstream-watch.ts):
+//  - it arms only when a real upstream SSE body opens, never for adapters that
+//    fake a stream from a blocking call, and never on non-streaming requests;
+//  - ANY body byte cancels it for the rest of the attempt: SSE keep-alive
+//    comments, role-only chunks and reasoning deltas all count, and it never
+//    applies between tokens;
+//  - a platform that declared a first-byte patience above the standard 60s
+//    chat timeout (NVIDIA NIM 180s prefill, CheapLLM, Radeon, custom relays,
+//    Cloudflare GLM, PROVIDER_TIMEOUT_<PLATFORM> raised) keeps its own
+//    watchdog and is never capped.
+// The 60s default equals that standard chat timeout, which #584 already treats
+// as "how slow may the first token be". Reasoning models mostly stream their
+// thinking (DeepSeek R1 hosts take 60-120s to the first ANSWER token but send
+// reasoning deltas within seconds, and those count); ones that think silently
+// (Gemini Pro without thought summaries) usually answer inside 60s. Same
+// precedence as the budget: setting → env → default; 0 disables.
+export const DEFAULT_ATTEMPT_SILENT_MS = 60_000;
+// Declared first-byte patience above this marks a platform as deliberately
+// slow; such attempts are exempt from the cap (see above).
+export const STANDARD_FIRST_BYTE_PATIENCE_MS = 60_000;
+export const ATTEMPT_SILENT_SETTING = 'fallback_attempt_silent_ms';
+
+export function getAttemptSilentMs(): number {
+  let stored: string | undefined;
+  try {
+    stored = getSetting(ATTEMPT_SILENT_SETTING);
+  } catch {
+    stored = undefined; // DB not ready — never throw on the proxy hot path
+  }
+  const candidates = [stored, process.env.FALLBACK_ATTEMPT_SILENT_MS];
+  for (const raw of candidates) {
+    if (raw === undefined || raw.trim() === '') continue;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return DEFAULT_ATTEMPT_SILENT_MS;
 }
 
 // Mutable per-request skip state threaded through the loop and mutated by
@@ -275,23 +325,10 @@ export function msUntilNextUtcMidnight(now = Date.now()): number {
   return Math.max(next - now, 60_000);
 }
 
-const pacificDate = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/Los_Angeles', year: 'numeric', month: 'numeric', day: 'numeric',
-});
-const pacificHour = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/Los_Angeles', hour: 'numeric', hourCycle: 'h23',
-});
-
 /** Gemini daily quotas reset at midnight Pacific, including DST transitions.
  * https://ai.google.dev/gemini-api/docs/rate-limits */
 export function msUntilNextPacificMidnight(now = Date.now()): number {
-  const parts = pacificDate.formatToParts(now);
-  const part = (name: string) => Number(parts.find(p => p.type === name)!.value);
-  // 08:00 UTC on the next Pacific date is either midnight (PST) or 01:00
-  // (PDT). Read the offset on that date, not now: DST days have 23/25 hours.
-  const candidate = Date.UTC(part('year'), part('month') - 1, part('day') + 1, 8);
-  const midnight = candidate - Number(pacificHour.format(candidate)) * 3_600_000;
-  return Math.max(midnight - now, 60_000);
+  return Math.max(pacificMidnight(now, 1) - now, 60_000);
 }
 
 /**
@@ -531,7 +568,12 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // failover hop per key. Key-scoped failures (auth/quota) stay on the
   // single-key path, and the per-key cooldown below is still the only thing
   // that outlives the request.
-  if (isProviderLevelError(err)) {
+  //
+  // Custom relays are exempt (#2023): every relay shares the one platform id
+  // 'custom' (#651), so one relay's 5xx/timeout must not rule out different
+  // endpoints for the rest of the request. Their failure isolation stays
+  // key-scoped (state.skipKeys and benchKey).
+  if (isProviderLevelError(err) && route.platform !== 'custom') {
     state.skipPlatforms.add(route.platform);
   }
   // 405 Method Not Allowed: the relay's gate refused the POST (login page, WAF,
@@ -655,7 +697,9 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
   // be a different account, but with the budget already spent on this one
   // the next PROVIDER is the better hop.
   if (isAccountSuspendedError(err)) {
-    state.skipPlatforms.add(route.platform);
+    if (route.platform !== 'custom') {
+      state.skipPlatforms.add(route.platform);
+    }
     benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state, 'reports the account suspended');
   } else if (isPaymentRequiredError(err)) {
     // A 402 is the ACCOUNT's balance, not one model's (#1239: one broke
@@ -666,6 +710,21 @@ export function recordRetryableFailure(route: RouteResult, err: any, state: Fall
     // different wallet and may well have credits, so only THIS key is out.
     benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state,
       isApinexCheckinRequired(route.platform, err) ? 'requires daily website check-in' : 'is out of credits (402)');
+  } else if (isHostConnectionError(err) && route.platform !== 'custom') {
+    // #2080: a reset / refused / unresolvable connection is the provider's
+    // HOST, and every model of the platform sits behind that host. The platform
+    // is already ruled out for THIS request above (isProviderLevelError), but
+    // the per-route cooldown benches only the model that was tried, so the
+    // next request picked the platform's next model and hit the same dead
+    // connection again: one wasted hop per model per request, which reads as
+    // "it keeps switching models inside the provider instead of switching
+    // provider". Bench this key on the platform's other models for the same
+    // short transient window. setCooldown never shortens a longer hold, and
+    // the cooldown probe lifts the bench early once the host answers again.
+    // Custom relays are exempt like the platform skip above (#2023): every
+    // relay shares the platform id 'custom', so this would bench other hosts.
+    benchKeyAcrossPlatform(route, decision.durationMs, decision.source, state,
+      `could not connect (${summarizeAttemptError(err?.message) || 'network error'})`);
   }
   // #1347 (PR 1): a provider-moment failure (429 / 5xx / timeout / transport)
   // is the provider's bad minute, not model evidence. When attribution is
@@ -1244,18 +1303,52 @@ function formatClassBreakdown(attempts: readonly AttemptRecord[]): string {
 //     expiry as retryAtMs.
 //   - anything else (capability filters like vision/tools, mixed reasons) →
 //     the router's status (429) with a generic routing_exhausted code.
-type RoutingDiagClass = 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'other';
+type RoutingDiagClass = 'config' | 'too_large' | 'time_bound' | 'monthly_budget' | 'no_vision' | 'other';
 
 function classifyRoutingDiagLine(line: string): RoutingDiagClass {
   const l = line.toLowerCase();
+  // First: a model id may itself contain 'rpm'/'tpm'-like substrings.
+  if (l.endsWith(': no vision support')) return 'no_vision';
   // "< estimated" first: the tpm_limit-too-small line also contains 'tpm',
   // which would otherwise misread as a transient window.
   if (l.includes('< estimated')) return 'too_large';
   const monthlyReasons = l.match(/key\(s\) — (.*)$/)?.[1];
   if (monthlyReasons?.split(', ').every(reason => /^monthly-budget-cap:\d+$/.test(reason))) return 'monthly_budget';
+  // A model with one key that cannot serve it (scope, other endpoint) and one
+  // that is only cooling down still has capacity that recovers by itself:
+  // time-bound, not config. Without this, "custom-key-mismatch:1, cooldown:1"
+  // read as config, and an image request whose only vision model was
+  // rate-limited came back as no_vision_model (#2061).
+  if (monthlyReasons?.split(', ').some(reason => TIME_BOUND_REASON.test(reason) && !reason.startsWith('monthly-budget-cap'))) return 'time_bound';
   if (/no provider registered|no enabled\+healthy key|no usable key|decrypt-error|no-resolved-provider|custom-key-mismatch/.test(l)) return 'config';
-  if (/cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency|monthly-budget-cap/.test(l)) return 'time_bound';
+  if (TIME_BOUND_REASON.test(l)) return 'time_bound';
   return 'other';
+}
+const TIME_BOUND_REASON = /cooldown|rpm|rpd|tpm|tpd|provider-daily-cap|provider-minute-cap|provider-daily-token-cap|key-concurrency|monthly-budget-cap/;
+
+/**
+ * Suffix for an exhaustion that ended because routing ran dry AFTER at least
+ * one attempt (#2080). Without it, "All 1 routed attempt(s) failed" reads as a
+ * failover that never moved to another provider, when in fact no other route
+ * was left: the failed provider was ruled out for the request, and every
+ * remaining candidate was unconfigured, on cooldown or unable to serve it. The
+ * router's own summary says which; a strict pin says why only one model's
+ * providers were eligible.
+ */
+export function failoverDeadEndNote(routeErr: any, strictPinnedModel?: string): string {
+  const raw = typeof routeErr?.message === 'string' ? routeErr.message.trim() : '';
+  // Drop the router's generic advice: the trail before this note already
+  // says what failed, and "add more API keys" is not the point here.
+  const summary = raw
+    .replace(/^All models exhausted[:.]?\s*/i, '')
+    .replace(/\s*Add more API keys or wait for rate limits to reset\.\s*/i, ' ')
+    .trim();
+  const reason = summary ? `: ${/[.!?]$/.test(summary) ? summary : `${summary}.`}` : '.';
+  const pin = strictPinnedModel
+    ? ` The request pinned model '${sanitizeProviderErrorMessage(strictPinnedModel)}', so failover only uses providers ` +
+      `that serve that model; send model "auto" to let a different model take over.`
+    : '';
+  return ` Failover stopped because no other route could take the request${reason}${pin}`;
 }
 
 export function routingExhaustionBody(routeErr: any): ExhaustionBody {
@@ -1284,6 +1377,27 @@ export function routingExhaustionBody(routeErr: any): ExhaustionBody {
       message: diag.length === 0
         ? `No models are enabled/configured to serve this request. Add provider API keys and enable models in the dashboard. ${message}`
         : `No candidate model has a configured, usable provider key. Add provider API keys in the dashboard. ${message}`,
+    };
+  }
+
+  // An image request (in the latest turn or in re-sent history) whose chain
+  // holds no vision model that could be routed to: every candidate was either
+  // text-only or had no usable key. Nothing will recover by waiting, so this is
+  // the 422 the up-front gate gives, not a 429 (#2061). Reached when the gate
+  // passed on catalog-wide capacity but THIS request's chain (a profile, a
+  // model group, a tier alias) has no servable vision model, and on surfaces
+  // without a gate of their own.
+  if (classes.includes('no_vision') && classes.every(c => c === 'no_vision' || c === 'config')) {
+    const skipped = classes.filter(c => c === 'no_vision').length;
+    return {
+      kind: 'bad_request',
+      status: 422,
+      type: 'invalid_request_error',
+      code: 'no_vision_model',
+      message: 'This request includes an image (in the latest message or in earlier conversation history), '
+        + `but no vision-capable model in its routing chain can serve it (${skipped} text-only model${skipped === 1 ? '' : 's'} skipped). `
+        + 'Enable a vision model with a usable API key in the Fallback Chain (or in the profile or model group the request routes to), '
+        + 'or remove the image from the conversation.',
     };
   }
 
@@ -1394,6 +1508,10 @@ export interface FallbackHooks {
   // logRoutingExhaustion). Absent = the line still fires, without identifying
   // the surface or the request.
   logIdentity?: { surface: string; requestId?: string; requestedModel?: string };
+  // The model id the client pinned, set ONLY when that pin routes strictly
+  // over the model's own providers (a unified model group) and never reaches
+  // a different model. Used to explain a failover that ran out of routes.
+  strictPinnedModel?: string;
   // Returns true once the client has hung up. Checked before STARTING each
   // retry: a chain nobody is waiting for must not keep burning provider
   // quota. Surfaces additionally thread a client-disconnect AbortSignal into
@@ -1409,7 +1527,21 @@ export interface FallbackHooks {
   // newHedgeAbortError(); the loop renders timedOut exhaustion, and benches the
   // model+key only when that attempt ate the whole budget by itself (see the
   // isHedgeAbortError branch below). Absent = pre-v2 behavior.
+  //
+  // The surface MUST abort only the CURRENT attempt's signal and hand the next
+  // attempt a fresh one (replace its controller after aborting), because a
+  // silent-window abort (see `streaming` below) fails over to another attempt.
   abortInFlight?: () => void;
+  // True for a streaming request. Enables the per-attempt silent-window cap
+  // (getAttemptSilentMs, #1960): dispatch runs under an upstream stream watch
+  // (lib/upstream-watch.ts), and an attempt whose opened upstream stream sends
+  // no bytes within the window is aborted and counted as an ordinary retryable
+  // stall, so the loop fails over while budget remains. Non-streaming requests
+  // never get the cap.
+  streaming?: boolean;
+  // Per-attempt silent-window override, mostly for tests. Defaults to
+  // getAttemptSilentMs() (setting → env → 60s; 0 disables).
+  attemptSilentMs?: number;
   // Skip state; recordRetryableFailure / recordAuthFailure (called by the loop)
   // mutate it, and the surface's route() reads it to exclude failed keys/models.
   state: FallbackState;
@@ -1492,6 +1624,10 @@ export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
 async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace): Promise<void> {
   const maxRetries = hooks.maxRetries ?? FALLBACK_MAX_RETRIES;
   const baseBudgetMs = hooks.timeBudgetMs ?? getFallbackTimeBudgetMs();
+  // #1960 silent-window cap: streaming surfaces that can abort an attempt.
+  const attemptSilentMs = hooks.streaming && hooks.abortInFlight
+    ? Math.max(0, hooks.attemptSilentMs ?? getAttemptSilentMs())
+    : 0;
   const startedAt = Date.now();
   const attempts: AttemptRecord[] = hooks.attemptLog ?? [];
   const keyOrdinals = new Map<string, number>();
@@ -1551,18 +1687,40 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
         );
         return;
       }
-      const exhaustion = lastError
+      let exhaustion = lastError
         ? exhaustedRetryError(lastError, undefined, { attempts })
         : routingExhaustionBody(routeErr);
+      // The trail alone reads as "failover never moved to another provider"
+      // (#2080). Say why it stopped: no other route was left to try.
+      if (lastError) {
+        const base = exhaustion.message.trimEnd();
+        const sep = /[.!?]$/.test(base) ? '' : '.';
+        exhaustion = { ...exhaustion, message: base + sep + failoverDeadEndNote(routeErr, hooks.strictPinnedModel) };
+      }
       // Zero attempts ran: log the router's per-candidate disposition, the only
       // record of why the pool was empty. With prior attempts the trail in the
       // exhaustion body already explains the failure.
       if (!lastError) logRoutingExhaustion(routeErr, hooks.logIdentity);
+      if (exhaustion.code === 'no_vision_model') {
+        logVisionBlocked({
+          surface: hooks.logIdentity?.surface ?? 'unidentified surface',
+          stage: 'routing',
+          requestId: hooks.logIdentity?.requestId,
+          candidates: Array.isArray((routeErr as { diagnostics?: unknown })?.diagnostics)
+            ? (routeErr as { diagnostics: unknown[] }).diagnostics.length
+            : undefined,
+        });
+      }
       hooks.onRoutingExhausted(lastError, routeErr, exhaustion, { attempts, timedOut: false });
       return;
     }
 
     let hedgeTimer: NodeJS.Timeout | undefined;
+    let silentTimer: NodeJS.Timeout | undefined;
+    let silentCapFired = false;
+    // Once settled (activity, commit, budget abort) the cap never re-arms for
+    // this attempt; it arms at most once, on the first opened upstream stream.
+    let silentSettled = false;
     try {
     // Select the endpoint before checking the budget: a slow endpoint may
     // still have time even after the base budget has expired. Recompute from
@@ -1619,21 +1777,67 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     // because past that point cancelling would truncate a healthy response and
     // buy nothing: a committed stream can no longer fail over anyway. Slow is
     // not the same as stalled, and only stalled is worth killing.
+    const settleSilentCap = () => {
+      silentSettled = true;
+      if (silentTimer) {
+        clearTimeout(silentTimer);
+        silentTimer = undefined;
+      }
+    };
     const disarmHedge = () => {
       if (hedgeTimer) {
         clearTimeout(hedgeTimer);
         hedgeTimer = undefined;
       }
+      settleSilentCap();
     };
     if (attempt > 1 && budgetMs > 0 && hooks.abortInFlight) {
       const remaining = budgetMs - (Date.now() - startedAt);
       if (remaining > 0) {
         hedgeTimer = setTimeout(() => {
+          hedgeTimer = undefined;
+          settleSilentCap(); // one abort per attempt
           console.log(`[FallbackLoop] retry time budget (${budgetMs}ms) expired with no first byte on ${route.platform}/${route.modelId} — aborting stalled upstream`);
           hooks.abortInFlight?.();
         }, remaining);
       }
     }
+    // #1960: a streaming attempt also gets the per-attempt silent-window cap
+    // (EVERY attempt, including the #751-exempt first two: a stall there burns
+    // the budget just the same). It arms when the provider reports an opened
+    // upstream stream and is cancelled by the first body byte of any kind, by
+    // commit (disarmHedge) or by the budget hedge. `silentCapFired` tells the
+    // catch below that this attempt stalled on its own, so it fails over
+    // instead of rendering exhaustion. When the budget timer would fire first,
+    // it wins (cap skipped) and behaves as before.
+    const upstreamWatch: UpstreamStreamWatch | undefined = attemptSilentMs > 0 ? {
+      opened: (patienceMs: number) => {
+        if (silentSettled || silentTimer) return;
+        // A platform that declared a longer first-byte patience (or none at
+        // all: 0 = unbounded) keeps its own watchdog.
+        if (patienceMs <= 0 || patienceMs > STANDARD_FIRST_BYTE_PATIENCE_MS) {
+          silentSettled = true;
+          return;
+        }
+        const remaining = hedgeTimer ? budgetMs - (Date.now() - startedAt) : Infinity;
+        if (attemptSilentMs >= remaining) {
+          silentSettled = true;
+          return;
+        }
+        silentTimer = setTimeout(() => {
+          silentTimer = undefined;
+          silentSettled = true;
+          if (hedgeTimer) {
+            clearTimeout(hedgeTimer);
+            hedgeTimer = undefined;
+          }
+          silentCapFired = true;
+          console.log(`[FallbackLoop] no upstream bytes from ${route.platform}/${route.modelId} within the ${attemptSilentMs}ms attempt silent window — aborting stalled upstream and failing over`);
+          hooks.abortInFlight?.();
+        }, attemptSilentMs);
+      },
+      activity: settleSilentCap,
+    } : undefined;
     let outcome: DispatchOutcome;
     try {
       // #590 (per-key proxy): if THIS key carries its own proxy URL, route the
@@ -1641,7 +1845,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       // otherwise the global proxy / direct path applies as before. The URL
       // arrives already decrypted on the route (services/router.ts), so an
       // attempt costs nothing extra — no query, no decrypt.
-      outcome = await withKeyProxy(route.proxyUrl, () => hooks.dispatch(route, attempt, { disarmHedge }));
+      outcome = await withKeyProxy(route.proxyUrl, () => runWithUpstreamWatch(upstreamWatch, () => hooks.dispatch(route, attempt, { disarmHedge })));
     } catch (err: any) {
       // Client-caused abort: the composed fetch signal fired because OUR
       // client hung up mid-attempt (see newClientAbortError). Not a
@@ -1681,6 +1885,25 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
       // rate-limit signal, so cooldownDecisionForError keeps it light) plus the
       // gradual model-level sink, both of which decay on their own if the route
       // recovers.
+      // #1960: the per-attempt silent-window cap fired (not the budget). This
+      // route stalled on its own — it is an ordinary retryable failure: log
+      // it, bench it lightly (a timeout, not a rate-limit signal), and move on
+      // to the next route. The loop-top budget check still decides whether a
+      // further attempt may start, so an exhausted budget renders the same
+      // timedOut exhaustion as before.
+      if (isHedgeAbortError(err) && silentCapFired) {
+        const stallErr = Object.assign(
+          new Error(`upstream stalled: no bytes from ${route.platform}/${route.modelId} within ${attemptSilentMs}ms of the stream opening (attempt silent-window timeout)`),
+          { status: 504 },
+        );
+        hooks.logFailure(route, stallErr, attempt);
+        recordRetryableFailure(route, stallErr, hooks.state);
+        attempts.push({ platform: route.platform, modelId: route.modelId, keyOrdinal: keyOrdinal(route), errorClass: 'timeout' });
+        traceAttempt('timeout', stallErr);
+        lastError = stallErr;
+        if (stopIfBreakerTripped()) return;
+        continue;
+      }
       if (isHedgeAbortError(err)) {
         const elapsedMs = Date.now() - startedAt;
         const attemptElapsedMs = Date.now() - attemptStartedAt;
@@ -1774,6 +1997,7 @@ async function runFallbackLoopAttempts(hooks: FallbackHooks, trace: RequestTrace
     return;
     } finally {
       if (hedgeTimer) clearTimeout(hedgeTimer);
+      if (silentTimer) clearTimeout(silentTimer);
       route.release?.();
     }
   }

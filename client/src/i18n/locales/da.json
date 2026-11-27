@@ -60,7 +60,16 @@
     "emailChanged": "E-mailen er skiftet.",
     "passwordReset": "Adgangskoden er nulstillet. Log ind.",
     "resetCodeDockerHint": "Kører du i Docker? Koden står i containerloggen: docker logs <container>.",
-    "desktopSessionFailed": "Dashboardet kunne ikke logge ind på den lokale server. Afslut FreeLLMAPI, og åbn det igen."
+    "desktopSessionFailed": "Dashboardet kunne ikke logge ind på den lokale server. Afslut FreeLLMAPI, og åbn det igen.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Gem",
@@ -171,7 +180,12 @@
     "updateNow": "Opdater nu",
     "updatingContainer": "Henter det nye image og genstarter. Siden genindlæses, når FreeLLMAPI er tilbage.",
     "updateNowFailed": "Opdateringstjenesten afviste anmodningen. Tjek at watchtower-containeren kører.",
-    "updateNowTimeout": "FreeLLMAPI er ikke genstartet efter 5 minutter. Tjek logfilerne for watchtower-containeren."
+    "updateNowTimeout": "FreeLLMAPI er ikke genstartet efter 5 minutter. Tjek logfilerne for watchtower-containeren.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeller",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Vælg en udbyder",
     "addKey": "Tilføj nøgle",
+    "addAnotherKey": "Tilføj en anden API-nøgle",
     "keyAdded": "Nøgle tilføjet",
     "endpointKeysShareModels": "Nøgler til det samme endpoint deler dets modeller.",
     "export": "Eksport",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "valgfrit",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "standard til model-id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API nøgle",
     "customCapabilities": "Kapaciteter",
     "addModel": "Tilføj model",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Ingen embedding-modeller endnu",
     "emptyDesc": "Embedding-familier vises her, når du tilføjer en provider-nøgle, der understøtter embeddings.",
-    "dragToReorder": "Træk for at ombestille udbyder"
+    "dragToReorder": "Træk for at ombestille udbyder",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Researchs selvforbedrende agent med vedvarende hukommelse og færdigheder, i terminalen eller i chat-apps.",
       "pi": "En minimal terminalagent, du former med dine egne udvidelser, færdigheder og prompt-skabeloner.",
       "reasonix": "En terminalbaseret kodeagent bygget til DeepSeek omkring prefix-caching, så lange sessioner forbliver billige.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "En lokal terminalbaseret kodeagent med vedvarende sessioner, tilladelser og enhver OpenAI-kompatibel udbyder."
     }
   },
   "update": {

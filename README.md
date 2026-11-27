@@ -15,7 +15,7 @@ Aggregate free tiers from dozens of providers, plus custom OpenAI-compatible cha
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · browse the full catalog: 736 model families, 1,313 free endpoints
 
-**English** · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md)
+**English** · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="Download for macOS"></a>
@@ -272,12 +272,13 @@ client = OpenAI(
     api_key="freellmapi-your-unified-key",
 )
 
-resp = client.chat.completions.create(
+response = client.chat.completions.with_raw_response.create(
     model="auto",  # let the router pick; or "auto:fast", "auto:smart", a profile, or a model id
     messages=[{"role": "user", "content": "Summarise the fall of Rome in one sentence."}],
 )
-print(resp.choices[0].message.content)
-print("Routed via:", resp.headers.get("x-routed-via"))
+completion = response.parse()
+print(completion.choices[0].message.content)
+print("Routed via:", response.headers.get("x-routed-via"))
 ```
 
 Streaming, the `auto:*` routing strategies, tool calling, vision input, Gemini Google Search grounding, embeddings, and the Anthropic Messages surface — with curl and Python examples for each — are all in **[docs/en/api/01-rest-api.md](docs/en/api/01-rest-api.md)**. Every response carries an `X-Routed-Via: <platform>/<model>` header so you can see which provider actually served it.
@@ -520,6 +521,22 @@ Contributors very welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev lo
 <a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
 <a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
 <a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
+<a href="https://github.com/tevasas"><img src="https://images.weserv.nl/?url=github.com/tevasas.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@tevasas" /></a>
+<a href="https://github.com/FabioLeitao"><img src="https://images.weserv.nl/?url=github.com/FabioLeitao.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@FabioLeitao" /></a>
+<a href="https://github.com/dirtious15"><img src="https://images.weserv.nl/?url=github.com/dirtious15.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@dirtious15" /></a>
+<a href="https://github.com/eltociear"><img src="https://images.weserv.nl/?url=github.com/eltociear.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@eltociear" /></a>
+<a href="https://github.com/Aniketchavan7"><img src="https://images.weserv.nl/?url=github.com/Aniketchavan7.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Aniketchavan7" /></a>
+<a href="https://github.com/flipcyde101"><img src="https://images.weserv.nl/?url=github.com/flipcyde101.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@flipcyde101" /></a>
+<a href="https://github.com/FNICKE"><img src="https://images.weserv.nl/?url=github.com/FNICKE.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@FNICKE" /></a>
+<a href="https://github.com/georgehadji"><img src="https://images.weserv.nl/?url=github.com/georgehadji.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@georgehadji" /></a>
+<a href="https://github.com/MuhammadAhmadRaza087"><img src="https://images.weserv.nl/?url=github.com/MuhammadAhmadRaza087.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@MuhammadAhmadRaza087" /></a>
+<a href="https://github.com/prascli"><img src="https://images.weserv.nl/?url=github.com/prascli.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@prascli" /></a>
+<a href="https://github.com/SASU004"><img src="https://images.weserv.nl/?url=github.com/SASU004.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@SASU004" /></a>
+<a href="https://github.com/SHMOUKE"><img src="https://images.weserv.nl/?url=github.com/SHMOUKE.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@SHMOUKE" /></a>
+<a href="https://github.com/Tushar49"><img src="https://images.weserv.nl/?url=github.com/Tushar49.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tushar49" /></a>
+<a href="https://github.com/Volko61"><img src="https://images.weserv.nl/?url=github.com/Volko61.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Volko61" /></a>
+<a href="https://github.com/eltociear"><img src="https://images.weserv.nl/?url=github.com/eltociear.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@eltociear" /></a>
+<a href="https://github.com/mamehi"><img src="https://images.weserv.nl/?url=github.com/mamehi.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mamehi" /></a>
 
 ## Disclaimer
 

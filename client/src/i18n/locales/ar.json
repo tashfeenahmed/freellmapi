@@ -60,7 +60,16 @@
     "emailChanged": "تم تغيير البريد الإلكتروني بنجاح.",
     "passwordReset": "تمت إعادة تعيين كلمة المرور. يرجى تسجيل الدخول.",
     "resetCodeDockerHint": "هل تعمل داخل Docker؟ الرمز موجود في سجل الحاوية: docker logs <container>.",
-    "desktopSessionFailed": "تعذّر على لوحة التحكم تسجيل الدخول إلى الخادم المحلي. أغلق FreeLLMAPI ثم افتحه من جديد."
+    "desktopSessionFailed": "تعذّر على لوحة التحكم تسجيل الدخول إلى الخادم المحلي. أغلق FreeLLMAPI ثم افتحه من جديد.",
+    "signInWithSso": "تسجيل الدخول باستخدام {provider}",
+    "orContinueWithPassword": "أو المتابعة بالبريد الإلكتروني",
+    "reverifyWithSso": "إعادة التحقق باستخدام {provider}",
+    "oidcReauthHint": "أكّد هويتك عبر {provider} للوصول إلى المفاتيح النصية.",
+    "oidcReauthSuccess": "تم التحقق من الهوية لمدة 5 دقائق قادمة.",
+    "oidcErrorNotAllowed": "حسابك غير مصرح له بتسجيل الدخول إلى لوحة التحكم هذه.",
+    "oidcErrorUnverifiedEmail": "يجب أن يتحقق موفر الهوية من بريدك الإلكتروني قبل تسجيل الدخول.",
+    "oidcErrorNoAccount": "لا يوجد حساب مطابق والإنشاء التلقائي للحسابات معطّل.",
+    "oidcErrorFailed": "فشل تسجيل الدخول الموحد. يرجى المحاولة مرة أخرى."
   },
   "common": {
     "save": "حفظ",
@@ -171,7 +180,12 @@
     "updateNow": "حدّث الآن",
     "updatingContainer": "جارٍ سحب الصورة الجديدة وإعادة التشغيل. ستُعاد تحميل هذه الصفحة عند عودة FreeLLMAPI.",
     "updateNowFailed": "لم يقبل المحدِّث الطلب. تحقّق من أن حاوية watchtower تعمل.",
-    "updateNowTimeout": "لم يُعد FreeLLMAPI التشغيل بعد 5 دقائق. راجع سجلات حاوية watchtower."
+    "updateNowTimeout": "لم يُعد FreeLLMAPI التشغيل بعد 5 دقائق. راجع سجلات حاوية watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "نماذج",
@@ -436,6 +450,7 @@
     "familyHaiku": "هايكو",
     "selectPlatform": "حدد مزودًا",
     "addKey": "إضافة مفتاح",
+    "addAnotherKey": "إضافة مفتاح API آخر",
     "keyAdded": "تمت إضافة المفتاح",
     "endpointKeysShareModels": "المفاتيح لنقطة النهاية نفسها تتشارك نماذجها.",
     "export": "تصدير",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "اختياري",
     "customFamily": "العائلة",
     "customFamilyPlaceholder": "الإعدادات الافتراضية لمعرف النموذج",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "مفتاح API",
     "customCapabilities": "القدرات",
     "addModel": "إضافة نموذج",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} توك ماكس",
     "emptyTitle": "لا توجد نماذج التضمين حتى الآن",
     "emptyDesc": "تظهر عائلات التضمين هنا بمجرد إضافة مفتاح موفر يدعم عمليات التضمين.",
-    "dragToReorder": "اسحب لإعادة ترتيب الموفر"
+    "dragToReorder": "اسحب لإعادة ترتيب الموفر",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "الانصهار",
@@ -1233,7 +1252,8 @@
       "hermes": "وكيل Nous Research ذاتي التحسين، بذاكرة دائمة ومهارات، في الطرفية أو على تطبيقات الدردشة.",
       "pi": "إطار وكيل بسيط في الطرفية تُشكّله بإضافاتك ومهاراتك وقوالب أوامرك الخاصة.",
       "reasonix": "وكيل برمجة للطرفية مصمّم أصلًا لـ DeepSeek، مبني حول التخزين المؤقت للبادئات لتبقى الجلسات الطويلة رخيصة.",
-      "zcode": "وكيل البرمجة من Z.ai لنماذج GLM الخاصة به، ويتصل بأي نقطة نهاية متوافقة مع OpenAI عبر سجل المزودات."
+      "zcode": "وكيل البرمجة من Z.ai لنماذج GLM الخاصة به، ويتصل بأي نقطة نهاية متوافقة مع OpenAI عبر سجل المزودات.",
+      "zero": "وكيل برمجة محلي للطرفية يدعم الجلسات الدائمة والأذونات وأي مزود متوافق مع OpenAI."
     }
   },
   "update": {

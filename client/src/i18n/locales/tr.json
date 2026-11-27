@@ -60,7 +60,16 @@
     "emailChanged": "E-posta değiştirildi.",
     "passwordReset": "Şifre sıfırlandı. Lütfen giriş yapın.",
     "resetCodeDockerHint": "Docker içinde mi çalışıyor? Kod konteyner günlüğündedir: docker logs <container>.",
-    "desktopSessionFailed": "Kontrol paneli yerel sunucuya giriş yapamadı. FreeLLMAPI uygulamasını kapatıp yeniden açın."
+    "desktopSessionFailed": "Kontrol paneli yerel sunucuya giriş yapamadı. FreeLLMAPI uygulamasını kapatıp yeniden açın.",
+    "signInWithSso": "{provider} ile oturum aç",
+    "orContinueWithPassword": "veya e-posta ile devam et",
+    "reverifyWithSso": "{provider} ile yeniden doğrula",
+    "oidcReauthHint": "Düz metin anahtarlara erişmek için kimliğini {provider} ile doğrula.",
+    "oidcReauthSuccess": "Kimlik önümüzdeki 5 dakika için doğrulandı.",
+    "oidcErrorNotAllowed": "Hesabının bu panoda oturum açma izni yok.",
+    "oidcErrorUnverifiedEmail": "Oturum açmadan önce kimlik sağlayıcın e-posta adresini doğrulamalıdır.",
+    "oidcErrorNoAccount": "Eşleşen bir hesap yok ve otomatik hesap oluşturma kapalı.",
+    "oidcErrorFailed": "Tek oturum açma başarısız oldu. Lütfen tekrar dene."
   },
   "common": {
     "save": "Kaydet",
@@ -171,7 +180,12 @@
     "updateNow": "Şimdi güncelle",
     "updatingContainer": "Yeni imaj çekiliyor ve yeniden başlatılıyor. FreeLLMAPI geri geldiğinde bu sayfa yenilenecek.",
     "updateNowFailed": "Güncelleyici isteği kabul etmedi. watchtower konteynerinin çalıştığından emin olun.",
-    "updateNowTimeout": "FreeLLMAPI 5 dakika sonra hâlâ yeniden başlamadı. watchtower konteynerinin günlüklerine bakın."
+    "updateNowTimeout": "FreeLLMAPI 5 dakika sonra hâlâ yeniden başlamadı. watchtower konteynerinin günlüklerine bakın.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeller",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Bir sağlayıcı seçin",
     "addKey": "Anahtar ekle",
+    "addAnotherKey": "Başka bir API anahtarı ekle",
     "keyAdded": "Anahtar eklendi",
     "endpointKeysShareModels": "Aynı uç noktanın anahtarları onun modellerini paylaşır.",
     "export": "Dışa aktar",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "isteğe bağlı",
     "customFamily": "Aile",
     "customFamilyPlaceholder": "varsayılan olarak model kimliği kullanılır",
+    "customEmbeddingInputType": "Giriş türü",
+    "customEmbeddingInputTypeUnset": "Belirtilmemiş",
+    "customEmbeddingInputTypeNone": "Yok (simetrik)",
     "customApiKey": "API anahtarı",
     "customCapabilities": "Yetenekler",
     "addModel": "Model ekle",
@@ -998,7 +1016,8 @@
     "tokMax": "maks. {tokens} token",
     "emptyTitle": "Henüz gömme modeli yok",
     "emptyDesc": "Gömmeleri destekleyen bir sağlayıcı anahtarı eklediğinizde gömme aileleri burada görünür.",
-    "dragToReorder": "Sağlayıcıyı yeniden sıralamak için sürükleyin"
+    "dragToReorder": "Sağlayıcıyı yeniden sıralamak için sürükleyin",
+    "inputTypeTitle": "Asimetrik gömme modeli: vektör uzayının bu tarafı input_type olarak gönderilir."
   },
   "fusion": {
     "title": "Füzyon",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research'ün kendini geliştiren ajanı; kalıcı bellek ve becerilerle, terminalde ya da sohbet uygulamalarında.",
       "pi": "Kendi uzantılarınız, becerileriniz ve istem şablonlarınızla şekillendirdiğiniz minimal bir terminal ajanı.",
       "reasonix": "DeepSeek için geliştirilmiş bir terminal kodlama ajanı; uzun oturumlar ucuz kalsın diye önek önbelleği etrafında kurulmuştur.",
-      "zcode": "Z.ai'nin GLM modelleri için kodlama ajanı; sağlayıcı kaydıyla herhangi bir OpenAI uyumlu uç noktaya bağlanır."
+      "zcode": "Z.ai'nin GLM modelleri için kodlama ajanı; sağlayıcı kaydıyla herhangi bir OpenAI uyumlu uç noktaya bağlanır.",
+      "zero": "Kalıcı oturumlar, izinler ve OpenAI uyumlu herhangi bir sağlayıcıyla çalışan yerel bir terminal kodlama ajanı."
     }
   },
   "update": {

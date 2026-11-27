@@ -15,7 +15,7 @@ Onlarca sağlayıcının ücretsiz kullanım kotalarını ve özel OpenAI uyumlu
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · tüm kataloğa göz atın: 736 model ailesi, 1.313 ücretsiz uç nokta
 
-[English](README.md) · **Türkçe** · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md)
+[English](README.md) · **Türkçe** · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · [O'zbekcha](README.uz.md) · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos-tr.svg" height="48" alt="macOS için indir"></a>
@@ -517,6 +517,21 @@ Katkılarınızı bekliyoruz! Geliştirme süreci, PR beklentileri ve AI/LLM des
 <a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
 <a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
 <a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
+<a href="https://github.com/tevasas"><img src="https://images.weserv.nl/?url=github.com/tevasas.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@tevasas" /></a>
+<a href="https://github.com/FabioLeitao"><img src="https://images.weserv.nl/?url=github.com/FabioLeitao.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@FabioLeitao" /></a>
+<a href="https://github.com/dirtious15"><img src="https://images.weserv.nl/?url=github.com/dirtious15.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@dirtious15" /></a>
+<a href="https://github.com/Aniketchavan7"><img src="https://images.weserv.nl/?url=github.com/Aniketchavan7.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Aniketchavan7" /></a>
+<a href="https://github.com/eltociear"><img src="https://images.weserv.nl/?url=github.com/eltociear.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@eltociear" /></a>
+<a href="https://github.com/flipcyde101"><img src="https://images.weserv.nl/?url=github.com/flipcyde101.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@flipcyde101" /></a>
+<a href="https://github.com/FNICKE"><img src="https://images.weserv.nl/?url=github.com/FNICKE.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@FNICKE" /></a>
+<a href="https://github.com/georgehadji"><img src="https://images.weserv.nl/?url=github.com/georgehadji.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@georgehadji" /></a>
+<a href="https://github.com/mamehi"><img src="https://images.weserv.nl/?url=github.com/mamehi.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mamehi" /></a>
+<a href="https://github.com/MuhammadAhmadRaza087"><img src="https://images.weserv.nl/?url=github.com/MuhammadAhmadRaza087.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@MuhammadAhmadRaza087" /></a>
+<a href="https://github.com/prascli"><img src="https://images.weserv.nl/?url=github.com/prascli.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@prascli" /></a>
+<a href="https://github.com/SASU004"><img src="https://images.weserv.nl/?url=github.com/SASU004.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@SASU004" /></a>
+<a href="https://github.com/SHMOUKE"><img src="https://images.weserv.nl/?url=github.com/SHMOUKE.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@SHMOUKE" /></a>
+<a href="https://github.com/Tushar49"><img src="https://images.weserv.nl/?url=github.com/Tushar49.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tushar49" /></a>
+<a href="https://github.com/Volko61"><img src="https://images.weserv.nl/?url=github.com/Volko61.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Volko61" /></a>
 
 <a id="disclaimer"></a>
 
