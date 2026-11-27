@@ -129,6 +129,7 @@ export class PuterProvider extends BaseProvider {
         if(buf.length>2_000_000)throw new Error('Oversized Puter stream frame');
         for(const raw of lines){
           const line=raw.trim();if(!line)continue;
+          if(line.length>2_000_000)throw new Error('Oversized Puter stream frame');
           const e=JSON.parse(line);
           if(e.error||e.type==='error'||e.type==='refusal_fallback'||e.usageDetails?.fallbackModel)throw new Error('Puter returned an error or substituted stream');
           if(e.type==='text'&&typeof e.text==='string' && e.text){sawText=true;yield {id,created,object:'chat.completion.chunk',model,choices:[{index:0,delta:{content:e.text},finish_reason:null}]};}
