@@ -237,11 +237,19 @@ export function retireCatalogModelUpstream(
   reason: string,
 ): boolean {
   const existing = getCatalogModelTombstone(db, 'chat', platform, modelId);
+  // Re-assert the retired state even when the tombstone already exists: an
+  // older build may have recorded the tombstone without disabling the row,
+  // and a catalog re-apply can re-enable the chain entries meanwhile.
+  disableRetiredModelRows(db, modelDbId);
   if (existing) return false;
   recordCatalogModelTombstone(db, 'chat', platform, modelId, { source: 'upstream_eol', reason });
+  return true;
+}
+
+function disableRetiredModelRows(db: Db, modelDbId: number): void {
   db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
   db.prepare('UPDATE profile_models SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
-  return true;
+  db.prepare('UPDATE models SET enabled = 0 WHERE id = ?').run(modelDbId);
 }
 
 /**
@@ -260,6 +268,7 @@ export function reinstateUpstreamRetiredCatalogModel(
     .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
     .get(platform, modelId) as { id: number } | undefined;
   if (row) {
+    db.prepare('UPDATE models SET enabled = 1 WHERE id = ?').run(row.id);
     db.prepare('UPDATE fallback_config SET enabled = 1 WHERE model_db_id = ?').run(row.id);
     db.prepare('UPDATE profile_models SET enabled = 1 WHERE model_db_id = ?').run(row.id);
   }
