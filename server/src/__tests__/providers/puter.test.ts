@@ -95,6 +95,13 @@ describe('native Puter wire protocol',()=>{
       if(valid)expect((await read()).at(-1)?.choices[0].finish_reason).toBe('stop');else await expect(read()).rejects.toThrow();
     }
   });
+  it('rejects an oversized frame even when its newline arrives in the same chunk',async()=>{
+    const frame=JSON.stringify({type:'text',text:'x'.repeat(2_000_001)})+'\n';
+    const stream=frame+'{"type":"usage","finish_reason":"stop"}\n';
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(stream)));
+    const read=async()=>{const chunks=[];for await(const chunk of new PuterProvider().streamChatCompletion('test',messages,model))chunks.push(chunk);return chunks;};
+    await expect(read()).rejects.toThrow('Oversized Puter stream frame');
+  });
   it('keeps translation and extraction routes out of chat and routing policy',()=>{
     for(const [platform,id] of [['xkiro','cohere/command-a-translate'],['cloudflare','@cf/meta/m2m100-1.2b']] as const){
       expect(specialistTask(id,platform)).toBe('translation');expect(specialistTask(id,'ovh')).toBeUndefined();
