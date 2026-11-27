@@ -9,12 +9,12 @@ import { z } from 'zod';
 import { getDb } from '../db/index.js';
 import { getAllPenalties, getRoutingScores, getRoutingStrategy, setRoutingStrategy, setCustomWeights, getExploreEnabled, setExploreEnabled, getPeakHoursConfig, setPeakHoursConfig, getActiveRoutingWeights, getKeySelectionStrategy, setKeySelectionStrategy } from '../services/router.js';
 import { BANDIT_PRESETS, isValidTimezone, type RoutingStrategy } from '../services/scoring.js';
-import { parseBudget, monthlyBudgetScore } from '../lib/budget.js';
+import { effectiveMonthlyBudget, monthlyBudgetScore, parseBudget } from '../lib/budget.js';
 import { getModelGroups } from '../services/model-groups.js';
 import { getPenaltyInspector, clearRouterPressure } from '../services/penalty-inspector.js';
 import { getCooldownCeilingMs, setCooldownCeilingMs, MIN_COOLDOWN_CEILING_MS, MAX_COOLDOWN_CEILING_MS } from '../services/ratelimit.js';
 import { getActiveProfileId } from '../services/profile-models.js';
-import { qualifiedModelMemberId } from '../lib/endpoint-scope.js';
+import { endpointScopeForBaseUrl, qualifiedModelMemberId } from '../lib/endpoint-scope.js';
 import { overriddenFieldNames } from '../services/model-state.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getQuotaOutlook } from '../services/quota-outlook.js';
@@ -262,6 +262,18 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
   `).all() as { platform: string; count: number }[];
   const keyCountMap = new Map(keyCounts.map(k => [k.platform, k.count]));
 
+  // Custom endpoints pool keys per base_url, not across all custom providers.
+  const customScopeKeyCount = new Map<string, number>();
+  for (const row of db.prepare(`
+    SELECT base_url, COUNT(*) as count
+    FROM api_keys
+    WHERE platform = 'custom' AND enabled = 1 AND status IN ('healthy', 'unknown') AND base_url IS NOT NULL
+    GROUP BY base_url
+  `).all() as { base_url: string; count: number }[]) {
+    const scope = endpointScopeForBaseUrl(row.base_url);
+    if (scope) customScopeKeyCount.set(scope, (customScopeKeyCount.get(scope) ?? 0) + row.count);
+  }
+
   // Get current dynamic penalties
   const penalties = getAllPenalties();
   const penaltyMap = new Map(penalties.map(p => [p.modelDbId, p]));
@@ -279,6 +291,9 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
   res.json(rows.map(r => {
     const penalty = penaltyMap.get(r.model_db_id);
     const group = groupByDbId.get(r.model_db_id);
+    const rowKeyCount = r.platform === 'custom' && r.endpoint_scope
+      ? (customScopeKeyCount.get(r.endpoint_scope) ?? 0)
+      : (keyCountMap.get(r.platform) ?? 0);
     return {
       modelDbId: r.model_db_id,
       groupKey: group?.groupKey,
@@ -306,7 +321,10 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
       // Parsed once here (single source of truth) so the dashboard never re-implements
       // budget-label parsing; 0 for rate-limited/placeholder labels. See lib/budget.ts.
       // Scaled by healthy/enabled key count for multi-account pooled capacity.
-      monthlyTokenBudgetTokens: parseBudget(r.monthly_token_budget) * Math.max(1, keyCountMap.get(r.platform) ?? 1),
+      monthlyTokenBudgetTokens: effectiveMonthlyBudget(r) * Math.max(1, rowKeyCount),
+      // True when the figure comes from tpd_limit × 30 rather than the label
+      // (#2030), so the dashboard prints the number instead of the label text.
+      monthlyTokenBudgetDerived: parseBudget(r.monthly_token_budget ?? '') === 0 && effectiveMonthlyBudget(r) > 0,
       supportsVision: r.supports_vision === 1,
       supportsTools: r.supports_tools === 1,
       // 'discovered' (#1348): fetched from a built-in provider's /models because
@@ -334,7 +352,7 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
       // provider's own (redacted) wording.
       retiredUpstream: r.tombstone_source === 'upstream_eol',
       retiredReason: r.tombstone_source === 'upstream_eol' ? (r.tombstone_reason ?? null) : null,
-      keyCount: keyCountMap.get(r.platform) ?? 0,
+      keyCount: rowKeyCount,
     };
   }));
 });
@@ -363,7 +381,21 @@ fallbackRouter.put('/', (req: Request, res: Response) => {
   }
 
   const db = getDb();
-  const activeProfileId = getActiveProfileId(db);
+  let activeProfileId = getActiveProfileId(db);
+  // An explicit ?profile= pins the write to that chain, like the read (#1047):
+  // the Models page saves a switch the moment it is clicked (#2024), and a
+  // write still queued when another chain is activated must land in the chain
+  // the click was made on, not "whichever is active by now".
+  const requestedRaw = req.query.profile;
+  if (requestedRaw !== undefined) {
+    const requested = Number.parseInt(String(requestedRaw), 10);
+    if (!Number.isInteger(requested) || requested <= 0
+      || !db.prepare('SELECT 1 FROM profiles WHERE id = ?').get(requested)) {
+      res.status(404).json({ error: { message: `no such profile: ${String(requestedRaw)}` } });
+      return;
+    }
+    activeProfileId = requested;
+  }
 
   // Writing to the active chain UPSERTS: the row may not be in the chain yet,
   // which is the normal state of every model in a hand-built one. The old
@@ -486,14 +518,14 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
   // dashboard's monthly-budget bar and legend follow this order, and chain
   // priority is seeded provider by provider, which read as "grouped by
   // provider" (#1243). Priority stays as the tiebreaker within a rank.
-  let rawModels: { model_db_id: number; platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number; enabled: number; intelligence_rank: number; rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null }[];
+  let rawModels: { model_db_id: number; platform: string; model_id: string; display_name: string; monthly_token_budget: string; priority: number; enabled: number; intelligence_rank: number; rpm_limit: number | null; rpd_limit: number | null; tpm_limit: number | null; tpd_limit: number | null; endpoint_scope: string }[];
 
   if (activeProfile) {
     // Profile mode: use profile_models chain (all models in profile, checked against enabled)
     rawModels = db.prepare(`
       SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
              pm.priority, pm.enabled, m.intelligence_rank,
-             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.endpoint_scope
       FROM profile_models pm
       JOIN models m ON m.id = pm.model_db_id
       WHERE pm.profile_id = ? AND m.enabled = 1
@@ -504,7 +536,7 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
     rawModels = db.prepare(`
       SELECT m.id as model_db_id, m.platform, m.model_id, m.display_name, m.monthly_token_budget,
              fc.priority, fc.enabled, m.intelligence_rank,
-             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit
+             m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.endpoint_scope
       FROM fallback_config fc
       JOIN models m ON m.id = fc.model_db_id
       WHERE m.enabled = 1
@@ -525,25 +557,82 @@ fallbackRouter.get('/token-usage', (_req: Request, res: Response) => {
       .map(k => [k.platform, k.count])
   );
 
-  const modelBudgets = rawModels
-    .filter(m => platformSet.has(m.platform))
-    .map(m => {
-      const keys = Math.max(1, keyCountMap.get(m.platform) ?? 1);
-      return {
-        modelDbId: m.model_db_id,
-        displayName: m.display_name,
-        platform: m.platform,
-        modelId: m.model_id,
-        intelligenceRank: m.intelligence_rank,
-        budget: parseBudget(m.monthly_token_budget) * keys,
-        used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
-        enabled: m.enabled === 1,
-        rpmLimit: m.rpm_limit,
-        rpdLimit: m.rpd_limit,
-        tpmLimit: m.tpm_limit,
-        tpdLimit: m.tpd_limit,
-      };
-    });
+  // Custom endpoints pool keys and monthly token caps per normalized base_url.
+  const enabledCustomScopes = new Set<string>();
+  const customScopeKeyCount = new Map<string, number>();
+  const customScopeTokenCap = new Map<string, number>();
+  for (const row of db.prepare(`
+    SELECT base_url, status, COALESCE(monthly_token_cap, 0) AS monthly_token_cap
+    FROM api_keys
+    WHERE platform = 'custom' AND enabled = 1 AND base_url IS NOT NULL
+  `).all() as { base_url: string; status: string; monthly_token_cap: number }[]) {
+    const scope = endpointScopeForBaseUrl(row.base_url);
+    if (!scope) continue;
+    enabledCustomScopes.add(scope);
+    if (row.status === 'healthy' || row.status === 'unknown') {
+      customScopeKeyCount.set(scope, (customScopeKeyCount.get(scope) ?? 0) + 1);
+      if (row.monthly_token_cap > 0) {
+        customScopeTokenCap.set(scope, (customScopeTokenCap.get(scope) ?? 0) + row.monthly_token_cap);
+      }
+    }
+  }
+
+  const activeModels = rawModels.filter(m => {
+    if (m.platform === 'custom' && m.endpoint_scope) {
+      return enabledCustomScopes.has(m.endpoint_scope);
+    }
+    return platformSet.has(m.platform);
+  });
+
+  // First pass: model-level budgets (monthly_token_budget label or tpd_limit * 30),
+  // scaled by usable keys for that platform or custom endpoint.
+  const prelim = activeModels.map(m => {
+    const keys = m.platform === 'custom' && m.endpoint_scope
+      ? Math.max(1, customScopeKeyCount.get(m.endpoint_scope) ?? 1)
+      : Math.max(1, keyCountMap.get(m.platform) ?? 1);
+    return {
+      m,
+      budget: effectiveMonthlyBudget(m) * keys,
+    };
+  });
+
+  // For custom endpoints with key-level monthly_token_cap and models lacking a
+  // model-level budget, divide the endpoint cap across those models so the
+  // total reflects the configured cap without double-counting.
+  const uncappedCountByScope = new Map<string, number>();
+  for (const { m, budget } of prelim) {
+    if (budget === 0 && m.platform === 'custom' && m.endpoint_scope && (customScopeTokenCap.get(m.endpoint_scope) ?? 0) > 0) {
+      uncappedCountByScope.set(m.endpoint_scope, (uncappedCountByScope.get(m.endpoint_scope) ?? 0) + 1);
+    }
+  }
+  const seenUncappedByScope = new Map<string, number>();
+
+  const modelBudgets = prelim.map(({ m, budget }) => {
+    let resolvedBudget = budget;
+    if (resolvedBudget === 0 && m.platform === 'custom' && m.endpoint_scope) {
+      const cap = customScopeTokenCap.get(m.endpoint_scope) ?? 0;
+      const count = uncappedCountByScope.get(m.endpoint_scope) ?? 0;
+      if (cap > 0 && count > 0) {
+        const idx = seenUncappedByScope.get(m.endpoint_scope) ?? 0;
+        seenUncappedByScope.set(m.endpoint_scope, idx + 1);
+        resolvedBudget = Math.floor(cap / count) + (idx === 0 ? cap % count : 0);
+      }
+    }
+    return {
+      modelDbId: m.model_db_id,
+      displayName: m.display_name,
+      platform: m.platform,
+      modelId: m.model_id,
+      intelligenceRank: m.intelligence_rank,
+      budget: resolvedBudget,
+      used: usageByModel.get(`${m.platform}:${m.model_id}`) ?? 0,
+      enabled: m.enabled === 1,
+      rpmLimit: m.rpm_limit,
+      rpdLimit: m.rpd_limit,
+      tpmLimit: m.tpm_limit,
+      tpdLimit: m.tpd_limit,
+    };
+  });
 
   // Total budget counts all models (both enabled and disabled — they contribute to the pool)
   const totalBudget = modelBudgets.reduce((s, m) => s + m.budget, 0);

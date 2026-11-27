@@ -60,7 +60,16 @@
     "emailChanged": "E-mailul a fost schimbat.",
     "passwordReset": "Parola a fost resetată. Autentifică-te.",
     "resetCodeDockerHint": "Rulezi în Docker? Codul se află în jurnalul containerului: docker logs <container>.",
-    "desktopSessionFailed": "Panoul de control nu s-a putut autentifica la serverul local. Închide FreeLLMAPI și deschide-l din nou."
+    "desktopSessionFailed": "Panoul de control nu s-a putut autentifica la serverul local. Închide FreeLLMAPI și deschide-l din nou.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Salvează",
@@ -171,7 +180,12 @@
     "updateNow": "Actualizează acum",
     "updatingContainer": "Se descarcă noua imagine și se repornește. Pagina se reîncarcă când FreeLLMAPI revine.",
     "updateNowFailed": "Actualizatorul nu a acceptat cererea. Verifică dacă containerul watchtower rulează.",
-    "updateNowTimeout": "FreeLLMAPI nu a repornit după 5 minute. Verifică jurnalele containerului watchtower."
+    "updateNowTimeout": "FreeLLMAPI nu a repornit după 5 minute. Verifică jurnalele containerului watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modele",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Alege un furnizor",
     "addKey": "Tonul de adăugare",
+    "addAnotherKey": "Adaugă o altă cheie API",
     "keyAdded": "Cheia adăugată",
     "endpointKeysShareModels": "Cheile aceluiași endpoint partajează modelele acestuia.",
     "export": "Export",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "opțional",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "Implicit la ID-ul modelului",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API cheie",
     "customCapabilities": "Capabilități",
     "addModel": "Adaugă modelul",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Încă nu există modele de embedding",
     "emptyDesc": "Familiile de încorporare apar aici odată ce adaugi o cheie de furnizor care suportă încorporarea.",
-    "dragToReorder": "Tragerea către furnizorul de recomandă"
+    "dragToReorder": "Tragerea către furnizorul de recomandă",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fuziune",
@@ -1233,7 +1252,8 @@
       "hermes": "Agentul auto-perfecționabil de la Nous Research, cu memorie persistentă și abilități, în terminal sau în aplicațiile de chat.",
       "pi": "Un agent de terminal minimalist pe care îl modelezi cu propriile extensii, abilități și șabloane de prompturi.",
       "reasonix": "Un agent de programare pentru terminal, nativ DeepSeek, construit în jurul cache-ului de prefix, ca sesiunile lungi să rămână ieftine.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Un agent local de programare în terminal cu sesiuni persistente, permisiuni și orice furnizor compatibil OpenAI."
     }
   },
   "update": {

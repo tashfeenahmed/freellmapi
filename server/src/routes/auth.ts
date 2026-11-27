@@ -16,7 +16,19 @@ import {
   desktopSessionToken,
   recordReauthFailure,
   clearReauthFailures,
+  hashSessionToken,
+  sessionReauthenticatedUntilMs,
 } from '../services/auth.js';
+import {
+  OIDC_TX_COOKIE_NAME,
+  OidcFlowError,
+  completeOidcCallback,
+  consumeOidcExchangeCode,
+  getOidcEndSessionUrl,
+  getPublicOidcStatus,
+  isPasswordLoginDisabled,
+  startOidcAuthorization,
+} from '../services/oidc.js';
 import { setupCodeMatches, clearSetupCode } from '../lib/setup-code.js';
 import { isLoopbackRequest } from '../lib/loopback.js';
 import { generateResetCode, resetCodeMatches, clearResetCode } from '../lib/reset-code.js';
@@ -168,17 +180,155 @@ export function desktopSignInAllowed(req: Request): boolean {
   return !isCrossSite(req);
 }
 
+function parseCookie(cookieHeader: string | undefined, name: string): string | undefined {
+  if (!cookieHeader) return undefined;
+  for (const part of cookieHeader.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    if (key === name) return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return undefined;
+}
+
+function requestOrigin(req: Request): string {
+  const proto = req.protocol === 'https' ? 'https' : 'http';
+  const host = req.get('host') || 'localhost:3001';
+  return `${proto}://${host}`;
+}
+
+function formatOidcCookie(value: string, secure: boolean, maxAgeSec: number): string {
+  const parts = [
+    `${OIDC_TX_COOKIE_NAME}=${encodeURIComponent(value)}`,
+    'Path=/api/auth/oidc',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAgeSec}`,
+  ];
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
 // Has the dashboard been set up yet, and is this caller authenticated?
 // `desktop` tells the dashboard it can fetch a session instead of showing the
 // sign-in form.
 authRouter.get('/status', (req: Request, res: Response) => {
   const session = validateSession(bearer(req));
+  const oidc = getPublicOidcStatus();
   res.json({
     needsSetup: userCount() === 0,
     authenticated: !!session,
     email: session?.email ?? null,
     desktop: desktopSignInAllowed(req),
+    ...(session ? {
+      authSource: session.authSource,
+      hasLocalPassword: session.hasLocalPassword,
+      reauthenticatedUntilMs: sessionReauthenticatedUntilMs(session),
+    } : {}),
+    ...(oidc ? { oidc } : {}),
   });
+});
+
+// ── OIDC dashboard sign-in (#2008) ────────────────────────────────────────
+authRouter.get('/oidc/login', async (req: Request, res: Response) => {
+  try {
+    const origin = requestOrigin(req);
+    const { authorizeUrl, cookieValue } = await startOidcAuthorization({
+      derivedOrigin: origin,
+      purpose: 'login',
+      returnPath: typeof req.query.returnTo === 'string' ? req.query.returnTo : '/',
+    });
+    res.setHeader('Set-Cookie', formatOidcCookie(cookieValue, req.protocol === 'https', 300));
+    res.redirect(302, authorizeUrl);
+  } catch (err) {
+    const code = err instanceof OidcFlowError ? err.code : 'provider_error';
+    if (code === 'not_configured') {
+      res.status(404).json({ error: { message: 'OIDC is not configured.', type: 'oidc_not_configured' } });
+      return;
+    }
+    console.warn(`[OIDC] Login start failed: ${err instanceof Error ? err.message : err}`);
+    res.redirect(302, `/#oidc_error=${encodeURIComponent(code)}`);
+  }
+});
+
+authRouter.post('/oidc/reauth/start', async (req: Request, res: Response) => {
+  const token = bearer(req);
+  const session = validateSession(token);
+  if (!session || !token) {
+    res.status(401).json({ error: { message: 'Authentication required', type: 'authentication_error' } });
+    return;
+  }
+  if (session.authSource !== 'oidc') {
+    res.status(400).json({ error: { message: 'Current session is not an OIDC session.', type: 'invalid_request' } });
+    return;
+  }
+  try {
+    const origin = requestOrigin(req);
+    const returnPath = typeof req.body?.returnPath === 'string' ? req.body.returnPath : '/keys';
+    const { authorizeUrl, cookieValue } = await startOidcAuthorization({
+      derivedOrigin: origin,
+      purpose: 'reauth',
+      sessionTokenHash: hashSessionToken(token),
+      expectedUserId: session.userId,
+      returnPath,
+    });
+    res.setHeader('Set-Cookie', formatOidcCookie(cookieValue, req.protocol === 'https', 300));
+    res.json({ authorizeUrl });
+  } catch (err) {
+    const status = err instanceof OidcFlowError && err.code === 'not_configured' ? 404 : 502;
+    res.status(status).json({
+      error: {
+        message: err instanceof Error ? err.message : 'Could not start OIDC re-authentication.',
+        type: err instanceof OidcFlowError ? err.code : 'oidc_error',
+      },
+    });
+  }
+});
+
+authRouter.get('/oidc/callback', async (req: Request, res: Response) => {
+  const secure = req.protocol === 'https';
+  res.setHeader('Set-Cookie', formatOidcCookie('', secure, 0));
+
+  if (typeof req.query.error === 'string' && req.query.error) {
+    console.warn(`[OIDC] Provider returned error=${req.query.error}`);
+    res.redirect(302, '/#oidc_error=provider_error');
+    return;
+  }
+
+  try {
+    const callbackUrl = new URL(req.originalUrl, requestOrigin(req));
+    const stateParam = typeof req.query.state === 'string' ? req.query.state : undefined;
+    const cookieValue = parseCookie(req.headers.cookie, OIDC_TX_COOKIE_NAME);
+    const result = await completeOidcCallback({ callbackUrl, stateParam, cookieValue });
+
+    if (result.purpose === 'reauth') {
+      res.redirect(302, `${result.returnPath}#oidc_reauth=ok`);
+      return;
+    }
+    res.redirect(302, `${result.returnPath}#oidc_code=${encodeURIComponent(result.exchangeCode)}`);
+  } catch (err) {
+    const code = err instanceof OidcFlowError ? err.code : 'exchange_failed';
+    console.warn(`[OIDC] Callback failed (${code}): ${err instanceof Error ? err.message : err}`);
+    res.redirect(302, `/#oidc_error=${encodeURIComponent(code)}`);
+  }
+});
+
+const oidcExchangeSchema = z.object({
+  code: z.string().min(1, 'Exchange code is required'),
+});
+
+authRouter.post('/oidc/exchange', (req: Request, res: Response) => {
+  const parsed = oidcExchangeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
+    return;
+  }
+  const grant = consumeOidcExchangeCode(parsed.data.code);
+  if (!grant) {
+    res.status(401).json({ error: { message: 'Invalid or expired OIDC exchange code', type: 'authentication_error' } });
+    return;
+  }
+  res.json({ token: grant.token, email: grant.email });
 });
 
 authRouter.post('/desktop-session', (req: Request, res: Response) => {
@@ -225,6 +375,15 @@ authRouter.post('/setup', (req: Request, res: Response) => {
 });
 
 authRouter.post('/login', (req: Request, res: Response) => {
+  if (isPasswordLoginDisabled()) {
+    res.status(403).json({
+      error: {
+        message: 'Password sign-in is disabled; sign in with SSO.',
+        type: 'password_login_disabled',
+      },
+    });
+    return;
+  }
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: { message: parsed.error.issues.map(e => e.message).join(', ') } });
@@ -254,9 +413,12 @@ authRouter.post('/login', (req: Request, res: Response) => {
   res.json({ token, email: user.email });
 });
 
-authRouter.post('/logout', (req: Request, res: Response) => {
-  deleteSession(bearer(req));
-  res.json({ success: true });
+authRouter.post('/logout', async (req: Request, res: Response) => {
+  const token = bearer(req);
+  const session = validateSession(token);
+  deleteSession(token);
+  const endSessionUrl = session?.authSource === 'oidc' ? await getOidcEndSessionUrl() : null;
+  res.json({ success: true, ...(endSessionUrl ? { endSessionUrl } : {}) });
 });
 
 authRouter.get('/me', (req: Request, res: Response) => {
@@ -265,7 +427,12 @@ authRouter.get('/me', (req: Request, res: Response) => {
     res.status(401).json({ error: { message: 'Authentication required', type: 'authentication_error' } });
     return;
   }
-  res.json({ email: session.email });
+  res.json({
+    email: session.email,
+    authSource: session.authSource,
+    hasLocalPassword: session.hasLocalPassword,
+    reauthenticatedUntilMs: sessionReauthenticatedUntilMs(session),
+  });
 });
 
 // Change email (requires active session + current password)
@@ -278,6 +445,10 @@ authRouter.post('/change-email', (req: Request, res: Response) => {
   const session = validateSession(bearer(req));
   if (!session) {
     res.status(401).json({ error: { message: 'Authentication required', type: 'authentication_error' } });
+    return;
+  }
+  if (!session.hasLocalPassword) {
+    res.status(403).json({ error: { message: 'This account signs in with SSO and has no local password.', type: 'oidc_account_no_password' } });
     return;
   }
   const parsed = changeEmailSchema.safeParse(req.body);
@@ -316,6 +487,10 @@ authRouter.post('/change-password', (req: Request, res: Response) => {
   const session = validateSession(bearer(req));
   if (!session) {
     res.status(401).json({ error: { message: 'Authentication required', type: 'authentication_error' } });
+    return;
+  }
+  if (!session.hasLocalPassword) {
+    res.status(403).json({ error: { message: 'This account signs in with SSO and has no local password.', type: 'oidc_account_no_password' } });
     return;
   }
   const parsed = changePasswordSchema.safeParse(req.body);

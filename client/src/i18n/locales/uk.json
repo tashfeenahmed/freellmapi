@@ -60,7 +60,16 @@
     "emailChanged": "E-mail успішно змінено.",
     "passwordReset": "Пароль скинуто. Увійдіть знову.",
     "resetCodeDockerHint": "Використовуєте Docker? Код знаходиться в лозі контейнера: docker logs <container>.",
-    "desktopSessionFailed": "Панель керування не змогла увійти на локальний сервер. Закрийте FreeLLMAPI і відкрийте його знову."
+    "desktopSessionFailed": "Панель керування не змогла увійти на локальний сервер. Закрийте FreeLLMAPI і відкрийте його знову.",
+    "signInWithSso": "Увійти через {provider}",
+    "orContinueWithPassword": "або продовжити через email",
+    "reverifyWithSso": "Підтвердити через {provider}",
+    "oidcReauthHint": "Підтвердьте особу через {provider}, щоб отримати доступ до відкритих ключів.",
+    "oidcReauthSuccess": "Особу підтверджено на наступні 5 хвилин.",
+    "oidcErrorNotAllowed": "Вашому обліковому запису заборонено вхід до цієї панелі.",
+    "oidcErrorUnverifiedEmail": "Постачальник ідентичності має підтвердити ваш email перед входом.",
+    "oidcErrorNoAccount": "Відповідного облікового запису немає, а автоматичне створення вимкнено.",
+    "oidcErrorFailed": "Помилка єдиного входу. Спробуйте ще раз."
   },
   "common": {
     "save": "зберегти",
@@ -171,7 +180,12 @@
     "updateNow": "Оновити зараз",
     "updatingContainer": "Завантажується новий образ і виконується перезапуск. Сторінка перезавантажиться, коли FreeLLMAPI повернеться.",
     "updateNowFailed": "Служба оновлення не прийняла запит. Перевірте, що контейнер watchtower запущено.",
-    "updateNowTimeout": "FreeLLMAPI не перезапустився за 5 хвилин. Перегляньте журнали контейнера watchtower."
+    "updateNowTimeout": "FreeLLMAPI не перезапустився за 5 хвилин. Перегляньте журнали контейнера watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Моделі",
@@ -436,6 +450,7 @@
     "familyHaiku": "Хайку",
     "selectPlatform": "Виберіть провайдера",
     "addKey": "Додати ключ",
+    "addAnotherKey": "Додати ще один API-ключ",
     "keyAdded": "Ключ додано",
     "endpointKeysShareModels": "Ключі однієї кінцевої точки спільно використовують її моделі.",
     "export": "Експорт",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "необов'язковий",
     "customFamily": "Сім'я",
     "customFamilyPlaceholder": "за замовчуванням ідентифікатор моделі",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Ключ API",
     "customCapabilities": "Можливості",
     "addModel": "Додати модель",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ток макс",
     "emptyTitle": "Вбудованих моделей ще немає",
     "emptyDesc": "Сімейства вбудовування з’являються тут, коли ви додаєте ключ постачальника, який підтримує вбудовування.",
-    "dragToReorder": "Перетягніть, щоб змінити порядок постачальника"
+    "dragToReorder": "Перетягніть, щоб змінити порядок постачальника",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",
@@ -1233,7 +1252,8 @@
       "hermes": "Агент від Nous Research, що самовдосконалюється, з постійною пам'яттю та навичками — у терміналі або в чат-застосунках.",
       "pi": "Мінімалістичний термінальний агент, який ви налаштовуєте власними розширеннями, навичками та шаблонами промптів.",
       "reasonix": "Термінальний агент для програмування, створений під DeepSeek і побудований навколо кешування префіксів, щоб довгі сесії залишалися дешевими.",
-      "zcode": "Кодувний агент Z.ai для його моделей GLM, що підключається до будь-якого сумісного з OpenAI ендпоінту через реєстр провайдерів."
+      "zcode": "Кодувний агент Z.ai для його моделей GLM, що підключається до будь-якого сумісного з OpenAI ендпоінту через реєстр провайдерів.",
+      "zero": "Локальний термінальний агент для програмування зі збереженими сесіями, дозволами та будь-яким OpenAI-сумісним провайдером."
     }
   },
   "update": {

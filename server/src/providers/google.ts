@@ -13,6 +13,7 @@ import { proxyFetch } from '../lib/proxy.js';
 import { assessProviderUrl } from '../lib/url-guard.js';
 import { recordQuotaObservationsFromResponse, type QuotaObservationContext } from '../services/provider-quota.js';
 import { providerTimeoutMs, streamStallTimeoutMs } from '../lib/provider-timeout.js';
+import { currentUpstreamWatch } from '../lib/upstream-watch.js';
 import { sanitizeForGemini } from '../lib/gemini-wire.js';
 import { resolveMaxTokens } from '../lib/sampling-params.js';
 
@@ -743,6 +744,9 @@ export class GoogleProvider extends BaseProvider {
     const inactivityTimeoutMs = streamStallTimeoutMs(this.platform);
     const firstByteMs = this.firstByteBudgetMs(options?.timeoutMs ?? this.timeoutMs, inactivityTimeoutMs);
     let awaitingFirstByte = true;
+    // Fallback silent-window cap (#1960), same contract as readSseStream.
+    const watch = currentUpstreamWatch();
+    watch?.opened(options?.timeoutMs ?? this.timeoutMs);
 
     try {
       while (true) {
@@ -751,6 +755,7 @@ export class GoogleProvider extends BaseProvider {
           : await this.readWithStallTimeout(() => reader.read(), inactivityTimeoutMs);
         awaitingFirstByte = false;
         if (done) break;
+        if (value && value.byteLength > 0) watch?.activity();
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');

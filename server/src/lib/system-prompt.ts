@@ -53,6 +53,21 @@ interface ProfileRow {
  * disabled profile is rejected exactly like an unknown key so a revoked
  * client can't distinguish "disabled" from "deleted".
  */
+/**
+ * The 401 text for a rejected inference key. A FreeLLMAPI licence key
+ * (`fla_…`) pasted where the API key belongs is the most common cause, and a
+ * bare "Invalid API key" sent people hunting for the wrong problem, so that
+ * case names the right key. Only the prefix is checked: the licence key is not
+ * looked up or echoed.
+ */
+export function invalidApiKeyMessage(token: string | undefined): string {
+  if (token?.trim().toLowerCase().startsWith('fla_')) {
+    return 'Invalid API key: this is your FreeLLMAPI licence key (fla_...). It unlocks Premium and is not an API key. '
+      + 'Use the Unified API key from the Keys page (it starts with "freellmapi-"), or click "Connect to FreeLLMAPI" on the Agents page.';
+  }
+  return 'Invalid API key';
+}
+
 export function resolveAuth(token: string | undefined): ResolvedAuth | null {
   if (!token) return null;
   if (timingSafeStringEqual(token, getUnifiedApiKey())) {

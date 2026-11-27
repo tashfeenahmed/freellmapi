@@ -60,7 +60,16 @@
     "emailChanged": "ਈਮੇਲ ਸਫਲਤਾਪੂਰਵਕ ਬਦਲੀ ਗਈ।",
     "passwordReset": "ਪਾਸਵਰਡ ਰੀਸੈੱਟ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "resetCodeDockerHint": "Docker ਵਿੱਚ ਚਲਾ ਰਹੇ ਹੋ? ਕੋਡ ਕੰਟੇਨਰ ਲੌਗ ਵਿੱਚ ਹੈ: docker logs <container>।",
-    "desktopSessionFailed": "ਡੈਸ਼ਬੋਰਡ ਲੋਕਲ ਸਰਵਰ ਵਿੱਚ ਸਾਈਨ ਇਨ ਨਹੀਂ ਕਰ ਸਕਿਆ। FreeLLMAPI ਬੰਦ ਕਰਕੇ ਦੁਬਾਰਾ ਖੋਲ੍ਹੋ।"
+    "desktopSessionFailed": "ਡੈਸ਼ਬੋਰਡ ਲੋਕਲ ਸਰਵਰ ਵਿੱਚ ਸਾਈਨ ਇਨ ਨਹੀਂ ਕਰ ਸਕਿਆ। FreeLLMAPI ਬੰਦ ਕਰਕੇ ਦੁਬਾਰਾ ਖੋਲ੍ਹੋ।",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "ਸੇਵ ਕਰੋ",
@@ -171,7 +180,12 @@
     "updateNow": "ਹੁਣੇ ਅੱਪਡੇਟ ਕਰੋ",
     "updatingContainer": "ਨਵੀਂ ਇਮੇਜ ਖਿੱਚੀ ਜਾ ਰਹੀ ਹੈ ਅਤੇ ਮੁੜ ਚਾਲੂ ਹੋ ਰਿਹਾ ਹੈ। FreeLLMAPI ਵਾਪਸ ਆਉਣ 'ਤੇ ਇਹ ਪੰਨਾ ਮੁੜ ਲੋਡ ਹੋਵੇਗਾ।",
     "updateNowFailed": "ਅੱਪਡੇਟਰ ਨੇ ਬੇਨਤੀ ਸਵੀਕਾਰ ਨਹੀਂ ਕੀਤੀ। ਜਾਂਚੋ ਕਿ watchtower ਕੰਟੇਨਰ ਚੱਲ ਰਿਹਾ ਹੈ।",
-    "updateNowTimeout": "5 ਮਿੰਟ ਬਾਅਦ ਵੀ FreeLLMAPI ਮੁੜ ਚਾਲੂ ਨਹੀਂ ਹੋਇਆ। watchtower ਕੰਟੇਨਰ ਦੇ ਲੌਗ ਵੇਖੋ।"
+    "updateNowTimeout": "5 ਮਿੰਟ ਬਾਅਦ ਵੀ FreeLLMAPI ਮੁੜ ਚਾਲੂ ਨਹੀਂ ਹੋਇਆ। watchtower ਕੰਟੇਨਰ ਦੇ ਲੌਗ ਵੇਖੋ।",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "ਮਾਡਲ",
@@ -436,6 +450,7 @@
     "familyHaiku": "ਹਾਇਕੂ",
     "selectPlatform": "ਇੱਕ ਪ੍ਰਦਾਤਾ ਚੁਣੋ",
     "addKey": "ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ",
+    "addAnotherKey": "ਇੱਕ ਹੋਰ API ਕੁੰਜੀ ਸ਼ਾਮਲ ਕਰੋ",
     "keyAdded": "ਕੁੰਜੀ ਸ਼ਾਮਲ ਕੀਤੀ ਗਈ",
     "endpointKeysShareModels": "ਇੱਕੋ ਐਂਡਪੌਇੰਟ ਦੀਆਂ ਕੁੰਜੀਆਂ ਇਸਦੇ ਮਾਡਲ ਸਾਂਝੇ ਕਰਦੀਆਂ ਹਨ।",
     "export": "ਨਿਰਯਾਤ",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ਵਿਕਲਪਿਕ",
     "customFamily": "ਪਰਿਵਾਰ",
     "customFamilyPlaceholder": "ਮਾਡਲ id ਲਈ ਡਿਫਾਲਟ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ਕੁੰਜੀ",
     "customCapabilities": "ਸਮਰੱਥਾਵਾਂ",
     "addModel": "ਮਾਡਲ ਸ਼ਾਮਲ ਕਰੋ",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ਟੋਕ ਅਧਿਕਤਮ",
     "emptyTitle": "ਅਜੇ ਤੱਕ ਕੋਈ ਏਮਬੈਡਿੰਗ ਮਾਡਲ ਨਹੀਂ ਹਨ",
     "emptyDesc": "ਏਮਬੈਡਿੰਗ ਪਰਿਵਾਰ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ ਜਦੋਂ ਤੁਸੀਂ ਇੱਕ ਪ੍ਰਦਾਤਾ ਕੁੰਜੀ ਜੋੜਦੇ ਹੋ ਜੋ ਏਮਬੈਡਿੰਗ ਦਾ ਸਮਰਥਨ ਕਰਦੀ ਹੈ।",
-    "dragToReorder": "ਪ੍ਰਦਾਤਾ ਨੂੰ ਮੁੜ ਕ੍ਰਮਬੱਧ ਕਰਨ ਲਈ ਘਸੀਟੋ"
+    "dragToReorder": "ਪ੍ਰਦਾਤਾ ਨੂੰ ਮੁੜ ਕ੍ਰਮਬੱਧ ਕਰਨ ਲਈ ਘਸੀਟੋ",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ਫਿਊਜ਼ਨ",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research ਦਾ ਆਪਣੇ ਆਪ ਨੂੰ ਬਿਹਤਰ ਬਣਾਉਣ ਵਾਲਾ ਏਜੰਟ, ਸਥਾਈ ਮੈਮੋਰੀ ਅਤੇ ਹੁਨਰਾਂ ਨਾਲ, ਟਰਮੀਨਲ ਵਿੱਚ ਜਾਂ ਚੈਟ ਐਪਾਂ 'ਤੇ।",
       "pi": "ਇੱਕ ਘੱਟੋ-ਘੱਟ ਟਰਮੀਨਲ ਏਜੰਟ, ਜਿਸਨੂੰ ਤੁਸੀਂ ਆਪਣੇ ਐਕਸਟੈਂਸ਼ਨਾਂ, ਹੁਨਰਾਂ ਅਤੇ ਪ੍ਰੌਂਪਟ ਟੈਮਪਲੇਟਾਂ ਨਾਲ ਘੜਦੇ ਹੋ।",
       "reasonix": "DeepSeek ਲਈ ਬਣਿਆ ਟਰਮੀਨਲ ਕੋਡਿੰਗ ਏਜੰਟ, ਪ੍ਰੀਫਿਕਸ ਕੈਸ਼ਿੰਗ ਦੁਆਲੇ ਬਣਾਇਆ ਗਿਆ ਤਾਂ ਜੋ ਲੰਬੇ ਸੈਸ਼ਨ ਵੀ ਸਸਤੇ ਰਹਿਣ।",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "ਸਥਾਈ ਸੈਸ਼ਨਾਂ, ਇਜਾਜ਼ਤਾਂ ਅਤੇ ਕਿਸੇ ਵੀ OpenAI-ਅਨੁਕੂਲ ਪ੍ਰਦਾਤਾ ਵਾਲਾ ਲੋਕਲ ਟਰਮੀਨਲ ਕੋਡਿੰਗ ਏਜੰਟ।"
     }
   },
   "update": {

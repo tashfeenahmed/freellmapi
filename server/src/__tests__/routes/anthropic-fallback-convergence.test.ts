@@ -277,4 +277,98 @@ describe('/v1/messages shared-loop convergence', () => {
     expect(deltas).toBe('Recovered by the next model.');
     expect(text).not.toContain('<|tool_call_begin|>');
   });
+
+  describe('streamed tool calls Claude Code must not see as a finished text answer (#2117)', () => {
+    const run = async (chunks: any[], tools: any[] | null = [WEATHER_TOOL]) => {
+      mockRouteRequest.mockReturnValue(fakeRoute(streamProvider(async function* () {
+        yield chunk({ role: 'assistant' });
+        for (const c of chunks) yield c;
+        yield chunk({}, 'stop');
+      })));
+      const { status, text } = await post(app, {
+        model: 'claude-sonnet-4-5', max_tokens: 64, stream: true,
+        messages: [{ role: 'user', content: 'weather?' }],
+        ...(tools ? { tools } : {}),
+      }, key);
+      const events = sseEvents(text);
+      return {
+        status,
+        tools: events.filter(e => e.event === 'content_block_start' && e.data.content_block?.type === 'tool_use').map(e => e.data.content_block),
+        args: events.filter(e => e.event === 'content_block_delta' && e.data.delta?.type === 'input_json_delta').map(e => JSON.parse(e.data.delta.partial_json)),
+        text: events.filter(e => e.event === 'content_block_delta' && e.data.delta?.type === 'text_delta').map(e => e.data.delta.text).join(''),
+        stop: events.find(e => e.event === 'message_delta')?.data.delta.stop_reason,
+      };
+    };
+
+    it('a bare JSON tool call split across chunks becomes tool_use (seen live from qwen2.5-coder)', async () => {
+      const r = await run([chunk({ content: '{"name": "get_weather", ' }), chunk({ content: '"arguments": {"city": "Paris"}}' })]);
+      expect(r.status).toBe(200);
+      expect(r.tools.map(t => t.name)).toEqual(['get_weather']);
+      expect(r.args).toEqual([{ city: 'Paris' }]);
+      expect(r.text).toBe('');
+      expect(r.stop).toBe('tool_use');
+    });
+
+    it('a ```json fenced tool call becomes tool_use', async () => {
+      const r = await run([chunk({ content: '```js' }), chunk({ content: 'on\n{"name": "get_weather", "arguments": {"city": "Rome"}}\n```' })]);
+      expect(r.args).toEqual([{ city: 'Rome' }]);
+      expect(r.stop).toBe('tool_use');
+    });
+
+    it('prose, then a <tool_call> split mid-marker: prose streams, the call becomes tool_use', async () => {
+      const r = await run([
+        chunk({ content: 'I will check the weather now. <tool_' }),
+        chunk({ content: 'call>\n{"name": "get_weather", "arguments": {"city": "Oslo"}}\n</tool_call>' }),
+      ]);
+      expect(r.text).toBe('I will check the weather now. ');
+      expect(r.args).toEqual([{ city: 'Oslo' }]);
+      expect(r.stop).toBe('tool_use');
+    });
+
+    it('a Claude-style <function_calls> block becomes tool_use', async () => {
+      const r = await run([chunk({ content: '<function_calls>\n<invoke name="get_weather">\n<parameter name="city">Lima</parameter>\n</invoke>\n</function_calls>' })]);
+      expect(r.args).toEqual([{ city: 'Lima' }]);
+      expect(r.stop).toBe('tool_use');
+    });
+
+    it('a name repeated on every delta stays the declared tool name', async () => {
+      const r = await run([
+        chunk({ tool_calls: [{ index: 0, id: 'call_a', type: 'function', function: { name: 'get_weather', arguments: '{"city":' } }] }),
+        chunk({ tool_calls: [{ index: 0, id: 'call_a', type: 'function', function: { name: 'get_weather', arguments: '"Doha"}' } }] }),
+      ]);
+      expect(r.tools.map(t => t.name)).toEqual(['get_weather']);
+      expect(r.args).toEqual([{ city: 'Doha' }]);
+    });
+
+    it('parallel calls without an index stay separate calls', async () => {
+      const r = await run([
+        chunk({ tool_calls: [{ id: 'call_a', type: 'function', function: { name: 'get_weather', arguments: '{"city":"Paris"}' } }] }),
+        chunk({ tool_calls: [{ id: 'call_b', type: 'function', function: { name: 'get_weather', arguments: '{"city":"Rome"}' } }] }),
+      ]);
+      expect(r.tools.map(t => t.id)).toEqual(['call_a', 'call_b']);
+      expect(r.args).toEqual([{ city: 'Paris' }, { city: 'Rome' }]);
+      expect(r.stop).toBe('tool_use');
+    });
+
+    it('prose followed by an unparseable block is still delivered as text (no error after commit)', async () => {
+      const r = await run([chunk({ content: 'Example: ' }), chunk({ content: '<tool_call>not json</tool_call> done.' })]);
+      expect(r.status).toBe(200);
+      expect(r.text).toBe('Example: <tool_call>not json</tool_call> done.');
+      expect(r.tools).toEqual([]);
+      expect(r.stop).toBe('end_turn');
+    });
+
+    it('without tools, JSON and markers are plain text', async () => {
+      const r = await run([chunk({ content: '{"name": "get_weather", "arguments": {}}' })], null);
+      expect(r.status).toBe(200);
+      expect(r.text).toBe('{"name": "get_weather", "arguments": {}}');
+      expect(r.stop).toBe('end_turn');
+    });
+
+    it('a JSON answer that is not a tool call is delivered unchanged', async () => {
+      const r = await run([chunk({ content: '{"answer": 42}' })]);
+      expect(r.text).toBe('{"answer": 42}');
+      expect(r.stop).toBe('end_turn');
+    });
+  });
 });

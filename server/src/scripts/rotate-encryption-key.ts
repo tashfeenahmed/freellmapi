@@ -17,16 +17,22 @@
  * written here decrypts under the running server exactly like one written by
  * `encrypt()`. The script does NOT touch the module-level key cache — it
  * performs every decrypt with `--old-key` and every encrypt with `--new-key`
- * explicitly, so it is safe to run while the server is stopped (recommended)
- * or even live (a writer that fires mid-run sees only already-migrated rows
- * because both keys are valid until the process restarts with the new key).
+ * explicitly.
+ *
+ * The server MUST be stopped. A running server keeps the OLD key cached
+ * (lib/crypto.ts): once the rows are rewritten it can decrypt none of them,
+ * and any key it encrypts before the restart is written under the old key and
+ * becomes unreadable on the new one. So the script takes an exclusive lock on
+ * the database and refuses to run while any other process has it open; the
+ * read and the write happen inside that one lock, so no row can change between
+ * them.
  *
  * Usage:
  *   tsx src/scripts/rotate-encryption-key.ts --old-key <64hex> --new-key <64hex> [--db <path>] [--dry-run]
  *
  *   --old-key  the current key (hex, 64 chars). Falls back to ENCRYPTION_KEY.
  *   --new-key  the key to rotate to (hex, 64 chars). Required.
- *   --db       SQLite path (default: the server's data/freeapi.db).
+ *   --db       SQLite path (default: FREEAPI_DB_PATH, else the server's data/freeapi.db).
  *   --dry-run  decrypt + print every affected row WITHOUT writing anything.
  *
  * Exits 0 on success (or a clean dry run), 1 on any decrypt/validation error.
@@ -264,7 +270,9 @@ export function applyRotation(
 function main(): void {
   const oldKeyHex = arg('old-key') ?? process.env.ENCRYPTION_KEY;
   const newKeyHex = arg('new-key');
-  const dbPath = arg('db') ?? DEFAULT_DB;
+  // Same resolution as the server's getDefaultDbPath(): an install that moved
+  // its database with FREEAPI_DB_PATH must not get a stale default rotated.
+  const dbPath = arg('db') ?? (process.env.FREEAPI_DB_PATH?.trim() || DEFAULT_DB);
   const dryRun = flag('dry-run');
 
   if (!oldKeyHex) {
@@ -287,8 +295,21 @@ function main(): void {
     process.exit(1);
   }
 
-  const db = new Database(dbPath, { readonly: dryRun });
+  const db = new Database(dbPath, { readonly: dryRun, timeout: 2000 });
   try {
+    if (!dryRun) {
+      // An exclusive lock is refused while any other connection has the file
+      // open, even an idle WAL reader such as a running server.
+      db.pragma('locking_mode = EXCLUSIVE');
+      try {
+        db.exec('BEGIN EXCLUSIVE');
+      } catch (err) {
+        if ((err as { code?: string }).code !== 'SQLITE_BUSY') throw err;
+        console.error(`error: another process has ${dbPath} open. Stop the FreeLLMAPI server first; nothing was written.`);
+        process.exit(1);
+      }
+    }
+
     const result = rotateSecrets(db, oldKey, newKey);
     if (result.error) {
       console.error(`error: ${result.error}`);
@@ -311,10 +332,12 @@ function main(): void {
     }
 
     applyRotation(db, rowsToRotate);
+    db.exec('COMMIT');
 
     console.log(`Rotated ${rowsToRotate.length} value(s) to the new key.`);
-    console.log('Next steps: set ENCRYPTION_KEY to the new key (or overwrite the .encryption-key file next to the DB) and restart the server.');
+    console.log('Next steps: set ENCRYPTION_KEY to the new key (or overwrite the .encryption-key file next to the DB), then start the server.');
   } finally {
+    if (db.inTransaction) db.exec('ROLLBACK');
     db.close();
   }
 }

@@ -60,7 +60,16 @@
     "emailChanged": "E-Mail erfolgreich geändert.",
     "passwordReset": "Passwort zurückgesetzt. Bitte melden Sie sich an.",
     "resetCodeDockerHint": "Läuft der Server in Docker? Der Code steht im Container-Log: docker logs <container>.",
-    "desktopSessionFailed": "Das Dashboard konnte sich nicht am lokalen Server anmelden. Beenden Sie FreeLLMAPI und öffnen Sie es erneut."
+    "desktopSessionFailed": "Das Dashboard konnte sich nicht am lokalen Server anmelden. Beenden Sie FreeLLMAPI und öffnen Sie es erneut.",
+    "signInWithSso": "Mit {provider} anmelden",
+    "orContinueWithPassword": "oder per E-Mail fortfahren",
+    "reverifyWithSso": "Mit {provider} erneut bestätigen",
+    "oidcReauthHint": "Bestätige deine Identität mit {provider}, um auf Klartext-Schlüssel zuzugreifen.",
+    "oidcReauthSuccess": "Identität für die nächsten 5 Minuten bestätigt.",
+    "oidcErrorNotAllowed": "Dein Konto darf sich nicht an diesem Dashboard anmelden.",
+    "oidcErrorUnverifiedEmail": "Dein Identitätsanbieter muss deine E-Mail-Adresse vor der Anmeldung verifizieren.",
+    "oidcErrorNoAccount": "Es existiert kein passendes Konto und die automatische Kontoerstellung ist deaktiviert.",
+    "oidcErrorFailed": "Single Sign-On fehlgeschlagen. Bitte versuche es erneut."
   },
   "common": {
     "save": "Speichern",
@@ -171,7 +180,12 @@
     "updateNow": "Jetzt aktualisieren",
     "updatingContainer": "Das neue Image wird geladen und neu gestartet. Die Seite lädt neu, sobald FreeLLMAPI wieder da ist.",
     "updateNowFailed": "Der Updater hat die Anfrage nicht angenommen. Prüfen Sie, ob der watchtower-Container läuft.",
-    "updateNowTimeout": "FreeLLMAPI ist nach 5 Minuten nicht neu gestartet. Prüfen Sie die Logs des watchtower-Containers."
+    "updateNowTimeout": "FreeLLMAPI ist nach 5 Minuten nicht neu gestartet. Prüfen Sie die Logs des watchtower-Containers.",
+    "injectSystemDate": "Systemdatum im Prompt",
+    "injectSystemDateHelp": "Stellt dem System-Prompt das heutige UTC-Datum (YYYY-MM-DD) voran, damit Modelle bei der Websuche aktuelle Ergebnisse abrufen. Wird übersprungen, falls bereits ein Datum enthalten ist.",
+    "injectSystemDateOff": "Aus",
+    "injectSystemDateWebSearch": "Websuche",
+    "injectSystemDateAlways": "Immer"
   },
   "models": {
     "title": "Modelle",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Wählen Sie einen Anbieter aus",
     "addKey": "Schlüssel hinzufügen",
+    "addAnotherKey": "Weiteren API-Schlüssel hinzufügen",
     "keyAdded": "Schlüssel hinzugefügt",
     "endpointKeysShareModels": "Schlüssel desselben Endpunkts teilen sich dessen Modelle.",
     "export": "Exportieren",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "optional",
     "customFamily": "Familie",
     "customFamilyPlaceholder": "Standardmäßig wird die Modell-ID verwendet",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API-Schlüssel",
     "customCapabilities": "Fähigkeiten",
     "addModel": "Modell hinzufügen",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Noch keine Einbettungsmodelle",
     "emptyDesc": "Einbettungsfamilien werden hier angezeigt, sobald Sie einen Anbieterschlüssel hinzufügen, der Einbettungen unterstützt.",
-    "dragToReorder": "Ziehen Sie, um den Anbieter neu anzuordnen"
+    "dragToReorder": "Ziehen Sie, um den Anbieter neu anzuordnen",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",
@@ -1233,7 +1252,8 @@
       "hermes": "Der selbstverbessernde Agent von Nous Research mit dauerhaftem Gedächtnis und Skills, im Terminal oder in Chat-Apps.",
       "pi": "Ein minimaler Terminal-Agent, den du mit eigenen Erweiterungen, Skills und Prompt-Vorlagen formst.",
       "reasonix": "Ein für DeepSeek gebauter Coding-Agent fürs Terminal, ausgelegt auf Prefix-Caching, damit lange Sitzungen günstig bleiben.",
-      "zcode": "Der Coding-Agent von Z.ai für seine GLM-Modelle, der über ein Provider-Verzeichnis jede OpenAI-kompatible Endstelle anspricht."
+      "zcode": "Der Coding-Agent von Z.ai für seine GLM-Modelle, der über ein Provider-Verzeichnis jede OpenAI-kompatible Endstelle anspricht.",
+      "zero": "Ein lokaler Terminal-Coding-Agent mit dauerhaften Sitzungen, Berechtigungen und jedem OpenAI-kompatiblen Anbieter."
     }
   },
   "update": {

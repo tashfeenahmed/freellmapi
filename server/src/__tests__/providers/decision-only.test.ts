@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { getProvider } from '../../providers/index.js';
 
 describe('keyless decision providers', () => {
-  it.each(['halx', 'aisense'] as const)('%s registers without a chat or inference health probe', async platform => {
+  it.each(['halx', 'aisense', 'classifierdev','tanod'] as const)('%s registers without a chat or inference health probe', async platform => {
     const provider = getProvider(platform)!;
     expect(provider.keyless).toBe(true);
     const fetch = vi.spyOn(globalThis, 'fetch');

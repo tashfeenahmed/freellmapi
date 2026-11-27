@@ -9,15 +9,16 @@ import { fileURLToPath } from 'node:url';
 import { applyGeneratedFiles, printDryRunDiff } from './config-files.js';
 import { detectChatGptClient } from './detect.js';
 import { getTool, tools } from './tools.js';
-import { resolveLaunchModel, type ResolvedModel } from './models.js';
+import { parseContextWindow, resolveLaunchModel, type ResolvedModel } from './models.js';
 import { DOCTOR_TOOLS, diagnose, exitCodeFor, formatReport, type ToolReport } from './doctor.js';
 import { keysHelp, runKeys, type KeyCommandOptions } from './keys.js';
-import type { CatalogModel, GenerateContext } from './types.js';
+import type { CatalogModel, ContextWindowChoice, GenerateContext } from './types.js';
 
 interface CliOptions extends KeyCommandOptions {
   apiKey?: string;
   profile: string;
   model?: string;
+  contextWindow?: ContextWindowChoice;
 }
 
 function rootUrl(url: string): string {
@@ -81,7 +82,7 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
     const value = inline ?? argv[index + 1];
     if (
       flag === '--url' || flag === '--api-key' || flag === '--profile'
-      || flag === '--model' || flag === '--timeout'
+      || flag === '--model' || flag === '--timeout' || flag === '--context-window'
       || flag === '--token' || flag === '--key' || flag === '--id'
     ) {
       if (inline === undefined) index += 1;
@@ -92,6 +93,7 @@ export function parseArgs(argv: string[]): { command?: string; options: CliOptio
       else if (flag === '--api-key') options.apiKey = value;
       else if (flag === '--profile') options.profile = validateProfile(value);
       else if (flag === '--timeout') options.timeoutMs = parseTimeout(value);
+      else if (flag === '--context-window') options.contextWindow = parseContextWindow(value);
       else if (flag === '--token') options.token = value;
       else if (flag === '--key') options.key = value;
       else if (flag === '--id') {
@@ -272,6 +274,7 @@ function help(): string {
     '  doctor [tool…]    Check whether a tool\'s requests actually reach this gateway',
     '                    (--timeout MS raises the probe wait on a slow link)',
     '  launch            Run Claude Code with credentials injected into the child environment',
+    '                    (setup-claude and launch take --context-window max|TOKENS)',
     '  launch-codex      Run Codex CLI with provider overrides and injected credentials',
     '  list              List supported coding agents',
     '  keys              Add, list, remove, or test provider keys (keys --help)',
@@ -298,6 +301,7 @@ async function setup(command: string, options: CliOptions): Promise<void> {
     models: rosters.available,
     homeDir: os.homedir(),
     requestedModelId,
+    contextWindow: options.contextWindow,
     detectedClient: detectChatGptClient(),
   };
   const generation = tool.generate(context);
@@ -362,7 +366,7 @@ export function claudeLaunchEnv(
   homeDir = os.homedir(),
   fullCatalog: CatalogModel[] = models,
 ): NodeJS.ProcessEnv {
-  const resolved = resolveLaunchModel(options.model, models, fullCatalog);
+  const resolved = resolveLaunchModel(options.model, models, fullCatalog, options.contextWindow);
   const selected = resolved.id;
   const env: NodeJS.ProcessEnv = { ...baseEnv };
   // Never leak the user's real Anthropic credentials to the gateway.
@@ -387,6 +391,14 @@ export function claudeLaunchEnv(
     ANTHROPIC_DEFAULT_HAIKU_MODEL: selected,
     CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: '1',
   });
+  // #2011: auto mode's server-side review cannot run behind this gateway (the
+  // routed models are not Anthropic's). Anthropic documents
+  // CLAUDE_CODE_AUTO_MODE_SERVER=0 for that case: Claude Code checks actions
+  // with its own classifier requests through the gateway and does not show
+  // the "isn't eligible" notice. An explicit value in the caller's shell wins.
+  if (env.CLAUDE_CODE_AUTO_MODE_SERVER === undefined || env.CLAUDE_CODE_AUTO_MODE_SERVER === '') {
+    env.CLAUDE_CODE_AUTO_MODE_SERVER = '0';
+  }
   // Only pin the compaction window when the catalog actually published one.
   // The old `?? 128_000` invented a number for every model with no stated
   // window, and a wrong window is worse than none: too high and Claude Code
@@ -464,6 +476,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const flag = arg.split('=', 1)[0];
     if (command !== 'keys' && ['--token', '--key', '--id'].includes(flag)) {
       throw new Error(`${flag} is only supported by keys`);
+    }
+    // Only Claude Code's window is written from it; anywhere else it would be
+    // a silent no-op.
+    if (flag === '--context-window' && command !== 'setup-claude' && command !== 'launch') {
+      throw new Error('--context-window is only supported by setup-claude and launch');
     }
     if (command === 'keys' && ['--api-key', '--profile', '--model'].includes(flag)) {
       throw new Error(`${flag} is not supported by keys; use keys --help for available options`);

@@ -60,7 +60,16 @@
     "emailChanged": "Agbanwela ozi-e.",
     "passwordReset": "Atọghatala okwuntughe. Biko banye.",
     "resetCodeDockerHint": "Ị na-agba na Docker? Koodu ahụ dị na ndekọ kọntetina: docker logs <container>.",
-    "desktopSessionFailed": "Dashboard enweghị ike ịbanye na sava mpaghara. Mechie FreeLLMAPI ma mepee ya ọzọ."
+    "desktopSessionFailed": "Dashboard enweghị ike ịbanye na sava mpaghara. Mechie FreeLLMAPI ma mepee ya ọzọ.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Chekwa",
@@ -171,7 +180,12 @@
     "updateNow": "Melite ugbu a",
     "updatingContainer": "Na-adọta onyonyo ọhụrụ ma na-amalitegharị. Ibe a ga-ebugharị mgbe FreeLLMAPI lọghachiri.",
     "updateNowFailed": "Onye mmelite anabataghị arịrịọ ahụ. Lelee ma akpa watchtower na-arụ ọrụ.",
-    "updateNowTimeout": "FreeLLMAPI amalitegharịbeghị mgbe nkeji 5 gachara. Lelee ndekọ akpa watchtower."
+    "updateNowTimeout": "FreeLLMAPI amalitegharịbeghị mgbe nkeji 5 gachara. Lelee ndekọ akpa watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Ụdị",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Họrọ onye na-eweta ya",
     "addKey": "Tinye igodo",
+    "addAnotherKey": "Tinye igodo API ọzọ",
     "keyAdded": "Igodo agbakwunyere",
     "endpointKeysShareModels": "Igodo nke otu njedebe na-ekekọrịta ụdị ya.",
     "export": "Mbupụ",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "nhọrọ",
     "customFamily": "Ezinụlọ",
     "customFamilyPlaceholder": "ndabara na ụdị id",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "igodo API",
     "customCapabilities": "Ike",
     "addModel": "Tinye ihe nlereanya",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Ọnweghị ụdị mgbakwunye",
     "emptyDesc": "Ezinaụlọ agbakwunyere na-apụta ebe a ozugbo ị gbakwunye igodo ndị na-eweta ihe na-akwado ntinye.",
-    "dragToReorder": "Dọrọ ka ịhazigharị onye na-eweta ya"
+    "dragToReorder": "Dọrọ ka ịhazigharị onye na-eweta ya",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Ngwakọta",
@@ -1233,7 +1252,8 @@
       "hermes": "Onye ọrụ Nous Research na-emeziwanye onwe ya, nwere ebe nchekwa na-adịgide na nkà, na terminal ma ọ bụ na ngwa mkparịta ụka.",
       "pi": "Obere onye ọrụ terminal ị na-akpụ site na ndọtị, nkà na ndebiri ajụjụ nke gị.",
       "reasonix": "Onye nnọchite ide koodu na terminal emere maka DeepSeek, wuru gburugburu prefix caching ka ogologo nnọkọ wee dị ọnụ ala.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Onye ọrụ koodu terminal mpaghara nwere nnọkọ na-adịgide adịgide, ikike, na onye na-enye ọrụ ọ bụla kwekọrọ na OpenAI."
     }
   },
   "update": {

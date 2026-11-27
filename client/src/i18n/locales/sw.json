@@ -60,7 +60,16 @@
     "emailChanged": "Barua pepe imebadilishwa.",
     "passwordReset": "Nenosiri limewekwa upya. Tafadhali ingia.",
     "resetCodeDockerHint": "Unatumia Docker? Msimbo uko kwenye kumbukumbu ya kontena: docker logs <container>.",
-    "desktopSessionFailed": "Dashibodi haikuweza kuingia kwenye seva ya ndani. Funga FreeLLMAPI kisha uifungue tena."
+    "desktopSessionFailed": "Dashibodi haikuweza kuingia kwenye seva ya ndani. Funga FreeLLMAPI kisha uifungue tena.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Hifadhi",
@@ -171,7 +180,12 @@
     "updateNow": "Sasisha sasa",
     "updatingContainer": "Inavuta picha mpya na kuanza upya. Ukurasa huu utapakia upya FreeLLMAPI itakaporudi.",
     "updateNowFailed": "Kisasishaji hakikukubali ombi. Hakikisha kontena la watchtower linafanya kazi.",
-    "updateNowTimeout": "FreeLLMAPI haijaanza upya baada ya dakika 5. Angalia kumbukumbu za kontena la watchtower."
+    "updateNowTimeout": "FreeLLMAPI haijaanza upya baada ya dakika 5. Angalia kumbukumbu za kontena la watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Mifano",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Chagua mtoaji",
     "addKey": "Ongeza ufunguo",
+    "addAnotherKey": "Ongeza ufunguo mwingine wa API",
     "keyAdded": "Ufunguo umeongezwa",
     "endpointKeysShareModels": "Vitufe vya mwisho huo huo hushiriki modeli zake.",
     "export": "Hamisha",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "hiari",
     "customFamily": "Familia",
     "customFamilyPlaceholder": "chaguo-msingi kwa kitambulisho cha mfano",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "Kitufe cha API",
     "customCapabilities": "Uwezo",
     "addModel": "Ongeza mfano",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Bado hakuna miundo ya kupachika",
     "emptyDesc": "Familia zinazopachika huonekana hapa pindi tu unapoongeza ufunguo wa mtoa huduma unaoauni upachikaji.",
-    "dragToReorder": "Buruta ili upange upya mtoa huduma"
+    "dragToReorder": "Buruta ili upange upya mtoa huduma",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",
@@ -1233,7 +1252,8 @@
       "hermes": "Wakala wa Nous Research anayejiboresha mwenyewe, mwenye kumbukumbu ya kudumu na ujuzi, kwenye terminal au kwenye programu za gumzo.",
       "pi": "Wakala mdogo wa terminal unaomuunda kwa viendelezi, ujuzi na violezo vya maagizo vyako mwenyewe.",
       "reasonix": "Wakala wa kuandika msimbo kwenye terminal aliyejengwa kwa ajili ya DeepSeek, kwa msingi wa prefix caching ili vipindi virefu vibaki nafuu.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Wakala wa uandishi wa msimbo kwenye terminal ya ndani yenye vipindi endelevu, ruhusa, na mtoa huduma yeyote anayelingana na OpenAI."
     }
   },
   "update": {

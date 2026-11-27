@@ -60,7 +60,16 @@
     "emailChanged": "Το e-mail άλλαξε.",
     "passwordReset": "Ο κωδικός επαναφέρθηκε. Συνδεθείτε.",
     "resetCodeDockerHint": "Εκτελείται σε Docker; Ο κωδικός βρίσκεται στο αρχείο καταγραφής του container: docker logs <container>.",
-    "desktopSessionFailed": "Ο πίνακας ελέγχου δεν μπόρεσε να συνδεθεί στον τοπικό διακομιστή. Κλείστε το FreeLLMAPI και ανοίξτε το ξανά."
+    "desktopSessionFailed": "Ο πίνακας ελέγχου δεν μπόρεσε να συνδεθεί στον τοπικό διακομιστή. Κλείστε το FreeLLMAPI και ανοίξτε το ξανά.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Αποθήκευση",
@@ -171,7 +180,12 @@
     "updateNow": "Ενημέρωση τώρα",
     "updatingContainer": "Λήψη της νέας εικόνας και επανεκκίνηση. Η σελίδα θα φορτωθεί ξανά όταν επιστρέψει το FreeLLMAPI.",
     "updateNowFailed": "Το πρόγραμμα ενημέρωσης δεν δέχτηκε το αίτημα. Ελέγξτε ότι εκτελείται το κοντέινερ watchtower.",
-    "updateNowTimeout": "Το FreeLLMAPI δεν έχει επανεκκινηθεί μετά από 5 λεπτά. Ελέγξτε τα αρχεία καταγραφής του κοντέινερ watchtower."
+    "updateNowTimeout": "Το FreeLLMAPI δεν έχει επανεκκινηθεί μετά από 5 λεπτά. Ελέγξτε τα αρχεία καταγραφής του κοντέινερ watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Μοντέλα",
@@ -436,6 +450,7 @@
     "familyHaiku": "Χαϊκού",
     "selectPlatform": "Επιλέξτε έναν πάροχο",
     "addKey": "Προσθήκη κλειδιού",
+    "addAnotherKey": "Προσθήκη άλλου κλειδιού API",
     "keyAdded": "Προστέθηκε κλειδί",
     "endpointKeysShareModels": "Τα κλειδιά του ίδιου endpoint μοιράζονται τα μοντέλα του.",
     "export": "Εξαγωγή",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "προαιρετικός",
     "customFamily": "Οικογένεια",
     "customFamilyPlaceholder": "Προεπιλογή σε αναγνωριστικό μοντέλου",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API κλειδί",
     "customCapabilities": "Δυνατότητες",
     "addModel": "Προσθήκη μοντέλου",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Δεν υπάρχουν ακόμη μοντέλα ενσωμάτωσης",
     "emptyDesc": "Οι οικογένειες ενσωμάτωσης εμφανίζονται εδώ μόλις προσθέσετε ένα κλειδί υπηρεσίας παροχής που υποστηρίζει ενσωματώσεις.",
-    "dragToReorder": "Σύρετε για να αλλάξετε τη σειρά του παρόχου"
+    "dragToReorder": "Σύρετε για να αλλάξετε τη σειρά του παρόχου",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Σύντηξη",
@@ -1233,7 +1252,8 @@
       "hermes": "Ο αυτοβελτιούμενος πράκτορας της Nous Research με μόνιμη μνήμη και δεξιότητες, στο τερματικό ή σε εφαρμογές συνομιλίας.",
       "pi": "Ένας μινιμαλιστικός πράκτορας τερματικού που διαμορφώνετε με δικές σας επεκτάσεις, δεξιότητες και πρότυπα προτροπών.",
       "reasonix": "Πράκτορας προγραμματισμού για το τερματικό, φτιαγμένος για το DeepSeek γύρω από την προσωρινή αποθήκευση προθεμάτων, ώστε οι μεγάλες συνεδρίες να μένουν φθηνές.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Ένας τοπικός πράκτορας προγραμματισμού τερματικού με μόνιμες συνεδρίες, δικαιώματα και κάθε πάροχο συμβατό με OpenAI."
     }
   },
   "update": {

@@ -60,7 +60,16 @@
     "emailChanged": "ഇമെയിൽ വിജയകരമായി മാറ്റി.",
     "passwordReset": "പാസ്‌വേഡ് റീസെറ്റ് ചെയ്തു. സൈൻ ഇൻ ചെയ്യുക.",
     "resetCodeDockerHint": "Docker-ൽ പ്രവർത്തിപ്പിക്കുകയാണോ? കോഡ് കണ്ടെയ്നർ ലോഗിലുണ്ട്: docker logs <container>.",
-    "desktopSessionFailed": "ഡാഷ്‌ബോർഡിന് ലോക്കൽ സെർവറിൽ സൈൻ ഇൻ ചെയ്യാനായില്ല. FreeLLMAPI അടച്ച് വീണ്ടും തുറക്കുക."
+    "desktopSessionFailed": "ഡാഷ്‌ബോർഡിന് ലോക്കൽ സെർവറിൽ സൈൻ ഇൻ ചെയ്യാനായില്ല. FreeLLMAPI അടച്ച് വീണ്ടും തുറക്കുക.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "സംരക്ഷിക്കുക",
@@ -171,7 +180,12 @@
     "updateNow": "ഇപ്പോൾ അപ്‌ഡേറ്റ് ചെയ്യുക",
     "updatingContainer": "പുതിയ ഇമേജ് എടുത്ത് റീസ്റ്റാർട്ട് ചെയ്യുന്നു. FreeLLMAPI തിരിച്ചെത്തുമ്പോൾ ഈ പേജ് റീലോഡ് ചെയ്യും.",
     "updateNowFailed": "അപ്‌ഡേറ്റർ അഭ്യർത്ഥന സ്വീകരിച്ചില്ല. watchtower കണ്ടെയ്‌നർ പ്രവർത്തിക്കുന്നുണ്ടോ എന്ന് പരിശോധിക്കുക.",
-    "updateNowTimeout": "5 മിനിറ്റിനുശേഷവും FreeLLMAPI റീസ്റ്റാർട്ട് ആയില്ല. watchtower കണ്ടെയ്‌നറിന്റെ ലോഗുകൾ പരിശോധിക്കുക."
+    "updateNowTimeout": "5 മിനിറ്റിനുശേഷവും FreeLLMAPI റീസ്റ്റാർട്ട് ആയില്ല. watchtower കണ്ടെയ്‌നറിന്റെ ലോഗുകൾ പരിശോധിക്കുക.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "മോഡലുകൾ",
@@ -436,6 +450,7 @@
     "familyHaiku": "ഹൈക്കു",
     "selectPlatform": "ഒരു ദാതാവിനെ തിരഞ്ഞെടുക്കുക",
     "addKey": "കീ ചേർക്കുക",
+    "addAnotherKey": "മറ്റൊരു API കീ ചേർക്കുക",
     "keyAdded": "കീ ചേർത്തു",
     "endpointKeysShareModels": "ഒരേ എൻഡ്‌പോയിന്റിന്റെ കീകൾ അതിന്റെ മോഡലുകൾ പങ്കിടുന്നു.",
     "export": "കയറ്റുമതി",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "ഓപ്ഷണൽ",
     "customFamily": "കുടുംബം",
     "customFamilyPlaceholder": "മോഡൽ ഐഡിയിലേക്ക് സ്ഥിരസ്ഥിതികൾ",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API കീ",
     "customCapabilities": "കഴിവുകൾ",
     "addModel": "മോഡൽ ചേർക്കുക",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ടോക്ക് പരമാവധി",
     "emptyTitle": "ഇതുവരെ എംബഡിംഗ് മോഡലുകളൊന്നുമില്ല",
     "emptyDesc": "എംബെഡ്ഡിംഗുകളെ പിന്തുണയ്ക്കുന്ന ഒരു ദാതാവിൻ്റെ കീ ചേർത്തുകഴിഞ്ഞാൽ എംബഡിംഗ് ഫാമിലികൾ ഇവിടെ ദൃശ്യമാകും.",
-    "dragToReorder": "ദാതാവിനെ പുനഃക്രമീകരിക്കാൻ വലിച്ചിടുക"
+    "dragToReorder": "ദാതാവിനെ പുനഃക്രമീകരിക്കാൻ വലിച്ചിടുക",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "ഫ്യൂഷൻ",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Research-ന്റെ സ്വയം മെച്ചപ്പെടുത്തുന്ന ഏജന്റ്, സ്ഥിരമായ മെമ്മറിയും സ്കില്ലുകളും സഹിതം, ടെർമിനലിലോ ചാറ്റ് ആപ്പുകളിലോ.",
       "pi": "നിങ്ങളുടെ സ്വന്തം എക്സ്റ്റൻഷനുകളും സ്കില്ലുകളും പ്രോംപ്റ്റ് ടെംപ്ലേറ്റുകളും കൊണ്ട് രൂപപ്പെടുത്തുന്ന ലളിതമായ ടെർമിനൽ ഏജന്റ്.",
       "reasonix": "DeepSeek-നായി നിർമ്മിച്ച ടെർമിനൽ കോഡിംഗ് ഏജന്റ്; ദൈർഘ്യമേറിയ സെഷനുകളും ചെലവുകുറഞ്ഞതാക്കാൻ പ്രിഫിക്സ് കാഷിംഗിനെ ചുറ്റിപ്പറ്റി നിർമ്മിച്ചത്.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "സ്ഥിരമായ സെഷനുകളും അനുമതികളും ഏതൊരു OpenAI-അനുയോജ്യ ദാതാവിനെയും പിന്തുണയ്ക്കുന്ന ലോക്കൽ ടെർമിനൽ കോഡിംഗ് ഏജന്റ്."
     }
   },
   "update": {

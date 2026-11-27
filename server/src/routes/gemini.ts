@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { buildModelListing, type NormalizedModel } from '../services/model-listing.js';
 import { extractApiToken } from './proxy.js';
 import { resolveAuth, prependSystemPrompt, type ResolvedAuth } from '../lib/system-prompt.js';
+import { maybeInjectSystemDate } from '../lib/system-date.js';
 import { runInboundChat, type InboundChatWire } from '../lib/inbound-chat.js';
 import {
   effortFromGeminiThinking,
@@ -202,10 +203,12 @@ async function handleGenerate(req: Request, res: Response, stream: boolean): Pro
   const tools = geminiToolsToChatTools(body.tools);
   await runInboundChat(req, res, {
     model: resolveGeminiModel(model),
-    // Server-enforced system prompt (#411): enforced prompt FIRST so the
-    // caller's systemInstruction follows it and cannot override it. Neutral
-    // no-op for the unified key and for profiles without a prompt.
-    messages: prependSystemPrompt(geminiContentsToMessages(body), auth.systemPrompt),
+    // Opt-in system date (#1931) + server-enforced system prompt (#411):
+    // enforced prompt FIRST so the caller's systemInstruction follows it.
+    messages: prependSystemPrompt(
+      maybeInjectSystemDate(geminiContentsToMessages(body), { tools }),
+      auth.systemPrompt,
+    ),
     stream,
     // Gemini CLI never sends maxOutputTokens; the shared 1024-token default
     // would truncate every response, so match Gemini's own model default.

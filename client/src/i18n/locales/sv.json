@@ -60,7 +60,16 @@
     "emailChanged": "E-postadressen har bytts.",
     "passwordReset": "Lösenordet återställt. Logga in.",
     "resetCodeDockerHint": "Kör du i Docker? Koden finns i containerloggen: docker logs <container>.",
-    "desktopSessionFailed": "Instrumentpanelen kunde inte logga in på den lokala servern. Avsluta FreeLLMAPI och öppna det igen."
+    "desktopSessionFailed": "Instrumentpanelen kunde inte logga in på den lokala servern. Avsluta FreeLLMAPI och öppna det igen.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Spara",
@@ -171,7 +180,12 @@
     "updateNow": "Uppdatera nu",
     "updatingContainer": "Hämtar den nya avbildningen och startar om. Sidan laddas om när FreeLLMAPI är tillbaka.",
     "updateNowFailed": "Uppdateraren tog inte emot begäran. Kontrollera att watchtower-containern körs.",
-    "updateNowTimeout": "FreeLLMAPI har inte startat om efter 5 minuter. Kontrollera loggarna för watchtower-containern."
+    "updateNowTimeout": "FreeLLMAPI har inte startat om efter 5 minuter. Kontrollera loggarna för watchtower-containern.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Modeller",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Välj en leverantör",
     "addKey": "Lägg till nyckel",
+    "addAnotherKey": "Lägg till en till API-nyckel",
     "keyAdded": "Nyckel tillagd",
     "endpointKeysShareModels": "Nycklar för samma endpoint delar dess modeller.",
     "export": "Export",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "Valfritt",
     "customFamily": "Familj",
     "customFamilyPlaceholder": "Standardinställning till modell-ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API nyckel",
     "customCapabilities": "Kapabiliteter",
     "addModel": "Lägg till modell",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Inga inbäddningsmodeller än",
     "emptyDesc": "Embedding-familjer visas här när du lägger till en leverantörsnyckel som stödjer inbäddningar.",
-    "dragToReorder": "Dra till omordna leverantör"
+    "dragToReorder": "Dra till omordna leverantör",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusion",
@@ -1233,7 +1252,8 @@
       "hermes": "Nous Researchs självförbättrande agent med beständigt minne och färdigheter, i terminalen eller i chattappar.",
       "pi": "En minimal terminalagent som du formar med egna tillägg, färdigheter och promptmallar.",
       "reasonix": "En terminalbaserad kodagent byggd för DeepSeek kring prefix-cachning, så att långa sessioner förblir billiga.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "En lokal terminalbaserad kodagent med beständiga sessioner, behörigheter och stöd för alla OpenAI-kompatibla leverantörer."
     }
   },
   "update": {

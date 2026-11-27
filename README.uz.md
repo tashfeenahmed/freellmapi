@@ -15,7 +15,7 @@ O'nlab provayderlarning bepul tariflarini, shuningdek, OpenAI bilan mos keladiga
 
 **[freellmapi.co](https://freellmapi.co/?utm_source=github&utm_medium=readme&utm_campaign=repository&utm_content=readme_top)** · to'liq katalogni ko'ring: 736 ta model oilasi, 1313 ta bepul endpoint
 
-[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha** · [한국어](README.ko.md)
+[English](README.md) · [Türkçe](README.tr.md) · [简体中文](README.zh-cn.md) · [Русский](README.ru.md) · **O'zbekcha** · [한국어](README.ko.md) · [日本語](README.ja.md)
 
 Bu tarjima ortda qolishi mumkin. Eng so'nggi ma'lumot uchun inglizcha README'ga qarang.
 
@@ -522,6 +522,21 @@ Hissa qo'shuvchilarni juda mamnuniyat bilan kutamiz! Ishlab chiqish jarayoni, PR
 <a href="https://github.com/indraoverflow"><img src="https://images.weserv.nl/?url=github.com/indraoverflow.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@indraoverflow" /></a>
 <a href="https://github.com/KHKRUTIK"><img src="https://images.weserv.nl/?url=github.com/KHKRUTIK.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@KHKRUTIK" /></a>
 <a href="https://github.com/lxymvl"><img src="https://images.weserv.nl/?url=github.com/lxymvl.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@lxymvl" /></a>
+<a href="https://github.com/tevasas"><img src="https://images.weserv.nl/?url=github.com/tevasas.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@tevasas" /></a>
+<a href="https://github.com/FabioLeitao"><img src="https://images.weserv.nl/?url=github.com/FabioLeitao.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@FabioLeitao" /></a>
+<a href="https://github.com/dirtious15"><img src="https://images.weserv.nl/?url=github.com/dirtious15.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@dirtious15" /></a>
+<a href="https://github.com/Aniketchavan7"><img src="https://images.weserv.nl/?url=github.com/Aniketchavan7.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Aniketchavan7" /></a>
+<a href="https://github.com/eltociear"><img src="https://images.weserv.nl/?url=github.com/eltociear.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@eltociear" /></a>
+<a href="https://github.com/flipcyde101"><img src="https://images.weserv.nl/?url=github.com/flipcyde101.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@flipcyde101" /></a>
+<a href="https://github.com/FNICKE"><img src="https://images.weserv.nl/?url=github.com/FNICKE.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@FNICKE" /></a>
+<a href="https://github.com/georgehadji"><img src="https://images.weserv.nl/?url=github.com/georgehadji.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@georgehadji" /></a>
+<a href="https://github.com/mamehi"><img src="https://images.weserv.nl/?url=github.com/mamehi.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@mamehi" /></a>
+<a href="https://github.com/MuhammadAhmadRaza087"><img src="https://images.weserv.nl/?url=github.com/MuhammadAhmadRaza087.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@MuhammadAhmadRaza087" /></a>
+<a href="https://github.com/prascli"><img src="https://images.weserv.nl/?url=github.com/prascli.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@prascli" /></a>
+<a href="https://github.com/SASU004"><img src="https://images.weserv.nl/?url=github.com/SASU004.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@SASU004" /></a>
+<a href="https://github.com/SHMOUKE"><img src="https://images.weserv.nl/?url=github.com/SHMOUKE.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@SHMOUKE" /></a>
+<a href="https://github.com/Tushar49"><img src="https://images.weserv.nl/?url=github.com/Tushar49.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Tushar49" /></a>
+<a href="https://github.com/Volko61"><img src="https://images.weserv.nl/?url=github.com/Volko61.png&w=40&h=40&fit=cover&mask=circle" width="40" alt="@Volko61" /></a>
 
 ## Ogohlantirish
 

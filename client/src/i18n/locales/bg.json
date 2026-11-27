@@ -60,7 +60,16 @@
     "emailChanged": "Имейлът е сменен.",
     "passwordReset": "Паролата е нулирана. Влезте отново.",
     "resetCodeDockerHint": "Работите в Docker? Кодът е в лога на контейнера: docker logs <container>.",
-    "desktopSessionFailed": "Таблото не успя да влезе в локалния сървър. Затворете FreeLLMAPI и го отворете отново."
+    "desktopSessionFailed": "Таблото не успя да влезе в локалния сървър. Затворете FreeLLMAPI и го отворете отново.",
+    "signInWithSso": "Sign in with {provider}",
+    "orContinueWithPassword": "or continue with email",
+    "reverifyWithSso": "Re-verify with {provider}",
+    "oidcReauthHint": "Confirm your identity with {provider} to access plaintext keys.",
+    "oidcReauthSuccess": "Identity verified for the next 5 minutes.",
+    "oidcErrorNotAllowed": "Your account is not permitted to sign in to this dashboard.",
+    "oidcErrorUnverifiedEmail": "Your identity provider must verify your email address before signing in.",
+    "oidcErrorNoAccount": "No matching account exists and automatic account creation is disabled.",
+    "oidcErrorFailed": "Single sign-on failed. Please try again."
   },
   "common": {
     "save": "Запази",
@@ -171,7 +180,12 @@
     "updateNow": "Актуализирай сега",
     "updatingContainer": "Изтегля се новият образ и се рестартира. Страницата ще се презареди, когато FreeLLMAPI се върне.",
     "updateNowFailed": "Актуализаторът не прие заявката. Проверете дали контейнерът watchtower работи.",
-    "updateNowTimeout": "FreeLLMAPI не се е рестартирал след 5 минути. Проверете логовете на контейнера watchtower."
+    "updateNowTimeout": "FreeLLMAPI не се е рестартирал след 5 минути. Проверете логовете на контейнера watchtower.",
+    "injectSystemDate": "System date in prompt",
+    "injectSystemDateHelp": "Prepend today’s UTC date (YYYY-MM-DD) to the system prompt so models query web search for current information. Skipped if the caller already includes a date. Off or Web search is recommended to preserve prompt caching.",
+    "injectSystemDateOff": "Off",
+    "injectSystemDateWebSearch": "Web search",
+    "injectSystemDateAlways": "Always"
   },
   "models": {
     "title": "Модели",
@@ -436,6 +450,7 @@
     "familyHaiku": "Хайку",
     "selectPlatform": "Изберете доставчик",
     "addKey": "Добави ключ",
+    "addAnotherKey": "Добави друг API ключ",
     "keyAdded": "Добавен ключ",
     "endpointKeysShareModels": "Ключовете за една и съща крайна точка споделят нейните модели.",
     "export": "Износ",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "по избор",
     "customFamily": "Семейство",
     "customFamilyPlaceholder": "По подразбиране към Model ID",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API ключ",
     "customCapabilities": "Възможности",
     "addModel": "Добави модел",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} ток макс",
     "emptyTitle": "Все още няма вградени модели",
     "emptyDesc": "Семействата за вграждане се появяват тук, след като добавите доставчик ключ, който поддържа вграждания.",
-    "dragToReorder": "Drag to reorder provider"
+    "dragToReorder": "Drag to reorder provider",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Сливане",
@@ -1233,7 +1252,8 @@
       "hermes": "Самоусъвършенстващият се агент на Nous Research с постоянна памет и умения — в терминала или в чат приложенията.",
       "pi": "Минималистичен агент за терминала, който оформяте със собствени разширения, умения и шаблони за подкани.",
       "reasonix": "Терминален агент за програмиране, създаден за DeepSeek и изграден около кеширането на префикси, така че дългите сесии да остават евтини.",
-      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry."
+      "zcode": "Z.ai's coding agent for its GLM models, speaking any OpenAI-compatible endpoint through a provider registry.",
+      "zero": "Локален терминален агент за програмиране с устойчиви сесии, разрешения и всеки доставчик, съвместим с OpenAI."
     }
   },
   "update": {

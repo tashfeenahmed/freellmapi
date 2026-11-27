@@ -57,6 +57,10 @@ export const MIN_CATALOG_VERSION = '2026.06.07';
 
 const SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000; // twice daily
 const BOOT_DELAY_MS = 10 * 1000; // let the server settle before first sync
+const NETWORK_RETRY_DELAY_MS = 1000;
+// After a failed scheduled sync, try again sooner than the 12h poll:
+// 15 min, 30 min, 1h, 2h, 4h, then the regular interval takes over.
+const FAILED_SYNC_RETRY_MS = [15, 30, 60, 120, 240].map((m) => m * 60 * 1000);
 const FETCH_TIMEOUT_MS = 20 * 1000;
 
 // settings table keys
@@ -103,9 +107,18 @@ export async function catalogFetch(input: string | URL, init?: RequestInit): Pro
   try {
     return await fetch(input, init);
   } catch (err) {
-    if (!fallbackFetch || init?.signal?.aborted) throw err;
-    console.warn(`[catalog-sync] ${describeFetchError(err)}; retrying through the desktop network stack`);
-    return fallbackFetch(input, init);
+    if (init?.signal?.aborted) throw err;
+    if (fallbackFetch) {
+      console.warn(`[catalog-sync] ${describeFetchError(err)}; retrying through the desktop network stack`);
+      return fallbackFetch(input, init);
+    }
+    // Server and Docker installs: one short retry. A dropped keep-alive
+    // socket or a brief network blip otherwise fails the license check right
+    // after a successful activation, and the next poll is 12h away.
+    console.warn(`[catalog-sync] ${describeFetchError(err)}; retrying once`);
+    await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_DELAY_MS));
+    if (init?.signal?.aborted) throw err;
+    return fetch(input, init);
   }
 }
 
@@ -167,6 +180,18 @@ interface CatalogEmbedding {
   priority: number;
   enabled: boolean;
   quotaLabel: string;
+  /** Optional per-model rate-limit windows, the embedding counterpart of
+   *  `CatalogModel.limits`. The chat catalogue carries these under a nested
+   *  `limits` object because one chat model has one row; an embedding entry is
+   *  already per-provider, so the four windows sit flat on the entry and stay
+   *  absent until the catalogue actually knows them. Absent/null = "no
+   *  opinion", i.e. the column stays NULL and nothing is throttled — which is
+   *  exactly how every row behaved before these columns existed, so an older
+   *  catalogue that never publishes them keeps syncing unchanged. */
+  rpm?: number | null;
+  rpd?: number | null;
+  tpm?: number | null;
+  tpd?: number | null;
 }
 
 interface CatalogTranscriptionModel {
@@ -338,6 +363,18 @@ export function catalogShapeProblems(value: unknown): string[] {
     if (!num(m?.dimensions)) return 'dimensions is not a number';
     if (!num(m?.priority)) return 'priority is not a number';
     if (!bool(m?.enabled)) return 'enabled is not a boolean';
+    // The four rate-limit windows are OPTIONAL (an older catalogue omits them
+    // entirely) and nullable (the catalogue may know a model has no published
+    // cap). A present value has to be a whole, non-negative count of
+    // requests/tokens — a string here would land in an INTEGER column and
+    // silently coerce, so reject the payload instead of storing nonsense.
+    for (const key of ['rpm', 'rpd', 'tpm', 'tpd'] as const) {
+      const value = m?.[key];
+      if (value === undefined || value === null) continue;
+      if (!num(value) || !Number.isInteger(value) || value < 0) {
+        return `${key} is not a non-negative integer`;
+      }
+    }
     return null;
   });
   each('transcriptionModels', (m) => {
@@ -429,7 +466,9 @@ function isCatalog(value: unknown): value is Catalog {
  *  - rows the user created (models.source = 'user': custom providers,
  *    declarative config, admin adds) are never updated, never deleted, and
  *    never adopted — on a platform:model_id collision the user row wins and
- *    the catalog entry is skipped outright;
+ *    the catalog entry is skipped outright; the same rule now applies to
+ *    embedding_models.source, so an embedding model the operator registered
+ *    on a native platform survives a catalog that does not list it;
  *  - catalog models the user deleted stay deleted via tombstones, while models
  *    auto-retired from an upstream 410/end-of-life response (#634) are only
  *    disabled — a catalog that still lists them lifts the retirement;
@@ -557,22 +596,23 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     VALUES (@platform, @modelId, @displayName, 'transcription', @priority, @enabled, @quotaLabel, @metaJson)
   `);
   const selectEmbedding = db.prepare(
-    'SELECT id, enabled FROM embedding_models WHERE platform = ? AND model_id = ?',
+    'SELECT id, enabled, source FROM embedding_models WHERE platform = ? AND model_id = ?',
   );
   const updateEmbedding = db.prepare(`
     UPDATE embedding_models SET
       family = @family, display_name = @displayName, dimensions = @dimensions,
       max_input_tokens = @maxInputTokens, priority = @priority,
-      quota_label = @quotaLabel, enabled = @enabled
+      quota_label = @quotaLabel, enabled = @enabled,
+      rpm_limit = @rpm, rpd_limit = @rpd, tpm_limit = @tpm, tpd_limit = @tpd
     WHERE id = @id
   `);
   const insertEmbedding = db.prepare(`
     INSERT INTO embedding_models
       (family, platform, model_id, display_name, dimensions, max_input_tokens,
-       priority, enabled, quota_label)
+       priority, enabled, quota_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, source)
     VALUES
       (@family, @platform, @modelId, @displayName, @dimensions, @maxInputTokens,
-       @priority, @enabled, @quotaLabel)
+       @priority, @enabled, @quotaLabel, @rpm, @rpd, @tpm, @tpd, 'catalog')
   `);
 
   const apply = db.transaction(() => {
@@ -624,7 +664,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
         continue;
       }
 
-      if ((m.platform === 'ovh' && specialistTask(m.modelId)) || m.platform === 'custom' || !hasProvider(m.platform as Platform)) {
+      if (specialistTask(m.modelId, m.platform) || m.platform === 'custom' || !hasProvider(m.platform as Platform)) {
         // An older binary may receive models for providers it cannot route yet;
         // skip them — they will appear after the user updates the app.
         counts.skippedUnknownPlatform++;
@@ -762,7 +802,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     // A separate registry: older binaries ignore it rather than treating it as chat.
     const specialistIds = new Set<string>();
     for (const m of catalog.specialistTextModels ?? []) {
-      if (m.platform !== 'ovh' || specialistTask(m.modelId) !== m.task) { counts.skippedUnknownPlatform++; continue; }
+      if (specialistTask(m.modelId, m.platform) !== m.task) { counts.skippedUnknownPlatform++; continue; }
       if (isCatalogModelTombstoned(db, 'media', m.platform, m.modelId)) continue;
       specialistIds.add(m.modelId);
       const row = selectMedia.get(m.platform, m.modelId) as {id:number;enabled:number}|undefined;
@@ -771,7 +811,7 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
       else { insertMedia.run({...fields, platform:m.platform, modelId:m.modelId, enabled:m.enabled ? 1 : 0}); counts.inserted++; }
     }
     // A downgrade to a free snapshot lacking the registry must revoke these rows.
-    for (const row of db.prepare("SELECT id,model_id FROM media_models WHERE platform='ovh' AND modality IN ('translation','summarization')").all() as {id:number;model_id:string}[]) {
+    for (const row of db.prepare("SELECT id,model_id FROM media_models WHERE platform IN ('ovh','cloudflare','xkiro') AND modality IN ('translation','summarization')").all() as {id:number;model_id:string}[]) {
       if (!specialistIds.has(row.model_id)) { db.prepare('DELETE FROM media_models WHERE id=?').run(row.id); counts.removed++; }
     }
 
@@ -816,7 +856,11 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
           continue;
         }
         inEmbeddingCatalog.add(`${m.platform}:${m.modelId}`);
-        const row = selectEmbedding.get(m.platform, m.modelId) as { id: number; enabled: number } | undefined;
+        const row = selectEmbedding.get(m.platform, m.modelId) as { id: number; enabled: number; source: string } | undefined;
+        // A row the operator owns wins outright, exactly like the chat path:
+        // the catalog neither clobbers its metadata nor adopts it, and the
+        // prune below leaves it alone because it is not source='catalog'.
+        if (row && row.source === 'user') continue;
         const fields = {
           family: m.family,
           displayName: m.displayName,
@@ -824,6 +868,13 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
           maxInputTokens: m.maxInputTokens,
           priority: m.priority,
           quotaLabel: m.quotaLabel,
+          // Catalogue metadata always wins, exactly like the chat path: a
+          // published cap replaces whatever the row carried, and an omitted
+          // one writes NULL ("no opinion") rather than reviving an old value.
+          rpm: m.rpm ?? null,
+          rpd: m.rpd ?? null,
+          tpm: m.tpm ?? null,
+          tpd: m.tpd ?? null,
         };
         if (row) {
           const enabled = m.enabled ? row.enabled : 0; // catalog and local disables both win
@@ -1039,11 +1090,29 @@ function applyCatalogInner(db: Db, catalog: Catalog): NonNullable<SyncResult['co
     // untouched". The JS truthy check on a non-empty array object would
     // misfire on `[]`, wiping the seeded rows; gate on length instead.
     if (catalog.embeddings && catalog.embeddings.length > 0) {
+      // Ownership is decided by the `source` provenance column, exactly as it
+      // is for the chat `models` table: only rows the catalog itself created
+      // are prune candidates. A row the operator registered on a NATIVE
+      // platform (source='user') is never deleted here, no matter what its
+      // platform or key_id says.
+      //
+      // The old guard could only fall back on `platform != 'custom' AND
+      // key_id IS NULL`, because embedding_models had no size_label and so no
+      // way to tell a hand-added row from a catalog row. That made every
+      // natively-registered embedding model indistinguishable from a
+      // catalog-owned one, and the next sync deleted it if the signed catalog
+      // did not list it — which is how nvidia/nemotron-3.5-embed-1b was lost.
+      // That model could not even be registered as a custom endpoint (NVIDIA's
+      // 3.5 family is asymmetric and rejects the custom probe with HTTP 400
+      // "'input_type' parameter is required for asymmetric models"), so
+      // binding it to a key was the only way to keep it alive.
       const embeddingCandidates = db
         .prepare(`
           SELECT id, platform, model_id
             FROM embedding_models
-           WHERE platform != 'custom' AND key_id IS NULL
+           WHERE platform != 'custom'
+             AND key_id IS NULL
+             AND source = 'catalog'
         `)
         .all() as { id: number; platform: string; model_id: string }[];
       const deleteEmbedding = db.prepare('DELETE FROM embedding_models WHERE id = ?');
@@ -1157,7 +1226,9 @@ export async function syncCatalog(force = false): Promise<SyncResult> {
     setSetting(SETTING_LAST_ERROR, '');
     return { ok: true, action: 'up_to_date', version: catalog.version, tier: catalog.tier };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    // describeFetchError adds the network cause (ECONNRESET, ENOTFOUND, ...)
+    // so "Last sync problem" says more than a bare "fetch failed".
+    const message = describeFetchError(err);
     console.warn(`[catalog-sync] ${message}`);
     setSetting(SETTING_LAST_ERROR, message);
     return { ok: false, action: 'error', detail: message };
@@ -1192,6 +1263,27 @@ export async function validateLicenseKey(key: string, timeoutMs = FETCH_TIMEOUT_
     console.warn(`[catalog-sync] license activation unreachable: ${describeFetchError(err)}`);
     return null;
   }
+}
+
+/**
+ * Store a key the license service just accepted. The activation answer is
+ * cached as the license status first, so the Premium page shows the plan
+ * even when the follow-up check cannot reach the service (it then only
+ * refreshes the cache). Without this the page said "Inactive" for a paid key.
+ */
+export async function storeActivatedLicense(key: string, activation: LicenseActivation): Promise<LicenseStatus | null> {
+  setSetting(SETTING_LICENSE_KEY, key);
+  const plan = activation.plan === 'annual' || activation.plan === 'lifetime' ? activation.plan : null;
+  const seeded: LicenseStatus = {
+    valid: activation.valid,
+    plan,
+    status: activation.status ?? null,
+    expiresAt: activation.expiresAt ?? null,
+    ...(activation.reason ? { reason: activation.reason } : {}),
+    checkedAtMs: Date.now(),
+  };
+  setSetting(SETTING_LICENSE_STATUS, JSON.stringify(seeded));
+  return refreshLicenseStatus();
 }
 
 /** Revalidate the stored license against the catalog service and cache the result. */
@@ -1282,6 +1374,7 @@ export function reapplyCachedCatalog(): { reapplied: boolean; version?: string }
 
 let cancelBootTimer: (() => void) | null = null;
 let cancelInterval: (() => void) | null = null;
+let cancelRetryTimer: (() => void) | null = null;
 
 export function startCatalogSync(scheduler: Scheduler): void {
   if (cancelInterval) return;
@@ -1290,9 +1383,21 @@ export function startCatalogSync(scheduler: Scheduler): void {
     return;
   }
   reapplyCachedCatalog();
-  const run = () => {
+  let failures = 0;
+  const run = async () => {
+    cancelRetryTimer?.();
+    cancelRetryTimer = null;
     void refreshLicenseStatus();
-    void syncCatalog();
+    const result = await syncCatalog();
+    if (result.ok) {
+      failures = 0;
+      return;
+    }
+    if (failures < FAILED_SYNC_RETRY_MS.length && cancelInterval) {
+      const delay = FAILED_SYNC_RETRY_MS[failures++];
+      console.warn(`[catalog-sync] retrying in ${delay / 60000} min`);
+      cancelRetryTimer = scheduler.after(delay, run);
+    }
   };
   cancelBootTimer = scheduler.after(BOOT_DELAY_MS, run);
   cancelInterval = scheduler.every(SYNC_INTERVAL_MS, run);
@@ -1307,5 +1412,9 @@ export function stopCatalogSync(): void {
   if (cancelInterval) {
     cancelInterval();
     cancelInterval = null;
+  }
+  if (cancelRetryTimer) {
+    cancelRetryTimer();
+    cancelRetryTimer = null;
   }
 }

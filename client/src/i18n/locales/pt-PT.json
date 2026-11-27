@@ -60,7 +60,16 @@
     "emailChanged": "E-mail alterado com sucesso.",
     "passwordReset": "Palavra-passe reposta. Inicie sessão.",
     "resetCodeDockerHint": "Está a usar Docker? O código está no registo do contentor: docker logs <container>.",
-    "desktopSessionFailed": "O painel não conseguiu iniciar sessão no servidor local. Feche o FreeLLMAPI e volte a abri-lo."
+    "desktopSessionFailed": "O painel não conseguiu iniciar sessão no servidor local. Feche o FreeLLMAPI e volte a abri-lo.",
+    "signInWithSso": "Iniciar sessão com {provider}",
+    "orContinueWithPassword": "ou continuar com e-mail",
+    "reverifyWithSso": "Voltar a verificar com {provider}",
+    "oidcReauthHint": "Confirme a sua identidade com {provider} para aceder às chaves em texto simples.",
+    "oidcReauthSuccess": "Identidade verificada durante os próximos 5 minutos.",
+    "oidcErrorNotAllowed": "A sua conta não tem permissão para iniciar sessão neste painel.",
+    "oidcErrorUnverifiedEmail": "O seu fornecedor de identidade tem de verificar o seu e-mail antes de iniciar sessão.",
+    "oidcErrorNoAccount": "Não existe nenhuma conta correspondente e a criação automática está desativada.",
+    "oidcErrorFailed": "O início de sessão único falhou. Tente novamente."
   },
   "common": {
     "save": "Guardar",
@@ -171,7 +180,12 @@
     "updateNow": "Atualizar agora",
     "updatingContainer": "A transferir a nova imagem e a reiniciar. Esta página recarrega quando o FreeLLMAPI voltar.",
     "updateNowFailed": "O atualizador não aceitou o pedido. Verifique se o contentor watchtower está em execução.",
-    "updateNowTimeout": "O FreeLLMAPI não reiniciou ao fim de 5 minutos. Verifique os registos do contentor watchtower."
+    "updateNowTimeout": "O FreeLLMAPI não reiniciou ao fim de 5 minutos. Verifique os registos do contentor watchtower.",
+    "injectSystemDate": "Data do sistema no prompt",
+    "injectSystemDateHelp": "Adiciona a data UTC atual (YYYY-MM-DD) ao início do prompt do sistema para ajudar os modelos na pesquisa web. Ignorado se o cliente já incluir uma data.",
+    "injectSystemDateOff": "Desativado",
+    "injectSystemDateWebSearch": "Pesquisa web",
+    "injectSystemDateAlways": "Sempre"
   },
   "models": {
     "title": "Modelos",
@@ -436,6 +450,7 @@
     "familyHaiku": "Haiku",
     "selectPlatform": "Selecione um fornecedor",
     "addKey": "Adicionar a tecla",
+    "addAnotherKey": "Adicionar outra chave API",
     "keyAdded": "Chave adicionada",
     "endpointKeysShareModels": "As chaves do mesmo endpoint partilham os seus modelos.",
     "export": "Exportação",
@@ -488,6 +503,9 @@
     "customDisplayNameOptional": "opcional",
     "customFamily": "Família",
     "customFamilyPlaceholder": "Define o ID do modelo",
+    "customEmbeddingInputType": "Input type",
+    "customEmbeddingInputTypeUnset": "Not specified",
+    "customEmbeddingInputTypeNone": "None (symmetric)",
     "customApiKey": "API chave",
     "customCapabilities": "Capacidades",
     "addModel": "Adicionar modelo",
@@ -998,7 +1016,8 @@
     "tokMax": "{tokens} tok max",
     "emptyTitle": "Ainda não há modelos de embedding",
     "emptyDesc": "As famílias de embedding aparecem aqui assim que adiciona uma chave de fornecedor que suporta embeddings.",
-    "dragToReorder": "Arrastar para o fornecedor de reencomenda"
+    "dragToReorder": "Arrastar para o fornecedor de reencomenda",
+    "inputTypeTitle": "Asymmetric embedding model: this side of the vector space is sent as input_type."
   },
   "fusion": {
     "title": "Fusão",
@@ -1233,7 +1252,8 @@
       "hermes": "O agente da Nous Research que se aperfeiçoa a si próprio, com memória persistente e competências, no terminal ou em apps de chat.",
       "pi": "Um agente de terminal minimalista que molda com as suas próprias extensões, competências e modelos de prompt.",
       "reasonix": "Um agente de programação para o terminal nativo do DeepSeek, construído em torno da cache de prefixos para que as sessões longas continuem baratas.",
-      "zcode": "O agente de código da Z.ai para os seus modelos GLM, que fala com qualquer endpoint compatível com OpenAI através de um registo de fornecedores."
+      "zcode": "O agente de código da Z.ai para os seus modelos GLM, que fala com qualquer endpoint compatível com OpenAI através de um registo de fornecedores.",
+      "zero": "Um agente de programação local para terminal com sessões duráveis, permissões e qualquer fornecedor compatível com OpenAI."
     }
   },
   "update": {
