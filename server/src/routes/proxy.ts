@@ -2602,6 +2602,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     maxRetries: MAX_RETRIES,
     state,
     attemptLog,
+    requireVision: hasImage,
     logIdentity: { surface: 'chat completions', requestId: requestGroupId, requestedModel: requestedModelLabel },
     strictPinnedModel,
     clientGone: () => clientGone,

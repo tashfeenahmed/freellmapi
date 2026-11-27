@@ -32,7 +32,11 @@ import {
 } from './fallback-loop.js';
 import { routedViaValue } from './header-value.js';
 import { applyTokenBudget, tokenBudgetMessage } from './guardrails.js';
-import { contentToString, estimateInputTokens } from './content.js';
+import {
+  contentToString,
+  estimateInputTokens,
+  messageHasImage,
+} from './content.js';
 import { routeOutputBudget } from './output-cap.js';
 import { normalizeMessageImages } from './image-normalize.js';
 import { repairToolArguments, toolSchemaMap } from './tool-args.js';
@@ -88,13 +92,6 @@ export interface InboundChatWire {
   sendToolCalls?(res: Response, route: RouteResult, calls: ChatToolCall[]): void;
   finishStream(res: Response, result: InboundChatResult): void;
   sendStreamError?(res: Response, message: string): void;
-}
-
-function hasImages(messages: ChatMessage[]): boolean {
-  return messages.some(message =>
-    Array.isArray(message.content)
-    && message.content.some(block =>
-      !!block && typeof block === 'object' && (block as { type?: string }).type === 'image_url'));
 }
 
 interface ResolvedPin {
@@ -199,7 +196,7 @@ export async function runInboundChat(
   const wantsTools = (input.tools?.length ?? 0) > 0;
   // Lets the failover loop learn which models reject tool calls (#1230).
   state.wantsTools = wantsTools;
-  const imageRequest = hasImages(input.messages);
+  const imageRequest = messageHasImage(input.messages);
   // Capped reserve (#470); threaded to the router separately because it is an
   // exact count and must not be inflated by the context-window safety margin
   // (#956 review).
@@ -233,6 +230,7 @@ export async function runInboundChat(
   await runFallbackLoop({
     state,
     attemptLog,
+    requireVision: imageRequest,
     logIdentity: { surface: 'inbound chat', requestedModel: input.model ?? 'auto' },
     clientGone: () => clientGone,
     route: () => {

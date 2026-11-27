@@ -266,6 +266,9 @@ function sendExhaustion(res: Response, body: ExhaustionBody): void {
       message: body.message,
       ...(body.code ? { code: body.code } : {}),
       ...(body.retryAtMs != null ? { retryAtMs: body.retryAtMs } : {}),
+      // Same additive block-cause fields the OpenAI-shaped surfaces carry.
+      ...(body.cause ? { cause: body.cause } : {}),
+      ...(body.causeDetail ? { cause_detail: body.causeDetail } : {}),
     },
   });
 }
@@ -818,6 +821,7 @@ export async function handleMessages(req: Request, res: Response): Promise<void>
     maxRetries: MAX_RETRIES,
     state,
     attemptLog,
+    requireVision: hasImage,
     logIdentity: { surface: 'anthropic messages', requestedModel },
     clientGone: () => clientGone,
     abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },

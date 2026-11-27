@@ -1225,6 +1225,7 @@ export async function handleResponses(req: Request, res: Response): Promise<void
     maxRetries: MAX_RETRIES,
     state,
     attemptLog,
+    requireVision: hasImage,
     logIdentity: { surface: 'responses', requestId: requestGroupId, requestedModel: requestedModelLabel },
     clientGone: () => clientGone,
     abortInFlight: () => { hedgeAbort.abort(newHedgeAbortError()); hedgeAbort = new AbortController(); },
