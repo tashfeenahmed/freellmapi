@@ -74,6 +74,7 @@ exports[`tool generators > setup-claude has stable golden output 1`] = `
   ],
   "notes": [
     "Claude Code will read this configuration automatically.",
+    "Claude Code context window: 131072 tokens.",
     "For zero-persistence credentials, prefer: freellmapi launch",
   ],
 }
