@@ -66,3 +66,26 @@ describe('GET /api/keys apiUrl (#2020)', () => {
     expect(byPlatform.get('cloudflare')?.apiUrl).toBeNull();
   });
 });
+
+describe('provider.getApiBaseUrl (#2020)', () => {
+  it('never puts credentials, query strings or the key itself into a built-in URL', async () => {
+    const { getAllProviders } = await import('../../providers/index.js');
+    const sentinel = 'SENTINEL-acct-123:SENTINEL-token-456';
+    const withUrl = new Set<string>();
+    for (const provider of getAllProviders()) {
+      if (provider.platform === 'custom') continue;
+      for (const key of [sentinel, 'no-key', undefined]) {
+        const url = provider.getApiBaseUrl(key);
+        if (url === null) continue;
+        expect(url, provider.platform).not.toContain('SENTINEL');
+        const parsed = new URL(url);
+        expect(parsed.protocol, provider.platform).toBe('https:');
+        expect(parsed.username + parsed.password, provider.platform).toBe('');
+        expect(parsed.search, provider.platform).toBe('');
+        withUrl.add(provider.platform);
+      }
+    }
+    expect(withUrl.size).toBeGreaterThan(50);
+    expect(getAllProviders().find(p => p.platform === 'cloudflare')?.getApiBaseUrl(sentinel)).toBeNull();
+  });
+});
