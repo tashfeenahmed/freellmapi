@@ -908,6 +908,70 @@ export async function openProviderWebSocket(url: string, platform: string, optio
   return new WebSocket(url, { ...options, ...(dispatcher ? { dispatcher: dispatcher as import('undici').Dispatcher } : {}) });
 }
 
+/**
+ * True for `*.localhost` names (e.g. `ollama.localhost`). RFC 6761 §6.3 makes
+ * them loopback, but many resolvers (glibc without nss-myhostname, minimal
+ * containers, Alpine) answer ENOTFOUND for subdomains. Plain `localhost` is
+ * left to the system resolver, which always maps it via /etc/hosts.
+ */
+function isLocalhostSubdomain(hostname: string): boolean {
+  return hostname.replace(/\.$/, '').toLowerCase().endsWith('.localhost');
+}
+
+export function isLocalhostSubdomainUrl(rawUrl: string): boolean {
+  try {
+    return isLocalhostSubdomain(new URL(rawUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+type LookupCallback = (err: NodeJS.ErrnoException | null, address: string | { address: string; family: number }[], family?: number) => void;
+
+/**
+ * DNS lookup that answers `*.localhost` names with loopback. Any other name
+ * fails with ENOTFOUND, so the shared dispatcher below can never map a
+ * different host (a redirect target, say) onto this machine.
+ */
+export function loopbackLookup(hostname: string, options: { all?: boolean; family?: number | string } | LookupCallback, cb?: LookupCallback): void {
+  const callback = (typeof options === 'function' ? options : cb) as LookupCallback;
+  const opts = typeof options === 'function' ? {} : options;
+  if (!isLocalhostSubdomain(hostname)) {
+    const err: NodeJS.ErrnoException = Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), {
+      code: 'ENOTFOUND', errno: -3008, syscall: 'getaddrinfo', hostname,
+    });
+    callback(err, opts.all ? [] : '', undefined);
+    return;
+  }
+  const family = opts.family === 6 || opts.family === 'IPv6' ? 6 : opts.family === 4 || opts.family === 'IPv4' ? 4 : 0;
+  const addrs = [
+    { address: '127.0.0.1', family: 4 },
+    { address: '::1', family: 6 },
+  ].filter(a => family === 0 || a.family === family);
+  if (opts.all) callback(null, addrs);
+  else callback(null, addrs[0].address, addrs[0].family);
+}
+
+let _localhostDispatcher: unknown;
+async function getLocalhostDispatcher(): Promise<unknown> {
+  if (!_localhostDispatcher) {
+    const { Agent } = await import('undici');
+    _localhostDispatcher = new Agent({ connect: { lookup: loopbackLookup as never } });
+  }
+  return _localhostDispatcher;
+}
+
+/** Direct (no proxy) fetch. `*.localhost` targets connect over loopback
+ * without asking the system resolver, which is what the URL guard assumed
+ * when it classified them as loopback. */
+async function directFetch(url: string, init: RequestInit | undefined): Promise<Response> {
+  if (isLocalhostSubdomainUrl(url)) {
+    const dispatcher = await getLocalhostDispatcher();
+    return fetch(url, { ...init, dispatcher } as unknown as RequestInit);
+  }
+  return fetch(url, init);
+}
+
 /** Route the request through the configured proxy (or straight to fetch). */
 async function dispatchFetch(
   url: string,
@@ -949,7 +1013,7 @@ async function dispatchFetch(
     if (proxyRequired) {
       throw proxyRequiredError(platform, 'proxy routing disabled or bypassed');
     }
-    return fetch(url, init);
+    return directFetch(url, init);
   }
 
   if (_proxyMode === 'fetch-relay' && _proxyUrl) {
@@ -964,7 +1028,7 @@ async function dispatchFetch(
     if (proxyRequired) {
       throw proxyRequiredError(platform, 'proxy not configured or proxy agent unavailable');
     }
-    return fetch(url, init);
+    return directFetch(url, init);
   }
 
   // SOCKS proxy → http/https fallback

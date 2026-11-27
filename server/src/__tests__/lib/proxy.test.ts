@@ -652,8 +652,14 @@ describe('local and LAN destinations bypass the proxy (#951)', () => {
       return 'proxied';
     }
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    // Direct means no dispatcher was injected either.
-    expect((fetchSpy.mock.calls[0]?.[1] as any)?.dispatcher).toBeUndefined();
+    // Direct means no proxy dispatcher was injected. *.localhost names get a
+    // plain undici Agent that only pins DNS to loopback (RFC 6761).
+    const dispatcher = (fetchSpy.mock.calls[0]?.[1] as any)?.dispatcher;
+    if (new URL(url).hostname.replace(/\.$/, '').endsWith('.localhost')) {
+      expect(dispatcher?.constructor?.name).toBe('Agent');
+    } else {
+      expect(dispatcher).toBeUndefined();
+    }
     return 'direct';
   };
 
@@ -1268,5 +1274,144 @@ describe('fetch failed carries its cause (#1373)', () => {
   it('keeps a bare fetch failed when there is no cause code', async () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(fetchFailed(new Error('something odd')));
     await expect(proxyFetch('https://api.example.com/v1')).rejects.toThrow(/^fetch failed$/);
+  });
+});
+
+describe('*.localhost connects over loopback without system DNS (RFC 6761)', () => {
+  it('recognises only *.localhost subdomains', async () => {
+    const { isLocalhostSubdomainUrl } = await import('../../lib/proxy.js');
+    expect(isLocalhostSubdomainUrl('http://ollama.localhost:11434/v1')).toBe(true);
+    expect(isLocalhostSubdomainUrl('http://Ollama.LocalHost.:11434/v1')).toBe(true);
+    expect(isLocalhostSubdomainUrl('http://localhost:11434/v1')).toBe(false);
+    expect(isLocalhostSubdomainUrl('http://localhost.evil.com/v1')).toBe(false);
+    expect(isLocalhostSubdomainUrl('not a url')).toBe(false);
+  });
+
+  it('loopbackLookup answers with loopback for single, all and family-pinned lookups', async () => {
+    const { loopbackLookup } = await import('../../lib/proxy.js');
+    const single = await new Promise(r => loopbackLookup('x.localhost', {}, (_e, a, f) => r([a, f])));
+    expect(single).toEqual(['127.0.0.1', 4]);
+    const all = await new Promise(r => loopbackLookup('x.localhost', { all: true }, (_e, a) => r(a)));
+    expect(all).toEqual([{ address: '127.0.0.1', family: 4 }, { address: '::1', family: 6 }]);
+    const v6 = await new Promise(r => loopbackLookup('x.localhost', { family: 6 }, (_e, a) => r(a)));
+    expect(v6).toBe('::1');
+  });
+
+  it('reaches a real server on 127.0.0.1 via a *.localhost name', async () => {
+    const { proxyFetch } = await import('../../lib/proxy.js');
+    const server = http.createServer((_req, res) => res.end('ok'));
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const { port } = server.address() as { port: number };
+    try {
+      const res = await proxyFetch(`http://probe.localhost:${port}/v1`, undefined, 'custom');
+      expect(await res.text()).toBe('ok');
+    } finally {
+      server.close();
+    }
+  });
+});
+
+describe('*.localhost pinning cannot be turned on another host', () => {
+  it('loopbackLookup refuses any name that is not *.localhost', async () => {
+    const { loopbackLookup } = await import('../../lib/proxy.js');
+    for (const name of ['evil.com', 'localhost.evil.com', 'xlocalhost', 'localhost', '127.0.0.1.nip.io']) {
+      const [err, addr] = await new Promise<[NodeJS.ErrnoException | null, unknown]>(r =>
+        loopbackLookup(name, { all: true }, (e, a) => r([e, a])));
+      expect(err?.code, name).toBe('ENOTFOUND');
+      expect(addr).toEqual([]);
+    }
+    const [err] = await new Promise<[NodeJS.ErrnoException | null]>(r => loopbackLookup('X.LocalHost.', {}, e => r([e])));
+    expect(err).toBeNull();
+  });
+
+  it('a redirect from a *.localhost upstream to another name is not pinned to loopback', async () => {
+    // A built-in platform follows redirects. Through the pinned dispatcher, a
+    // Location pointing at any other name must not be answered with 127.0.0.1.
+    const { proxyFetch } = await import('../../lib/proxy.js');
+    const server = http.createServer((req, res) => {
+      if (req.url === '/start') {
+        res.writeHead(302, { location: `http://not-local.invalid:${(server.address() as { port: number }).port}/secret` });
+        res.end();
+      } else {
+        res.end(`LEAK host=${req.headers.host}`);
+      }
+    });
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const { port } = server.address() as { port: number };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await expect(proxyFetch(`http://probe.localhost:${port}/start`, undefined, 'openai')).rejects.toThrow();
+    } finally {
+      server.close();
+    }
+  });
+
+  it('a custom provider on *.localhost answering a redirect is refused', async () => {
+    const { proxyFetch } = await import('../../lib/proxy.js');
+    const server = http.createServer((_req, res) => {
+      res.writeHead(302, { location: 'http://169.254.169.254/latest/meta-data/' });
+      res.end();
+    });
+    await new Promise<void>(r => server.listen(0, '127.0.0.1', () => r()));
+    const { port } = server.address() as { port: number };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(proxyFetch(`http://probe.localhost:${port}/v1`, undefined, 'custom')).rejects.toThrow(/redirected \(302\)/);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('reaches an IPv6-only loopback server via a *.localhost name', async () => {
+    const { proxyFetch } = await import('../../lib/proxy.js');
+    const server = http.createServer((_req, res) => res.end('v6'));
+    const listening = await new Promise<boolean>(r => {
+      server.once('error', () => r(false));
+      server.listen(0, '::1', () => r(true));
+    });
+    if (!listening) return; // host without IPv6 loopback
+    const { port } = server.address() as { port: number };
+    try {
+      const res = await proxyFetch(`http://v6.localhost:${port}/v1`, undefined, 'custom');
+      expect(await res.text()).toBe('v6');
+    } finally {
+      server.close();
+    }
+  });
+
+  it('FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS blocks *.localhost before any connection', async () => {
+    const { proxyFetch } = await import('../../lib/proxy.js');
+    process.env.FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS = 'true';
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      for (const url of ['http://probe.localhost:1/v1', 'http://Probe.LocalHost.:1/v1', 'http://a:b@x.localhost/v1']) {
+        await expect(proxyFetch(url, undefined, 'custom'), url).rejects.toThrow(/FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS/);
+      }
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS;
+    }
+  });
+
+  it('a *.localhost target with a global HTTP proxy configured goes direct, not to the proxy', async () => {
+    const { proxyFetch } = await import('../../lib/proxy.js');
+    const seen: string[] = [];
+    const proxy = http.createServer((req, res) => { seen.push(req.url ?? ''); res.end('via-proxy'); });
+    proxy.on('connect', (req, sock) => { seen.push(`CONNECT ${req.url}`); sock.destroy(); });
+    const upstream = http.createServer((_req, res) => res.end('direct'));
+    await new Promise<void>(r => proxy.listen(0, '127.0.0.1', () => r()));
+    await new Promise<void>(r => upstream.listen(0, '127.0.0.1', () => r()));
+    applyProxyUrl(`http://127.0.0.1:${(proxy.address() as { port: number }).port}`);
+    try {
+      const res = await proxyFetch(`http://probe.localhost:${(upstream.address() as { port: number }).port}/v1`, undefined, 'custom');
+      expect(await res.text()).toBe('direct');
+      expect(seen).toEqual([]);
+    } finally {
+      applyProxyUrl('');
+      proxy.close();
+      upstream.close();
+    }
   });
 });

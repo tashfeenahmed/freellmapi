@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { classifyIp, assessProviderUrl, assertProviderUrlAllowed, isLoopbackOrPrivateUrl, isLoopbackOrPrivateHostname } from '../../lib/url-guard.js';
 
 // SSRF guard for user-supplied custom-provider base URLs (#440). Metadata and
@@ -185,6 +185,15 @@ describe('assessProviderUrl', () => {
     expect(verdict.allowed).toBe(false);
   });
 
+  it('treats *.localhost as loopback without asking DNS (RFC 6761)', async () => {
+    const resolve = vi.fn(async () => { throw new Error('ENOTFOUND'); });
+    expect(await assessProviderUrl('http://ollama.localhost:11434/v1', { resolve })).toEqual({ allowed: true });
+    expect(await assessProviderUrl('http://localhost.:11434/v1', { resolve })).toEqual({ allowed: true });
+    expect(resolve).not.toHaveBeenCalled();
+    const blocked = await assessProviderUrl('http://ollama.localhost/v1', { resolve, blockPrivate: true });
+    expect(blocked.allowed).toBe(false);
+  });
+
   it('assertProviderUrlAllowed throws for a name that cannot resolve', async () => {
     // .invalid is reserved (RFC 6761) and never resolves.
     await expect(assertProviderUrlAllowed('http://nothing-here.invalid/v1')).rejects.toThrow(/could not resolve/);
@@ -249,5 +258,67 @@ describe('isLoopbackOrPrivateHostname (hostname half, used by the proxy router)'
     expect(isLoopbackOrPrivateHostname('notlocalhost')).toBe(false);
     expect(isLoopbackOrPrivateHostname('my-lan-box.local')).toBe(false);
     expect(isLoopbackOrPrivateHostname('')).toBe(false);
+  });
+});
+
+describe('*.localhost classification is by exact label, never by substring', () => {
+  const metadataResolve = () => vi.fn(async () => ['169.254.169.254']);
+
+  for (const url of [
+    'http://localhost.evil.com/v1',
+    'http://localhost.evil.com./v1',
+    'http://xlocalhost/v1',
+    'http://evil-localhost.com/v1',
+    'http://localhost..:8080/v1',
+    'http://b.localhost@evil.com/v1',
+    'http://evil.com\\@x.localhost/v1',
+    'http://evil.com#.localhost',
+    'http://evil.com/.localhost',
+    'http://evil.com?.localhost',
+  ]) {
+    it(`asks DNS (and blocks metadata) for ${url}`, async () => {
+      const resolve = metadataResolve();
+      const verdict = await assessProviderUrl(url, { resolve });
+      expect(resolve).toHaveBeenCalled();
+      expect(verdict.allowed).toBe(false);
+    });
+  }
+
+  for (const url of [
+    'http://evil.localhost./v1',
+    'http://EVIL.LocalHost:8080/v1',
+    'http://x.ｌｏｃａｌｈｏｓｔ/v1',
+    'http://x.localhost%2e/v1',
+    'http://a@b.localhost:9/v1',
+    'http://a:pw@b.localhost/v1',
+    'https://deep.sub.localhost/v1',
+    'http://LOCALHOST./v1',
+  ]) {
+    it(`classifies ${url} as loopback without DNS, and blockPrivate blocks it`, async () => {
+      const resolve = metadataResolve();
+      expect(await assessProviderUrl(url, { resolve })).toEqual({ allowed: true });
+      expect(resolve).not.toHaveBeenCalled();
+      const blocked = await assessProviderUrl(url, { resolve, blockPrivate: true });
+      expect(blocked.allowed).toBe(false);
+      expect(blocked.reason).toMatch(/private address \(127\.0\.0\.1\)/);
+    });
+  }
+
+  it('the env flag blocks *.localhost through assertProviderUrlAllowed', async () => {
+    process.env.FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS = 'true';
+    try {
+      await expect(assertProviderUrlAllowed('http://ollama.localhost:11434/v1')).rejects.toThrow(/FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS/);
+      await expect(assertProviderUrlAllowed('http://localhost:11434/v1')).rejects.toThrow(/FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS/);
+    } finally {
+      delete process.env.FREEAPI_BLOCK_PRIVATE_PROVIDER_URLS;
+    }
+  });
+
+  it('IPv6 loopback/mapped literals stay classified by address', async () => {
+    for (const url of ['http://[::1]/v1', 'http://[::ffff:127.0.0.1]/v1', 'http://[0:0:0:0:0:0:0:1]/v1']) {
+      expect((await assessProviderUrl(url, { blockPrivate: true })).allowed, url).toBe(false);
+      expect((await assessProviderUrl(url, { blockPrivate: false })).allowed, url).toBe(true);
+    }
+    expect((await assessProviderUrl('http://[::ffff:169.254.169.254]/v1')).allowed).toBe(false);
   });
 });
