@@ -20,6 +20,7 @@ FreeLLMAPI는 여러 제공자의 무료 플랜을 하나의 `/v1` API로 묶습
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="macOS용 다운로드"></a>
   <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store.svg" height="48" alt="Microsoft Store에서 받기"></a>
+  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows.svg" height="48" alt="Windows용 다운로드"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker.svg" height="48" alt="Docker로 직접 호스팅"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store.svg" height="48" alt="Google Play에서 받기"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store.svg" height="48" alt="App Store에서 다운로드"></a>
@@ -198,6 +199,8 @@ Docker Compose, 로컬 개발, 선언형 시작 설정, 프로덕션 빌드, LAN
 ![FreeLLMAPI 데스크톱 앱](repo-assets/desktop.png)
 
 GitHub 릴리스마다 macOS용 `.dmg`와 Windows용 `.exe`가 올라옵니다. Windows에서는 Smart App Control을 통과하고 자동 업데이트도 되는 Microsoft Store 버전을 권장합니다. 트레이 팝업에서 통합 API 키를 복사하면 바로 쓸 수 있습니다. 계정이나 비밀번호 설정은 필요 없습니다. **[릴리스에서 다운로드](https://github.com/tashfeenahmed/freellmapi/releases/latest)** · **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)** · [소스에서 빌드하는 방법과 데이터 저장 위치](docs/en/install/01-install.md#desktop-app)
+
+**Store 없이 Windows에 설치하기:** Store에서 설치가 안 되면("문제가 발생했습니다" 등) [최신 릴리스](https://github.com/tashfeenahmed/freellmapi/releases/latest)에서 `FreeLLMAPI-Setup-<version>.exe`(설치 파일, 자동 업데이트) 또는 `FreeLLMAPI-<version>-win.zip`(포터블: 압축을 풀고 `FreeLLMAPI.exe` 실행)을 받으세요. 둘 다 서명되지 않았으므로 SmartScreen에 "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**을 누르세요. Smart App Control은 앱별 예외가 없으니, 막히면 Store 버전이나 [Docker](docs/en/install/01-install.md#docker-compose)를 쓰세요.
 
 macOS 12 Monterey 이상에서는 **arm64(Apple Silicon)**와 **x64(Intel)** 중 Mac에 맞는 버전을 고르세요. 두 버전 모두 ZIP 파일로도 받을 수 있습니다.
 

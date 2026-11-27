@@ -22,6 +22,7 @@
 <p align="center">
   <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/macos.svg" height="48" alt="Download for macOS"></a>
   <a href="https://apps.microsoft.com/detail/9PBN6G8K2B7F"><img src="repo-assets/badges/microsoft-store.svg" height="48" alt="Get it from Microsoft Store"></a>
+  <a href="https://github.com/tashfeenahmed/freellmapi/releases/latest"><img src="repo-assets/badges/windows.svg" height="48" alt="Download for Windows"></a>
   <a href="docs/en/install/01-install.md#docker-compose"><img src="repo-assets/badges/docker.svg" height="48" alt="Self-host with Docker"></a>
   <a href="https://play.google.com/store/apps/details?id=co.freellmapi.app"><img src="repo-assets/badges/play-store.svg" height="48" alt="Get it on Google Play"></a>
   <a href="https://apps.apple.com/app/id6804648934"><img src="repo-assets/badges/app-store.svg" height="48" alt="Download on the App Store"></a>
@@ -186,6 +187,8 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 ![Настольное приложение FreeLLMAPI](repo-assets/desktop.png)
 
 **[Скачать из Releases](https://github.com/tashfeenahmed/freellmapi/releases/latest)**. К каждому выпуску прикладываются `.dmg` для macOS и `.exe` для Windows. В Windows лучше установить версию из **[Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F)**: она подписана, поэтому Smart App Control её не блокирует, а Store сам её обновляет. Регистрация и отдельный пароль не требуются: необходим только единый API-ключ, доступный во всплывающем окне трея. Сборка из исходников и пути хранения данных: [docs/en/install/01-install.md#desktop-app](docs/en/install/01-install.md#desktop-app).
+
+**Windows без Store:** если Store не устанавливает приложение (например, «Что-то пошло не так»), откройте [последний выпуск](https://github.com/tashfeenahmed/freellmapi/releases/latest) и скачайте `FreeLLMAPI-Setup-<version>.exe` (установщик, обновляется сам) или `FreeLLMAPI-<version>-win.zip` (портативная версия: распакуйте и запустите `FreeLLMAPI.exe`). Оба файла не подписаны, поэтому если SmartScreen показывает «Система Windows защитила ваш компьютер», нажмите **Подробнее → Выполнить в любом случае**. В Smart App Control нет исключений для отдельных приложений: если он их блокирует, используйте версию из Store или [Docker](docs/en/install/01-install.md#docker-compose).
 
 Для macOS 12 Monterey и новее выберите **arm64 (Apple Silicon)** или **x64 (Intel)**. Обе версии для Mac также доступны в ZIP.
 

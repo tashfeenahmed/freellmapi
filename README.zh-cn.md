@@ -187,6 +187,8 @@ curl -fsSL https://freellmapi.co/install.sh | bash
 
 **[从 Releases 下载](https://github.com/tashfeenahmed/freellmapi/releases/latest)** —— 每个版本都附带 macOS 的 `.dmg` 和 Windows 的 `.exe` 安装包。不需要注册账号或设置密码：你唯一需要的凭据就是托盘悬浮窗里的统一 API 密钥。从源码构建的步骤，以及数据存放位置，见 [docs/zh-cn/install/01-install.md#桌面应用](docs/zh-cn/install/01-install.md#桌面应用)。
 
+**Windows 备选方式：** 也可以从 [Microsoft Store](https://apps.microsoft.com/detail/9PBN6G8K2B7F) 安装（已签名，Smart App Control 不会拦截，并由 Store 自动更新）。如果 Store 无法安装（例如提示“出现问题”），请打开[最新版本](https://github.com/tashfeenahmed/freellmapi/releases/latest)，下载 `FreeLLMAPI-Setup-<version>.exe`（安装包，可自动更新）或 `FreeLLMAPI-<version>-win.zip`（便携版：解压后运行 `FreeLLMAPI.exe`）。这两个文件都未签名，如果 SmartScreen 提示“Windows 已保护你的电脑”，点击 **更多信息 → 仍要运行**。Smart App Control 不支持按应用放行：如被拦截，请改用 Store 版本或 [Docker](docs/zh-cn/install/01-install.md)。
+
 macOS 要求 12 Monterey 或更高版本；Apple Silicon 请选择 **arm64**，Intel 请选择 **x64**。两种 Mac 构建都提供 ZIP 下载。
 
 ## 兼容 OpenAI 的客户端
