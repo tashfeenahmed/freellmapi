@@ -21,6 +21,7 @@ export class KeenableProvider extends SearchOnlyProvider {
   readonly platform: Platform = 'keenable';
   readonly name = 'Keenable';
   keyless = true;
+  override get apiBaseUrl(): string { return KEENABLE_BASE_URL; }
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     const anonymous = isAnonymousCredential(apiKey);

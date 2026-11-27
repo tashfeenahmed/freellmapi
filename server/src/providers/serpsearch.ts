@@ -6,6 +6,7 @@ export const SERPSEARCH_BASE_URL = 'https://api.serpsearch.com/api/v1';
 export class SerpSearchProvider extends SearchOnlyProvider {
   readonly platform = 'serpsearch' as const;
   readonly name = 'SerpSearch';
+  override get apiBaseUrl(): string { return SERPSEARCH_BASE_URL; }
 
   /** #1599: SerpSearch has no account or usage endpoint, so the only possible
    * key check is a search with no query, and its maintainer asked that we send

@@ -266,6 +266,20 @@ export abstract class BaseProvider {
    * true; overridden by subclasses. */
   readonly supportsChat: boolean = true;
 
+  /** Upstream API request base URL for this provider when it has a single
+   *  stable endpoint URL (#2020). Returns null when a provider has no single
+   *  URL or embeds secret credential parts in the path. */
+  get apiBaseUrl(): string | null {
+    return null;
+  }
+
+  /** Per-key override hook for providers whose host depends on the key
+   *  (e.g. Zhipu global vs domestic console, Parallel MCP vs REST). Never
+   *  embed secret credential material in the returned URL. */
+  getApiBaseUrl(_apiKey?: string): string | null {
+    return this.apiBaseUrl;
+  }
+
   abstract chatCompletion(
     apiKey: string,
     messages: ChatMessage[],

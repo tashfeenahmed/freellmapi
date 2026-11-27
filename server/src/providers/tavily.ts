@@ -9,6 +9,7 @@ export const TAVILY_BASE_URL = 'https://api.tavily.com';
 export class TavilyProvider extends SearchOnlyProvider {
   readonly platform: Platform = 'tavily';
   readonly name = 'Tavily';
+  override get apiBaseUrl(): string { return TAVILY_BASE_URL; }
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     return this.probe(`${TAVILY_BASE_URL}/usage`, {

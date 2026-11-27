@@ -9,6 +9,7 @@ export const LINKUP_BASE_URL = 'https://api.linkup.so/v1';
 export class LinkupProvider extends SearchOnlyProvider {
   readonly platform: Platform = 'linkup';
   readonly name = 'Linkup';
+  override get apiBaseUrl(): string { return LINKUP_BASE_URL; }
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     return this.probe(`${LINKUP_BASE_URL}/credits/balance`, {

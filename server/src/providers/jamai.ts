@@ -23,6 +23,7 @@ function checkModel(requested: string, returned: unknown): void {
 export class JamaiProvider extends BaseProvider {
   readonly platform: Platform = 'jamai';
   readonly name = 'JamAI Base';
+  override get apiBaseUrl(): string { return JAMAI_BASE_URL; }
 
   private body(messages: ChatMessage[], modelId: string, options: CompletionOptions | undefined, stream: boolean): Record<string, unknown> {
     if (options?.response_format) throw Object.assign(new Error('JamAI does not support structured response formats'), { status: 422 });

@@ -414,6 +414,10 @@ export interface ApiKey {
   label: string;
   maskedKey: string;
   baseUrl: string | null;
+  /** Upstream API request base URL for this key's provider or custom endpoint (#2020).
+   *  Null when the provider has no single static endpoint URL (or embeds part of
+   *  the credential in its path). */
+  apiUrl?: string | null;
   /** Optional custom-endpoint group label (#1176); null = legacy single
    *  "Custom" group. Only set on platform='custom' rows. */
   groupLabel?: string | null;

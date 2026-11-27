@@ -13,6 +13,7 @@ export const EXA_BASE_URL = 'https://api.exa.ai';
 export class ExaProvider extends SearchOnlyProvider {
   readonly platform: Platform = 'exa';
   readonly name = 'Exa';
+  override get apiBaseUrl(): string { return EXA_BASE_URL; }
 
   /** #1599: validation is an empty search, so the health pass checks a key
    * once instead of every few minutes. */

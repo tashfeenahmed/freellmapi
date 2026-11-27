@@ -582,6 +582,7 @@ export interface GoogleProviderOptions {
 export class GoogleProvider extends BaseProvider {
   readonly platform = 'google' as const;
   readonly name = 'Google AI Studio';
+  override get apiBaseUrl(): string { return API_BASE; }
   private readonly timeoutMs: number;
 
   constructor(opts: GoogleProviderOptions = {}) {

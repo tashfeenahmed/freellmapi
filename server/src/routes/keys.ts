@@ -496,12 +496,17 @@ keysRouter.get('/', (_req: Request, res: Response) => {
     // month" instead of only the cap (OpenRouter's GET /api/v1/key returns
     // limit_remaining for the same reason).
     const monthlyUsage = getMonthlyUsage(Number(row.id));
+    const provider = resolveProvider(row.platform);
+    const apiUrl = row.platform === 'custom'
+      ? (row.base_url ?? null)
+      : (provider?.getApiBaseUrl(realKey) ?? null);
     return {
       id: row.id,
       platform: row.platform,
       label: row.label,
       maskedKey,
       baseUrl: row.base_url ?? null,
+      apiUrl,
       // Optional custom-endpoint group label (#1176); null = legacy single
       // "Custom" group.
       groupLabel: row.group_label ?? null,

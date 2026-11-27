@@ -9,6 +9,7 @@ export const FIRECRAWL_BASE_URL = 'https://api.firecrawl.dev/v2';
 export class FirecrawlProvider extends SearchOnlyProvider {
   readonly platform: Platform = 'firecrawl';
   readonly name = 'Firecrawl';
+  override get apiBaseUrl(): string { return FIRECRAWL_BASE_URL; }
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     return this.probe(`${FIRECRAWL_BASE_URL}/team/credit-usage`, {

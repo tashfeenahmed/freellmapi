@@ -10,6 +10,7 @@ export const OUTCRAWL_BASE_URL = 'https://api.outcrawl.ai/v1';
 export class OutcrawlProvider extends SearchOnlyProvider {
   readonly platform: Platform = 'outcrawl';
   readonly name = 'Outcrawl';
+  override get apiBaseUrl(): string { return OUTCRAWL_BASE_URL; }
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     return this.probe(`${OUTCRAWL_BASE_URL}/credits`, {

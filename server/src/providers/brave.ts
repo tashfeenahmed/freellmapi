@@ -15,6 +15,7 @@ export const BRAVE_BAD_KEY_CODE = 'SUBSCRIPTION_TOKEN_INVALID';
 export class BraveProvider extends SearchOnlyProvider {
   readonly platform = 'brave' as const;
   readonly name = 'Brave Search';
+  override get apiBaseUrl(): string { return BRAVE_BASE_URL; }
 
   override get supportsKeyPolling(): boolean {
     return false;

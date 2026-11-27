@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -17,7 +17,7 @@ import {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import { ChevronDown, CircleAlert, Copy, ExternalLink, FlaskConical, Info, KeyRound, Layers, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Zap } from 'lucide-react'
+import { Check, ChevronDown, CircleAlert, Copy, ExternalLink, FlaskConical, Info, KeyRound, Layers, Link2, ListFilter, ListPlus, MoreHorizontal, Pencil, Plus, RefreshCw, Search, Sparkles, Trash2, Zap } from 'lucide-react'
 import type { ApiKey, ApiKeyModel, Platform } from '../../../../shared/types'
 import { formatSqliteUtcToLocalTime } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -100,6 +100,12 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
   // Key whose plaintext the operator asked to copy; re-authentication happens
   // in the dialog, not here (#705).
   const [copyKey, setCopyKey] = useState<{ id: number; maskedKey: string } | null>(null)
+  // Key whose API request URL was just copied — shows brief check feedback (#2020).
+  const [copiedUrlKeyId, setCopiedUrlKeyId] = useState<number | null>(null)
+  const copiedUrlTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (copiedUrlTimer.current) clearTimeout(copiedUrlTimer.current)
+  }, [])
   // Key whose model scope is being edited (#657).
   const [scopeKeyId, setScopeKeyId] = useState<number | null>(null)
   // Re-open the post-add model picker against the current catalog (#657).
@@ -323,6 +329,19 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
     void copyText(handle).then(ok => {
       if (ok) toast.success(t('keys.groupHandleCopied', { handle }))
       else toast.error(t('keys.groupHandleCopyFailed'))
+    })
+  }
+
+  function copyApiUrl(keyId: number, url: string) {
+    void copyText(url).then(ok => {
+      if (!ok) {
+        toast.error(t('common.copyFailed'))
+        return
+      }
+      toast.success(t('setup.copiedUrl'))
+      setCopiedUrlKeyId(keyId)
+      if (copiedUrlTimer.current) clearTimeout(copiedUrlTimer.current)
+      copiedUrlTimer.current = setTimeout(() => setCopiedUrlKeyId(null), 1500)
     })
   }
 
@@ -675,9 +694,10 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                       const isExpanded = expandedKeyIds.has(k.id)
                       const isChecking = checkKey.isPending && checkKey.variables === k.id
                       const checkinRequired = k.platform === 'apinex' && k.cooldowns?.some(c => c.source === 'checkin')
+                      const apiUrl = k.apiUrl ?? k.baseUrl ?? null
                       return (
                         <div key={k.id} className="bg-card">
-                          <div className="group/krow flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                          <div className="group/krow flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-muted/40 transition-colors">
                             {/* #787: bulk-select checkbox — enabling the row-level
                                 batch bar below. Deliberately secondary: the switch
                                 stays the primary per-key control, and a checkbox on
@@ -788,7 +808,7 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                                 </span>
                               </Tooltip>
                             )}
-                            <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/krow:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+                            <div className="flex w-full flex-wrap justify-end sm:w-auto sm:flex-nowrap items-center gap-0.5 opacity-0 transition-opacity group-hover/krow:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
                               <Button
                                 variant="ghost"
                                 size="icon-xs"
@@ -820,6 +840,20 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                                     aria-label={t('keys.copyFullKey')}
                                   >
                                     <Copy className="size-3" />
+                                  </Button>
+                                </Tooltip>
+                              )}
+                              {apiUrl && (
+                                <Tooltip text={copiedUrlKeyId === k.id ? t('setup.copiedUrl') : `${t('setup.copyUrl')}\n${apiUrl}`}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => copyApiUrl(k.id, apiUrl)}
+                                    aria-label={copiedUrlKeyId === k.id ? t('setup.copiedUrl') : t('setup.copyUrl')}
+                                  >
+                                    {copiedUrlKeyId === k.id
+                                      ? <Check className="size-3 text-emerald-600 dark:text-emerald-400" />
+                                      : <Link2 className="size-3" />}
                                   </Button>
                                 </Tooltip>
                               )}

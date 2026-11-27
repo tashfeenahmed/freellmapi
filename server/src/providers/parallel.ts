@@ -19,6 +19,10 @@ export class ParallelProvider extends SearchOnlyProvider {
   readonly platform: Platform = 'parallel';
   readonly name = 'Parallel';
   keyless = true;
+  override get apiBaseUrl(): string { return PARALLEL_BASE_URL; }
+  override getApiBaseUrl(apiKey?: string): string {
+    return apiKey && isAnonymousCredential(apiKey) ? PARALLEL_MCP_URL : PARALLEL_BASE_URL;
+  }
 
   /** #1599: validation is an empty search, so the health pass checks a key
    * once instead of every few minutes. */

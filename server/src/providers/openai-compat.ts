@@ -216,6 +216,10 @@ export class OpenAICompatProvider extends BaseProvider {
     this.quotaProbe = opts.quotaProbe;
   }
 
+  override get apiBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   /** Resolve the parallel_tool_calls flag to send upstream. For providers that
    * only accept single tool calls (NVIDIA NIM), force `false` whenever tools are
    * present so the model never tries to emit two at once and 400s; otherwise pass

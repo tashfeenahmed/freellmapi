@@ -9,6 +9,7 @@ export class VarosityProvider extends BaseProvider {
   readonly platform = 'varosity' as const;
   readonly name = 'Varosity';
   readonly supportsChat = false;
+  override get apiBaseUrl(): string { return VAROSITY_BASE_URL; }
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     if (!apiKey.trim()) return { valid: false, error: 'Varosity API key is required' };

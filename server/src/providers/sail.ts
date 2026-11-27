@@ -86,6 +86,7 @@ interface SailProviderOptions {
 export class SailProvider extends BaseProvider {
   readonly platform: Platform = 'sail';
   readonly name = 'Sail Research';
+  override get apiBaseUrl(): string { return BASE_URL; }
   private readonly timeoutMs: number;
   private readonly pollIntervalMs: number;
 

@@ -10,6 +10,7 @@ export class SpeechifyProvider extends BaseProvider {
   readonly platform = 'speechify' as const;
   readonly name = 'Speechify';
   readonly supportsChat = false;
+  override get apiBaseUrl(): string { return SPEECHIFY_BASE_URL; }
 
   async validateKey(apiKey: string): Promise<KeyValidationResult> {
     const response = await this.fetchWithTimeout(`${SPEECHIFY_BASE_URL}/workspaces/current/entitlements`, {
