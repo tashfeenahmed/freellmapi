@@ -98,7 +98,10 @@ export class CloudflareProvider extends BaseProvider {
       }),
       // 'request' bounds: the deadline covers the body read too, so a 200
       // whose body hangs aborts instead of stalling res.json() forever.
-    }, this.timeoutFor(modelId, options?.timeoutMs), { signal: options?.signal, timeoutBounds: 'request' });
+    }, this.timeoutFor(modelId, options?.timeoutMs), { signal: options?.signal, timeoutBounds: 'request' })
+      // No answer (timeout, transport): Cloudflare may still bill, so keep the
+      // call's likely cost, and close the reservation.
+      .catch((e: unknown) => { meter.settle(null); throw e; });
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
@@ -115,7 +118,7 @@ export class CloudflareProvider extends BaseProvider {
       throw providerHttpError(res, `Cloudflare API error ${res.status}: ${(err as any).error?.message ?? (err as any).errors?.[0]?.message ?? res.statusText}`, err);
     }
 
-    const data = await res.json() as ChatCompletionResponse;
+    const data = await res.json().catch((e: unknown) => { meter.settle(null); throw e; }) as ChatCompletionResponse;
     meter.settle(data.usage
       ? { inputTokens: data.usage.prompt_tokens ?? inputTokens, outputTokens: data.usage.completion_tokens ?? 0 }
       : null);
@@ -162,7 +165,8 @@ export class CloudflareProvider extends BaseProvider {
       }),
       // Default 'headers' bounds: the deadline dies at response headers, and
       // the client signal + stall watchdog own the stream from there.
-    }, this.timeoutFor(modelId, options?.timeoutMs), { signal: options?.signal });
+    }, this.timeoutFor(modelId, options?.timeoutMs), { signal: options?.signal })
+      .catch((e: unknown) => { meter.settle(null); throw e; });
     recordQuotaObservationsFromResponse(res, {
       platform: this.platform,
       keyId: quotaContext?.keyId,
