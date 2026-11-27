@@ -697,7 +697,7 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                       const apiUrl = k.apiUrl ?? k.baseUrl ?? null
                       return (
                         <div key={k.id} className="bg-card">
-                          <div className="group/krow flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                          <div className="group/krow flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-muted/40 transition-colors">
                             {/* #787: bulk-select checkbox — enabling the row-level
                                 batch bar below. Deliberately secondary: the switch
                                 stays the primary per-key control, and a checkbox on
@@ -808,7 +808,7 @@ export function ProviderList({ onAddKey }: { onAddKey: (platform?: Platform) => 
                                 </span>
                               </Tooltip>
                             )}
-                            <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/krow:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
+                            <div className="flex w-full flex-wrap justify-end sm:w-auto sm:flex-nowrap items-center gap-0.5 opacity-0 transition-opacity group-hover/krow:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100">
                               <Button
                                 variant="ghost"
                                 size="icon-xs"
