@@ -510,7 +510,7 @@ export function registerCustomEmbeddingModel(db: Db, reg: CustomEmbeddingRegistr
   return { modelDbId: Number(model.lastInsertRowid), created: true };
 }
 
-async function callProvider(row: EmbeddingModelRow, credential: ProviderCredential, inputs: string[], dimensions?: number): Promise<ProviderCallResult> {
+async function callProvider(row: EmbeddingModelRow, credential: ProviderCredential, inputs: string[], dimensions?: number, inputType?: EmbeddingInputType | null): Promise<ProviderCallResult> {
   const { key } = credential;
   switch (row.platform) {
     case 'roboflow': {
@@ -545,24 +545,26 @@ async function callProvider(row: EmbeddingModelRow, credential: ProviderCredenti
       // carries no input_type with 400, so the operator's choice travels with
       // the model row. A symmetric custom endpoint keeps the exact body it
       // has always sent: no input_type field at all.
-      const inputType = asEmbeddingInputType(row.input_type);
+      const effectiveInputType = inputType ?? asEmbeddingInputType(row.input_type);
       return openAiStyleEmbed(
         `${credential.baseUrl}/embeddings`,
         row.platform,
         key,
         row.model_id,
         inputs,
-        inputType ? { input_type: inputType } : {},
+        effectiveInputType ? { input_type: effectiveInputType } : {},
         dimensions,
       );
     }
     case 'google':
       return openAiStyleEmbed('https://generativelanguage.googleapis.com/v1beta/openai/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'nvidia':
-      // NeMo Retriever NIMs require input_type; 'query' is the symmetric-safe
-      // choice for a gateway that can't know whether this is index or query time.
+      // NeMo Retriever NIMs require input_type. Honour the caller's side when it
+      // says which one it is ('passage' while indexing, 'query' while
+      // searching); fall back to 'query' so existing callers keep the exact
+      // behaviour they had before this hint existed.
       // MRL models (e.g. llama-nemotron-embed-1b-v2) accept dimensions and truncate.
-      return openAiStyleEmbed('https://integrate.api.nvidia.com/v1/embeddings', row.platform, key, row.model_id, inputs, { input_type: 'query' }, dimensions);
+      return openAiStyleEmbed('https://integrate.api.nvidia.com/v1/embeddings', row.platform, key, row.model_id, inputs, { input_type: inputType ?? 'query' }, dimensions);
     case 'openrouter':
       return openAiStyleEmbed('https://openrouter.ai/api/v1/embeddings', row.platform, key, row.model_id, inputs, {}, dimensions);
     case 'sealion':
@@ -702,7 +704,7 @@ function logEmbeddingRequest(
  * request body. The override is independent of the model's native dimension — the
  * family registry still pins the canonical dimension, this just lets callers ask
  * for a smaller vector at the cost of some accuracy. */
-export async function runEmbeddings(model: string | undefined, inputs: string[], dimensions?: number): Promise<EmbeddingsResult> {
+export async function runEmbeddings(model: string | undefined, inputs: string[], dimensions?: number, inputType?: EmbeddingInputType | null): Promise<EmbeddingsResult> {
   const family = resolveFamily(model);
   if (!family) {
     throw new EmbeddingsError(
@@ -816,7 +818,7 @@ export async function runEmbeddings(model: string | undefined, inputs: string[],
       // provider-account minute budget, exactly like a chat attempt.
       const leaseId = acquireLease(row.platform, ledgerModelId, credential.id, estimatedTokens);
       try {
-        const out = await callProvider(row, credential, inputs, dimensions);
+        const out = await callProvider(row, credential, inputs, dimensions, inputType);
         if (out.vectors.length !== inputs.length || out.vectors.some(v => !Array.isArray(v) || v.length === 0)) {
           throw new EmbeddingsError('upstream returned malformed embeddings', 502);
         }
