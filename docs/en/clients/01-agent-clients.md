@@ -32,7 +32,7 @@ choose **+ Configure Custom Model**, pick **Custom**, and fill in:
 
 - **URL**: `http://127.0.0.1:31415/v1/chat/completions` for the desktop app,
   or `http://localhost:3001/v1/chat/completions` for a self-hosted server.
-  Since v0.16.52 the bare `…/v1` also works.
+  Since v0.16.53 the bare `…/v1` also works.
 - **API Key**: the unified key from the dashboard (or the tray popover).
 - **Model**: `auto` to let FreeLLMAPI pick, or any model id from the
   dashboard's Models page.
