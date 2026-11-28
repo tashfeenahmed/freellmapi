@@ -24,6 +24,25 @@ Any client that can target an OpenAI-compatible base URL can use FreeLLMAPI:
 - **Local GPU boxes**: add custom OpenAI-compatible endpoints for Ollama,
   llama.cpp, LM Studio, vLLM, or an internal gateway.
 
+## Tencent WorkBuddy
+
+WorkBuddy's custom model form sends requests to the URL exactly as typed; it
+does not add `/chat/completions`. In the chat view open the model picker,
+choose **+ Configure Custom Model**, pick **Custom**, and fill in:
+
+- **URL**: `http://127.0.0.1:31415/v1/chat/completions` for the desktop app,
+  or `http://localhost:3001/v1/chat/completions` for a self-hosted server.
+  Since v0.16.53 the bare `…/v1` also works.
+- **API Key**: the unified key from the dashboard (or the tray popover).
+- **Model**: `auto` to let FreeLLMAPI pick, or any model id from the
+  dashboard's Models page.
+
+WorkBuddy only speaks OpenAI Chat Completions for custom models, which is what
+FreeLLMAPI serves on that URL. You still need at least one provider key under
+**Keys**; check that requests work in the **Playground** first. If WorkBuddy
+runs on a different machine, turn on **Allow LAN access** in the desktop app's
+tray menu and use that machine's LAN address instead of `127.0.0.1`.
+
 ## Claude Desktop (third-party gateway)
 
 Claude Desktop can use FreeLLMAPI as a third-party inference gateway. It speaks
