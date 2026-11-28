@@ -50,6 +50,9 @@ const PURE_MODULES = [
   'stream-keepalive.ts',
   'structured-output.ts',
   'tool-args.ts',
+  // Streaming tool_call delta accumulation (#44206); pure state machine over
+  // the deltas it is fed.
+  'tool-call-accumulator.ts',
   'tool-call-rescue.ts',
   // Type-only imports today; listed so they stay that way.
   'client-classifier.ts',

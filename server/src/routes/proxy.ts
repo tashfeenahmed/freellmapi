@@ -25,6 +25,7 @@ import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { invalidToolArgumentsError, invalidToolCallReasons, isToolArgumentValidationEnabled } from '../lib/tool-validate.js';
 import { sanitizeProviderErrorMessage } from '../lib/error-redaction.js';
 import { rescueInlineToolCalls, startsWithDialectMarker, couldBecomeDialectMarker, containsDialectMarker } from '../lib/tool-call-rescue.js';
+import { ToolCallAccumulator } from '../lib/tool-call-accumulator.js';
 import { getContextHandoffMode, recordIncomingMessages, maybeInjectContextHandoff, recordSuccessfulModel, hasPriorModel, HANDOFF_MAX_TOKENS } from '../services/context-handoff.js';
 import { isFusionModel, runFusion, fusionConfigSchema, FusionError, FUSION_MODEL_ID } from '../services/fusion.js';
 import { isRetryableError, isPaymentRequiredError, isModelNotFoundError, isModelAccessForbiddenError, isClientAbortError, newClientAbortError, newHedgeAbortError, isUpstreamClassificationOutput } from '../lib/error-classify.js';
@@ -2689,7 +2690,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         let mode: 'undecided' | 'passthrough' | 'dialect' | 'json' = 'undecided';
         let heldText = '';
         const preamble: unknown[] = []; // role-only chunks held until flush
-        const toolCallAcc = new Map<number, { id?: string; name: string; args: string }>();
+        const toolCallAcc = new ToolCallAccumulator();
         let upstreamFinish: string | null = null;
         let usageChunk: unknown = null;
         let lastMeta: { id?: string; model?: string; created?: number } = {};
@@ -2850,13 +2851,12 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
             if (reasoning.length > 0) streamReasoning += reasoning;
 
             // Buffer tool_call deltas — emitted complete + repaired at end.
+            // ToolCallAccumulator routes each entry so streamed fragments
+            // keep merging by index while a delta packing several complete
+            // calls splits them into separate calls in array order
+            // (see lib/tool-call-accumulator.ts).
             for (const tc of choice.delta?.tool_calls ?? []) {
-              const idx = tc.index ?? 0;
-              if (!toolCallAcc.has(idx)) toolCallAcc.set(idx, { id: undefined, name: '', args: '' });
-              const acc = toolCallAcc.get(idx)!;
-              if (tc.id && !acc.id) acc.id = tc.id;
-              if (tc.function?.name) acc.name += tc.function.name;
-              if (tc.function?.arguments) acc.args += tc.function.arguments;
+              toolCallAcc.add(tc);
             }
 
             normalizeOutboundContent(anyChunk);
@@ -2933,9 +2933,8 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
           // calls whose args still aren't valid JSON.
           const schemas = toolSchemaMap(tools);
           let syntheticStreamIds = 0;
-          const completedCalls = [...toolCallAcc.entries()]
-            .sort((a, b) => a[0] - b[0])
-            .map(([, acc]) => ({
+          const completedCalls = toolCallAcc.entries()
+            .map(acc => ({
               id: acc.id && acc.id.length > 0 ? acc.id : `call_stream_${++syntheticStreamIds}`,
               type: 'function' as const,
               function: { name: acc.name, arguments: repairToolArguments(acc.args || '{}', schemas.get(acc.name)) },
