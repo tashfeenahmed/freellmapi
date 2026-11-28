@@ -8,6 +8,9 @@ const model='gemini-3.8-flash', messages=[{role:'user' as const,content:'Hi'}];
 describe('native Puter wire protocol',()=>{
   afterEach(()=>vi.unstubAllGlobals());
   it.each([
+    ['seed-2-0-code-preview-260328', 'byteplus:byteplus/seed-2-0-code-preview-260328'],
+    ['seed-2-0-pro-260328', 'byteplus:byteplus/seed-2-0-pro-260328'],
+    ['glm-5-2-260617', 'byteplus:byteplus/glm-5-2-260617'],
     ['qwen-max', 'alibaba:qwen/qwen-max'],
     ['qwen3-omni-flash', 'alibaba:qwen/qwen3-omni-flash'],
     ['qwen3.5-omni-plus', 'alibaba:qwen/qwen3.5-omni-plus'],

@@ -4,6 +4,9 @@ import { BaseProvider, providerHttpError, type CompletionOptions } from './base.
 
 // Wire IDs only. No route is discovered or enabled without the signed catalog.
 const pinned: Record<string,string> = {
+  "seed-2-0-code-preview-260328": "byteplus:byteplus/seed-2-0-code-preview-260328",
+  "seed-2-0-pro-260328": "byteplus:byteplus/seed-2-0-pro-260328",
+  "glm-5-2-260617": "byteplus:byteplus/glm-5-2-260617",
   "qwen-max": "alibaba:qwen/qwen-max",
   "qwen3-omni-flash": "alibaba:qwen/qwen3-omni-flash",
   "qwen3.5-omni-plus": "alibaba:qwen/qwen3.5-omni-plus",
