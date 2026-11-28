@@ -47,6 +47,13 @@ function isRoutable(modelDbId: number): boolean {
   return row?.enabled === 1;
 }
 
+function isModelEnabled(modelDbId: number): boolean {
+  const row = getDb()
+    .prepare('SELECT enabled FROM models WHERE id = ?')
+    .get(modelDbId) as { enabled: number } | undefined;
+  return row?.enabled === 1;
+}
+
 function routeFor(modelDbId: number, modelId = MODEL_ID) {
   return { modelDbId, platform: PLATFORM, modelId };
 }
@@ -145,10 +152,22 @@ describe('noteModelRetirementSignal (auto-disable with a reason — #634)', () =
     const id = seedModel();
     expect(noteModelRetirementSignal(routeFor(id), NVIDIA_EOL, {})).toBe(true);
     expect(isRoutable(id)).toBe(false);
+    expect(isModelEnabled(id)).toBe(false);
 
     const tombstone = getCatalogModelTombstone(getDb(), 'chat', PLATFORM, MODEL_ID);
     expect(tombstone?.source).toBe('upstream_eol');
     expect(tombstone?.reason).toContain('end of life');
+  });
+
+  it('reasserts the disabled state when an upstream-retirement tombstone already exists', () => {
+    const id = seedModel();
+    expect(noteModelRetirementSignal(routeFor(id), NVIDIA_EOL, {})).toBe(true);
+    getDb().prepare('UPDATE models SET enabled = 1 WHERE id = ?').run(id);
+    getDb().prepare('UPDATE fallback_config SET enabled = 1 WHERE model_db_id = ?').run(id);
+
+    expect(noteModelRetirementSignal(routeFor(id), NVIDIA_EOL, {})).toBe(false);
+    expect(isModelEnabled(id)).toBe(false);
+    expect(isRoutable(id)).toBe(false);
   });
 
   it('leaves a transient 404 alone no matter how often it repeats', () => {
@@ -234,10 +253,12 @@ describe('catalog sync vs. upstream retirement (#634)', () => {
     const id = seedModel('eol-test-relisted');
     noteModelRetirementSignal(routeFor(id, 'eol-test-relisted'), NVIDIA_EOL, {});
     expect(isRoutable(id)).toBe(false);
+    expect(isModelEnabled(id)).toBe(false);
 
     applyCatalog(getDb(), catalogWith('eol-test-relisted', true));
 
     expect(isRoutable(id)).toBe(true);
+    expect(isModelEnabled(id)).toBe(true);
     expect(getCatalogModelTombstone(getDb(), 'chat', PLATFORM, 'eol-test-relisted')).toBeUndefined();
     expect(getDb().prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
       .get(PLATFORM, 'eol-test-relisted')).toBeDefined();

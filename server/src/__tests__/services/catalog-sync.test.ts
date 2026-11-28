@@ -431,18 +431,23 @@ describe('reapplyCachedCatalog', () => {
     expect(reapplyCachedCatalog().reapplied).toBe(true);
     expect(getCatalogModelTombstone(getDb(), 'chat', 'groq', 'replay-retired')?.source).toBe('upstream_eol');
     expect(chainOff()).toBe(0);
-    // Retirement disables the chain entries, never the row: the dashboard keeps
-    // showing it as retired upstream rather than losing it.
+    // Keep the retired row visible, but disabled so explicit model pins cannot
+    // dispatch to it.
     expect(
       (getDb().prepare('SELECT enabled FROM models WHERE id = ?').get(row.id) as { enabled: number }).enabled,
-    ).toBe(1);
+    ).toBe(0);
 
     // Same model, still listed enabled, but a catalog the install has not seen.
-    const newer = catalogOf(existingAsCatalogModels());
+    const newerModels = existingAsCatalogModels();
+    newerModels.find((model) => model.modelId === 'replay-retired')!.enabled = true;
+    const newer = catalogOf(newerModels);
     newer.version = '2099.02.02';
     applyCatalog(getDb(), newer);
     expect(getCatalogModelTombstone(getDb(), 'chat', 'groq', 'replay-retired')).toBeUndefined();
     expect(chainOff()).toBe(1);
+    expect(
+      (getDb().prepare('SELECT enabled FROM models WHERE id = ?').get(row.id) as { enabled: number }).enabled,
+    ).toBe(1);
   });
 
   it('clears the applied version when an older install has no cached document', () => {
