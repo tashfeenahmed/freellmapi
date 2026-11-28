@@ -2,9 +2,11 @@ import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 
 // Durable per-attempt routing traces (P2 #15): the fallback loop records every
 // dispatched attempt — failures AND the successful final one — with timing and
-// outcome, and persists them to `request_attempts` keyed to the terminal
-// `requests` row, in one insert batch after the response finishes. Children
-// are pruned with their parents (ON DELETE CASCADE + foreign_keys=ON).
+// outcome, and persists them to `request_attempts` in one insert batch after
+// the response finishes, duplicated against EVERY `requests` row the ladder
+// wrote (per-attempt error rows + terminal row) so opening any row in the
+// dashboard shows the full trail (#44206 UI gap). Children are pruned with
+// their parents (ON DELETE CASCADE + foreign_keys=ON).
 
 const { mockCheckKeyHealth } = vi.hoisted(() => ({ mockCheckKeyHealth: vi.fn() }));
 vi.mock('../../services/health.js', () => ({
@@ -60,8 +62,18 @@ interface AttemptRow {
 
 function allAttempts(): AttemptRow[] {
   return getDb().prepare(
-    'SELECT request_id, ordinal, platform, model_id, key_ordinal, key_label, outcome, start_offset_ms, duration_ms, error_summary FROM request_attempts ORDER BY ordinal',
+    'SELECT request_id, ordinal, platform, model_id, key_ordinal, key_label, outcome, start_offset_ms, duration_ms, error_summary FROM request_attempts ORDER BY request_id, ordinal',
   ).all() as AttemptRow[];
+}
+
+function attemptsFor(requestId: number): AttemptRow[] {
+  return getDb().prepare(
+    'SELECT request_id, ordinal, platform, model_id, key_ordinal, key_label, outcome, start_offset_ms, duration_ms, error_summary FROM request_attempts WHERE request_id = ? ORDER BY ordinal',
+  ).all(requestId) as AttemptRow[];
+}
+
+function successRowId(): number {
+  return (getDb().prepare("SELECT id FROM requests WHERE status = 'success'").get() as { id: number }).id;
 }
 
 beforeAll(() => {
@@ -79,7 +91,7 @@ beforeEach(() => {
 });
 
 describe('per-attempt routing traces', () => {
-  it('persists the full multi-attempt ladder, ordered, with error classes and timings, keyed to the terminal success row', async () => {
+  it('persists the full multi-attempt ladder, ordered, with error classes and timings, duplicated to every row of the ladder', async () => {
     const routes = [
       fakeRoute({ platform: 'groq', modelId: 'llama-x' }),
       fakeRoute({ platform: 'google', modelId: 'gemini-y' }),
@@ -100,7 +112,7 @@ describe('per-attempt routing traces', () => {
     }));
 
     const successRow = getDb().prepare("SELECT id FROM requests WHERE status = 'success'").get() as { id: number };
-    const rows = allAttempts();
+    const rows = attemptsFor(successRow.id);
 
     expect(rows).toHaveLength(3);
     expect(rows.map(r => r.ordinal)).toEqual([0, 1, 2]);
@@ -109,8 +121,6 @@ describe('per-attempt routing traces', () => {
     expect(rows.map(r => r.model_id)).toEqual(['llama-x', 'gemini-y', 'qwen-z']);
     // Per-request key ordinals, never raw key ids.
     expect(rows.map(r => r.key_ordinal)).toEqual([1, 2, 3]);
-    // Every attempt hangs off the SAME parent: the terminal success row.
-    expect(new Set(rows.map(r => r.request_id))).toEqual(new Set([successRow.id]));
 
     // Timing: offsets are ladder-relative and monotonic; each attempt ran
     // for at least its simulated 10ms.
@@ -119,13 +129,16 @@ describe('per-attempt routing traces', () => {
     expect(rows[2].start_offset_ms).toBeGreaterThan(rows[1].start_offset_ms);
     for (const r of rows) expect(r.duration_ms).toBeGreaterThanOrEqual(5);
 
-    // The mid-ladder failure rows carry no children of their own.
+    // #44206: the mid-ladder failure rows carry the SAME full ladder as the
+    // terminal row, so opening an error row in the dashboard shows the trail.
     const errorIds = getDb().prepare("SELECT id FROM requests WHERE status = 'error'").all() as { id: number }[];
     expect(errorIds).toHaveLength(2);
     for (const { id } of errorIds) {
-      const c = getDb().prepare('SELECT COUNT(*) as c FROM request_attempts WHERE request_id = ?').get(id) as { c: number };
-      expect(c.c).toBe(0);
+      const ladder = attemptsFor(id);
+      expect(ladder).toHaveLength(3);
+      expect(ladder.map(r => r.outcome)).toEqual(['rate_limited', 'timeout', 'ok']);
     }
+    expect(allAttempts()).toHaveLength(9);
   });
 
   it('snapshots the operator-facing key label per attempt, and leaves it null for unlabeled keys (#869)', async () => {
@@ -146,7 +159,7 @@ describe('per-attempt routing traces', () => {
         logRequest(route.platform, route.modelId, route.keyId, 'error', 10, 0, 5, err.message),
     }));
 
-    const rows = allAttempts();
+    const rows = attemptsFor(successRowId());
     expect(rows.map(r => r.key_label)).toEqual(['work laptop', null, 'billing account']);
     // The label is the operator's own name for the key, never the internal key
     // id and never the credential.
@@ -176,7 +189,7 @@ describe('per-attempt routing traces', () => {
         logRequest(route.platform, route.modelId, route.keyId, 'error', 10, 0, 5, err.message),
     }));
 
-    const rows = allAttempts();
+    const rows = attemptsFor(successRowId());
     expect(rows).toHaveLength(2);
     expect(rows.map(r => r.outcome)).toEqual(['rate_limited', 'ok']);
 
@@ -233,10 +246,9 @@ describe('per-attempt routing traces', () => {
     }));
 
     const lastErrorRow = getDb().prepare('SELECT id FROM requests ORDER BY id DESC LIMIT 1').get() as { id: number };
-    const rows = allAttempts();
+    const rows = attemptsFor(lastErrorRow.id);
     expect(rows).toHaveLength(2);
     expect(rows.map(r => r.outcome)).toEqual(['rate_limited', 'rate_limited']);
-    expect(new Set(rows.map(r => r.request_id))).toEqual(new Set([lastErrorRow.id]));
   });
 
   it('prunes request_attempts rows with their parent requests rows (retention)', () => {
