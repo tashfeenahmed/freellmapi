@@ -93,4 +93,15 @@ describe('toGeminiExtendedConfig', () => {
     expect(toGeminiExtendedConfig({ seed: 1 })).not.toHaveProperty('thinkingConfig');
     expect(toGeminiExtendedConfig(undefined)).not.toHaveProperty('thinkingConfig');
   });
+
+  it('thinking_budget overrides the effort-tier default while none still disables thinking', () => {
+    expect(toGeminiExtendedConfig({ thinking_budget: 4096 }).thinkingConfig)
+      .toEqual({ thinkingBudget: 4096, includeThoughts: true });
+    expect(toGeminiExtendedConfig({ reasoning_effort: 'low', thinking_budget: 16384 }).thinkingConfig)
+      .toEqual({ thinkingBudget: 16384, includeThoughts: true });
+    expect(toGeminiExtendedConfig({ reasoning_effort: 'none', thinking_budget: 16384 }).thinkingConfig)
+      .toEqual({ thinkingBudget: 0 });
+    expect(toGeminiExtendedConfig({ thinking_budget: 0 }).thinkingConfig)
+      .toEqual({ thinkingBudget: 0 });
+  });
 });

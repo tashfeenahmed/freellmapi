@@ -53,6 +53,21 @@ import {
   type SamplingSettings,
 } from '@/lib/playground-sampling'
 import {
+  isReasoningCustomized,
+  readReasoningPreferences,
+  reasoningRequestParams,
+  resolveEffortForModel,
+  resolveReasoningCapabilities,
+  resolveThinkingBudgetForModel,
+  setModelReasoningEffort,
+  setModelThinkingBudget,
+  setModelThinkingBudgetEnabled,
+  writeReasoningPreferences,
+  type ReasoningCapabilities,
+  type ReasoningEffortLevel,
+  type ReasoningPreferencesMap,
+} from '@/lib/playground-reasoning'
+import {
   SIDEBAR_OPEN_KEY,
   autoTitle,
   createConversation,
@@ -81,6 +96,7 @@ interface FallbackEntry {
   sizeLabel: string
   intelligenceRank: number
   supportsVision: boolean
+  reasoningCapabilities?: ReasoningCapabilities
   keyCount: number
 }
 
@@ -266,6 +282,13 @@ export default function PlaygroundPage() {
     setSampling(next)
     writeSampling(next)
   }
+  // Per-model reasoning preferences (effort + optional thinking budget),
+  // persisted in localStorage like the sampling knobs.
+  const [reasoningPrefs, setReasoningPrefs] = useState<ReasoningPreferencesMap>(() => readReasoningPreferences())
+  const updateReasoningPrefs = (next: ReasoningPreferencesMap) => {
+    setReasoningPrefs(next)
+    writeReasoningPreferences(next)
+  }
   // "Search the web" (#1174): look the question up with POST /v1/search first
   // and hand the model numbered sources to cite. A preference like the
   // sampling knobs, so it is remembered here rather than per conversation.
@@ -446,6 +469,10 @@ export default function PlaygroundPage() {
   // Collapse the same model from multiple providers into one option (value =
   // canonical id, which the proxy resolves to the whole group).
   const modelOptions = buildModelOptions(availableModels, unifyOn)
+  const reasoningCapabilities = resolveReasoningCapabilities(selectedModel, availableModels)
+  const reasoningEffort = resolveEffortForModel(reasoningPrefs, selectedModel, reasoningCapabilities)
+  const thinkingBudget = resolveThinkingBudgetForModel(reasoningPrefs, selectedModel)
+  const reasoningCustomized = isReasoningCustomized(reasoningPrefs, selectedModel, reasoningCapabilities)
 
   // Picker values that can accept images. A unified option counts as vision-
   // capable when ANY of its providers is, because routing picks a vision member
@@ -893,6 +920,9 @@ export default function PlaygroundPage() {
         // and max_tokens, spelled as /v1/chat/completions parses them. An
         // untouched rail adds nothing at all, leaving provider defaults alone.
         ...samplingRequestParams(sampling),
+        // Reasoning controls for models that support them (defaulting to
+        // 'medium' when supported; omitted entirely for unsupported models).
+        ...reasoningRequestParams(reasoningPrefs, selectedModel, reasoningCapabilities),
       }
       if (selectedModel !== 'auto') body.model = selectedModel
       // Everything streams: fusion so you can watch the panel and the judge
@@ -1343,6 +1373,20 @@ export default function PlaygroundPage() {
         onSystemPromptChange={updateSystemPrompt}
         sampling={sampling}
         onSamplingChange={updateSampling}
+        reasoningCapabilities={reasoningCapabilities}
+        reasoningEffort={reasoningEffort}
+        onReasoningEffortChange={(effort: ReasoningEffortLevel) =>
+          updateReasoningPrefs(setModelReasoningEffort(reasoningPrefs, selectedModel, effort))
+        }
+        thinkingBudgetEnabled={thinkingBudget.enabled}
+        onThinkingBudgetEnabledChange={enabled =>
+          updateReasoningPrefs(setModelThinkingBudgetEnabled(reasoningPrefs, selectedModel, enabled))
+        }
+        thinkingBudget={thinkingBudget.value}
+        onThinkingBudgetChange={budget =>
+          updateReasoningPrefs(setModelThinkingBudget(reasoningPrefs, selectedModel, budget))
+        }
+        reasoningCustomized={reasoningCustomized}
         webSearch={webSearch}
         onWebSearchChange={updateWebSearch}
         webSearchAvailable={webSearchAvailable}

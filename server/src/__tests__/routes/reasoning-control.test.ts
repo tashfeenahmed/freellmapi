@@ -180,6 +180,17 @@ describe('request-side reasoning control (end-to-end)', () => {
     expect(captured.body).not.toHaveProperty('reasoning_effort');
   });
 
+  it('accepts thinking_budget without leaking it to openai-compat upstreams', async () => {
+    const captured = mockJson(textCompletion('ok'));
+    const { status } = await request(app, '/v1/chat/completions', {
+      model: 'auto', reasoning_effort: 'high', thinking_budget: 12000,
+      messages: [{ role: 'user', content: 'hi' }],
+    }, openaiHeaders());
+    expect(status).toBe(200);
+    expect(captured.body.reasoning_effort).toBe('high');
+    expect(captured.body).not.toHaveProperty('thinking_budget');
+  });
+
   it('non-streaming: inline <think> is extracted into reasoning_content in the response', async () => {
     mockJson(textCompletion('<think>let me add</think>The answer is 4.'));
     const { status, body } = await request(app, '/v1/chat/completions', {

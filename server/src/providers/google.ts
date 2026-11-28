@@ -271,16 +271,23 @@ export function toGeminiExtendedConfig(options?: CompletionOptions): Record<stri
     const schema = rf.type === 'json_schema' ? rf.json_schema?.schema : undefined;
     if (schema) out.responseSchema = sanitizeForGemini(schema);
   }
-  // Request-side reasoning control: reasoning_effort → thinkingConfig. Only
-  // set when the client asked — a request without the knob keeps Gemini's
-  // model-default thinking behavior unchanged. includeThoughts surfaces
-  // thought summaries so reasoning_content flows back out (see
+  // Request-side reasoning control: reasoning_effort / thinking_budget →
+  // thinkingConfig. Only set when the client asked — a request without either
+  // knob keeps Gemini's model-default thinking behavior unchanged. Explicit
+  // 'none'/'minimal' always disables thinking; otherwise an explicit
+  // thinking_budget overrides the coarse effort-tier default. includeThoughts
+  // surfaces thought summaries so reasoning_content flows back out (see
   // extractReasoningContent).
   const effort = options?.reasoning_effort;
-  if (effort) {
-    out.thinkingConfig = (effort === 'none' || effort === 'minimal')
+  const budget = options?.thinking_budget;
+  if (effort === 'none' || effort === 'minimal') {
+    out.thinkingConfig = { thinkingBudget: 0 };
+  } else if (typeof budget === 'number' && Number.isInteger(budget) && budget >= 0) {
+    out.thinkingConfig = budget === 0
       ? { thinkingBudget: 0 }
-      : { thinkingBudget: EFFORT_THINKING_BUDGET[effort], includeThoughts: true };
+      : { thinkingBudget: budget, includeThoughts: true };
+  } else if (effort) {
+    out.thinkingConfig = { thinkingBudget: EFFORT_THINKING_BUDGET[effort], includeThoughts: true };
   }
   return out;
 }

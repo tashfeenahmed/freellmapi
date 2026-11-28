@@ -19,6 +19,7 @@ import { overriddenFieldNames } from '../services/model-state.js';
 import { parseModelScope, scopeAllows } from '../lib/model-scope.js';
 import { getQuotaOutlook } from '../services/quota-outlook.js';
 import { getDecisionRoutingStatus, setDecisionRoutingSettings } from '../services/routing-decision.js';
+import { reasoningCapabilitiesFor } from '../lib/sampling-params.js';
 
 export const fallbackRouter = Router();
 
@@ -327,6 +328,7 @@ fallbackRouter.get('/', (req: Request, res: Response) => {
       monthlyTokenBudgetDerived: parseBudget(r.monthly_token_budget ?? '') === 0 && effectiveMonthlyBudget(r) > 0,
       supportsVision: r.supports_vision === 1,
       supportsTools: r.supports_tools === 1,
+      reasoningCapabilities: reasoningCapabilitiesFor(r.platform),
       // 'discovered' (#1348): fetched from a built-in provider's /models because
       // the catalog carries none for it. Routes like a catalog row.
       source: r.platform === 'custom' || r.key_id != null
