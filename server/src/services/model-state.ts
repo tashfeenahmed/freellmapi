@@ -222,9 +222,8 @@ export function recordCatalogModelTombstone(
  * Auto-disable a catalog model the provider reports as permanently retired
  * (issue #634). Deliberately NOT a delete: the row stays visible in the
  * dashboard, tagged with the upstream wording, and the user can flip it back on
- * if they disagree. Turning off the chain entries (and the active profile's
- * copy) is exactly what the dashboard's own switch does, so the router stops
- * picking it while an explicitly-requested model id still resolves.
+ * if they disagree. Disable the model row as well as its chain entries so
+ * explicit model pins cannot keep dispatching to a permanently retired route.
  *
  * Returns true when this call performed the retirement (false when it was
  * already retired, or the user had deleted the model outright).
@@ -237,11 +236,20 @@ export function retireCatalogModelUpstream(
   reason: string,
 ): boolean {
   const existing = getCatalogModelTombstone(db, 'chat', platform, modelId);
-  if (existing) return false;
+  if (existing) {
+    if (existing.source === 'upstream_eol') setRetiredModelRows(db, modelDbId, false);
+    return false;
+  }
   recordCatalogModelTombstone(db, 'chat', platform, modelId, { source: 'upstream_eol', reason });
-  db.prepare('UPDATE fallback_config SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
-  db.prepare('UPDATE profile_models SET enabled = 0 WHERE model_db_id = ?').run(modelDbId);
+  setRetiredModelRows(db, modelDbId, false);
   return true;
+}
+
+function setRetiredModelRows(db: Db, modelDbId: number, enabled: boolean): void {
+  const value = enabled ? 1 : 0;
+  db.prepare('UPDATE models SET enabled = ? WHERE id = ?').run(value, modelDbId);
+  db.prepare('UPDATE fallback_config SET enabled = ? WHERE model_db_id = ?').run(value, modelDbId);
+  db.prepare('UPDATE profile_models SET enabled = ? WHERE model_db_id = ?').run(value, modelDbId);
 }
 
 /**
@@ -260,8 +268,7 @@ export function reinstateUpstreamRetiredCatalogModel(
     .prepare('SELECT id FROM models WHERE platform = ? AND model_id = ?')
     .get(platform, modelId) as { id: number } | undefined;
   if (row) {
-    db.prepare('UPDATE fallback_config SET enabled = 1 WHERE model_db_id = ?').run(row.id);
-    db.prepare('UPDATE profile_models SET enabled = 1 WHERE model_db_id = ?').run(row.id);
+    setRetiredModelRows(db, row.id, true);
   }
   return true;
 }
