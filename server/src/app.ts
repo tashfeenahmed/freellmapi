@@ -229,6 +229,18 @@ export function createApp(config?: Config) {
   // their sessions off mid-conversation. body-parser skips requests whose
   // body was already parsed, so the second parser only sees what the first
   // didn't own; an over-limit body throws from whichever parser matched.
+  // A POST to the bare base URL (`/v1` or `/v1/`) is a chat completion from a
+  // client that uses the URL exactly as typed instead of appending
+  // `/chat/completions` — Tencent WorkBuddy's custom-model form does this.
+  // Before this it fell through to the SPA fallback and got the dashboard's
+  // index.html with a 200, which clients report as an opaque parse failure.
+  // A POST there has no other meaning, so route it to the chat handler. The
+  // rewrite runs before every /v1 middleware so they all see the real path.
+  app.post(['/v1', '/v1/'], (req, _res, next) => {
+    req.url = '/v1/chat/completions' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '');
+    next();
+  });
+
   app.use(
     ['/v1', '/v1beta', '/mcp', '/api/chat', '/api/generate', '/api/embed', '/api/embeddings'],
     express.json({ limit: cfg.requestBodyLimitBytes }),
@@ -377,6 +389,21 @@ export function createApp(config?: Config) {
   // instead of index.html.
   app.use(statusRouter);
 
+  // Unmatched API-surface paths get a JSON 404 that names the right URL, never
+  // the dashboard's HTML (which reached clients as a 200 or an HTML 404 that
+  // OpenAI SDKs can't parse).
+  app.use(['/v1', '/v1beta'], (req, res) => {
+    res.status(404).json({
+      error: {
+        message: `No endpoint at ${req.method} ${req.originalUrl.split('?')[0]}. `
+          + 'For OpenAI-compatible clients, set the base URL to <this server>/v1; '
+          + 'if the client wants the full address, use <this server>/v1/chat/completions.',
+        type: 'invalid_request_error',
+        code: 'unknown_endpoint',
+      },
+    });
+  });
+
   // Error handler (for API routes)
   app.use(errorHandler);
 
@@ -417,7 +444,9 @@ export function createApp(config?: Config) {
     }));
     // SPA fallback — serve index.html for non-API routes
     app.use((req, res, next) => {
-      if (req.path.startsWith('/api/') || req.path.startsWith('/v1/') || req.path.startsWith('/v1beta/')) {
+      // Only page navigations get index.html; a POST/PUT/DELETE that reached
+      // here is an API call to a path nobody owns.
+      if ((req.method !== 'GET' && req.method !== 'HEAD') || req.path.startsWith('/api/') || req.path.startsWith('/v1/') || req.path.startsWith('/v1beta/')) {
         next();
         return;
       }
