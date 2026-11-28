@@ -1,0 +1,2 @@
+# gglint: no secrets in agent config files
+npx --no -- gglint secrets --staged
