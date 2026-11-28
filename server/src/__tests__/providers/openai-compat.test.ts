@@ -714,6 +714,9 @@ describe('OpenAICompatProvider - platform instances', () => {
     // unorouter's /v1/models requires auth (401 without a key), so default
     // key validation works — no validateUrl override, unlike xkiro.
     { platform: 'unorouter', name: 'UnoRouter',      baseUrl: 'https://api.unorouter.com/v1' },
+    // crowllm's /v1/models is public without a key but 401s a wrong Bearer,
+    // so the default key validation (which sends the key) is a real check.
+    { platform: 'crowllm',   name: 'CrowLLM',        baseUrl: 'https://crowllm.com/v1' },
     // xkiro validates against /v1/usage (its /v1/models is public — 200 with no
     // key), so it carries a validateUrl; chat routing is stock openai-compat.
     { platform: 'xkiro',      name: 'xKiro',         baseUrl: 'https://api.xkiro.com/v1' },

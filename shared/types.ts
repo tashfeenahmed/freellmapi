@@ -263,6 +263,15 @@ export type Platform =
   // validation works. Catalog rows live in the hosted catalog (premium now,
   // free after the 30-day model-age gate).
   | 'unorouter'
+  // CrowLLM (crowllm.com) — OpenAI-compatible gateway. Free key from
+  // crowllm.com/sign-up (email only, no card). Free-account ids carry a `:free`
+  // suffix; the public /api/pricing feed marks which of them bill at zero,
+  // and the shelf rotates (31 of 38 today). Live-probed 2026-11-23: /v1/models
+  // answers 200 without a key but 401s `Invalid token` on a wrong Bearer, and
+  // /v1/chat/completions 401s without a key, so default key validation works.
+  // Per-account RPM/RPD limits are unpublished (429 on cap); one account pool.
+  // Catalog rows are left to the hosted catalog; none are seeded here.
+  | 'crowllm'
   // xKiro (xkiro.com) — OpenAI-compatible gateway at api.xkiro.com/v1. Free key
   // from xkiro.com (no card); free plan is 5M tokens/day on its free models,
   // paid models 403 on a free key.

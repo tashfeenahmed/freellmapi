@@ -107,6 +107,8 @@ describe('key parser', () => {
     expect(detectPlatform('ORCA_')).toBe('orcarouter');
     expect(detectPlatform('UNOROUTER_')).toBe('unorouter');
     expect(detectPlatform('UNO_ROUTER_')).toBe('unorouter');
+    expect(detectPlatform('CROWLLM_')).toBe('crowllm');
+    expect(detectPlatform('CROW_LLM_')).toBe('crowllm');
     expect(detectPlatform('XKIRO_')).toBe('xkiro');
     expect(detectPlatform('MODELSCOPE_')).toBe('modelscope');
     expect(detectPlatform('ANYAPI_')).toBe('anyapi');
@@ -148,6 +150,7 @@ describe('key parser', () => {
     expect(AUTH_JSON_PROVIDER_MAP['sea-lion']).toBe('sealion');
     expect(AUTH_JSON_PROVIDER_MAP['orca-router']).toBe('orcarouter');
     expect(AUTH_JSON_PROVIDER_MAP['uno-router']).toBe('unorouter');
+    expect(AUTH_JSON_PROVIDER_MAP['crow-llm']).toBe('crowllm');
     expect(AUTH_JSON_PROVIDER_MAP['model-scope']).toBe('modelscope');
     expect(AUTH_JSON_PROVIDER_MAP['any-api']).toBe('anyapi');
     expect(AUTH_JSON_PROVIDER_MAP['b-ai']).toBe('bai');

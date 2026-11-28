@@ -625,6 +625,25 @@ register(new OpenAICompatProvider({
   baseUrl: 'https://api.unorouter.com/v1',
 }));
 
+// CrowLLM (crowllm.com) — OpenAI-compatible gateway (new-api fork). Free key
+// from crowllm.com/sign-up (email only, no card). Free-account ids carry a `:free`
+// suffix; the public /api/pricing feed marks which of them bill at zero (31 of 38
+// today) and the rest carry a small per-token rate, so the shelf rotates and a 429
+// is not the only limit to respect. Live-probed 2026-11-23: GET /v1/models is public (200 with
+// no Authorization) but answers 401 "Invalid token" to a wrong Bearer, and
+// chat/completions 401s without a key — the default /v1/models key validation
+// sends the key, so it is a real check; no validateUrl override needed.
+// Distinct OpenAI / Anthropic / Gemini wire shapes live on the same host
+// (crowllm.com/v1, crowllm.com for /v1/messages, crowllm.com/v1beta); only the
+// OpenAI shape is registered here. Per-account RPM/RPD is unpublished (429 on
+// cap), so provider-quota pools the platform as one allowance. Catalog rows
+// live in the hosted catalog; nothing is seeded.
+register(new OpenAICompatProvider({
+  platform: 'crowllm',
+  name: 'CrowLLM',
+  baseUrl: 'https://crowllm.com/v1',
+}));
+
 // xKiro (xkiro.com) — OpenAI-compatible gateway at api.xkiro.com/v1 (the
 // apex serves the same API today, but the docs name api.). Free key from
 // xkiro.com (no card). Live-probed 2026-08-23 with a free-plan key: /v1/usage
