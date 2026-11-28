@@ -28,13 +28,33 @@ export function withKeyProxy<T>(proxyUrl: string | undefined, fn: () => T): T {
 // was configured. Lazy-loading keeps the proxy feature genuinely zero-cost and
 // zero-risk for the common no-proxy case.
 type Ctor<T> = new (...args: any[]) => T;
+let _undici: typeof import('undici') | null = null;
 let _proxyAgentCtor: Ctor<unknown> | null = null;
 let _socksAgentCtor: Ctor<unknown> | null = null;
 
+async function loadUndici(): Promise<typeof import('undici')> {
+  if (!_undici) _undici = await import('undici');
+  return _undici;
+}
+
 async function loadHttpProxyAgent(): Promise<Ctor<unknown>> {
-  if (!_proxyAgentCtor) _proxyAgentCtor = (await import('undici')).ProxyAgent as unknown as Ctor<unknown>;
+  if (!_proxyAgentCtor) _proxyAgentCtor = (await loadUndici()).ProxyAgent as unknown as Ctor<unknown>;
   return _proxyAgentCtor;
 }
+
+/** Drive an npm-undici Dispatcher with that same module's fetch.
+ *  Node's bundled fetch (undici v8 on Node 26) rejects a v6 Dispatcher with
+ *  `invalid onError method` (#2155). The no-proxy path stays on global fetch
+ *  so flushProxyCache can still swap `undici.globalDispatcher.1`. */
+async function fetchWithDispatcher(
+  url: string,
+  init: RequestInit | undefined,
+  dispatcher: unknown,
+): Promise<Response> {
+  const undici = await loadUndici();
+  return undici.fetch(url, { ...init, dispatcher } as Parameters<typeof undici.fetch>[1]) as unknown as Promise<Response>;
+}
+
 async function loadSocksAgent(): Promise<Ctor<unknown>> {
   if (!_socksAgentCtor) _socksAgentCtor = (await import('socks-proxy-agent')).SocksProxyAgent as unknown as Ctor<unknown>;
   return _socksAgentCtor;
@@ -904,7 +924,7 @@ export async function openProviderWebSocket(url: string, platform: string, optio
     if (!resolved || resolved.isSocks) throw new Error('Native WebSockets require a working HTTP/HTTPS forward proxy; no direct fallback was attempted');
     dispatcher = resolved.dispatcher;
   }
-  const { WebSocket } = await import('undici');
+  const { WebSocket } = await loadUndici();
   return new WebSocket(url, { ...options, ...(dispatcher ? { dispatcher: dispatcher as import('undici').Dispatcher } : {}) });
 }
 
@@ -955,7 +975,7 @@ export function loopbackLookup(hostname: string, options: { all?: boolean; famil
 let _localhostDispatcher: unknown;
 async function getLocalhostDispatcher(): Promise<unknown> {
   if (!_localhostDispatcher) {
-    const { Agent } = await import('undici');
+    const { Agent } = await loadUndici();
     _localhostDispatcher = new Agent({ connect: { lookup: loopbackLookup as never } });
   }
   return _localhostDispatcher;
@@ -967,7 +987,7 @@ async function getLocalhostDispatcher(): Promise<unknown> {
 async function directFetch(url: string, init: RequestInit | undefined): Promise<Response> {
   if (isLocalhostSubdomainUrl(url)) {
     const dispatcher = await getLocalhostDispatcher();
-    return fetch(url, { ...init, dispatcher } as unknown as RequestInit);
+    return fetchWithDispatcher(url, init, dispatcher);
   }
   return fetch(url, init);
 }
@@ -997,7 +1017,7 @@ async function dispatchFetch(
         if (resolved.isSocks) {
           return socksFetch(url, init, resolved.dispatcher as http.Agent, platform, requestType, timeoutMs);
         }
-        return fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
+        return fetchWithDispatcher(url, init, resolved.dispatcher);
       }
       if (proxyRequired) {
         throw proxyRequiredError(platform, 'per-key proxy agent unavailable');
@@ -1036,8 +1056,8 @@ async function dispatchFetch(
     return socksFetch(url, init, resolved.dispatcher as http.Agent, platform, requestType, timeoutMs);
   }
 
-  // HTTP/HTTPS proxy → undici (dispatcher is an undici extension not in TS types)
-  return fetch(url, { ...init, dispatcher: resolved.dispatcher } as unknown as RequestInit);
+  // HTTP/HTTPS proxy → npm undici fetch + its ProxyAgent (#2155).
+  return fetchWithDispatcher(url, init, resolved.dispatcher);
 }
 
 /** Send an application-layer HTTP request through a user-controlled fetch
@@ -1211,7 +1231,7 @@ export async function probeProxyUrl(
       if (resolved.isSocks) {
         response = await socksFetch(target, { signal: AbortSignal.timeout(timeoutMs) }, resolved.dispatcher as http.Agent, undefined, 'unknown', timeoutMs);
       } else {
-        response = await fetch(target, { ...{ signal: AbortSignal.timeout(timeoutMs) }, dispatcher: resolved.dispatcher } as unknown as RequestInit);
+        response = await fetchWithDispatcher(target, { signal: AbortSignal.timeout(timeoutMs) }, resolved.dispatcher);
       }
     }
     // A relay answers on the same connection it forwards over, so a 401/403
