@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import http from 'http';
 import https from 'https';
+import net from 'net';
 import {
   applyProxyUrl,
   applyProxyMode,
@@ -426,10 +427,17 @@ describe('proxy source logging (#353)', () => {
 });
 
 describe('NO_PROXY bypass (#353)', () => {
+  // HTTP/HTTPS proxy traffic uses npm-undici fetch (#2155), so a global
+  // fetch spy only sees the direct path. A thrown connect error with no
+  // global fetch call means the ProxyAgent ran.
   const dispatcherFor = async (url: string) => {
-    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
-    await proxyFetch(url, { method: 'POST' }, 'groq');
-    return (spy.mock.calls[0][1] as any)?.dispatcher;
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
+    try {
+      await proxyFetch(url, { method: 'POST' }, 'groq');
+    } catch {
+      return spy.mock.calls.length === 0 ? { via: 'undici' } : (spy.mock.calls[0][1] as { dispatcher?: unknown })?.dispatcher;
+    }
+    return (spy.mock.calls[0][1] as { dispatcher?: unknown })?.dispatcher;
   };
 
   it('parses a comma-separated list, lower-cased', () => {
@@ -446,7 +454,7 @@ describe('NO_PROXY bypass (#353)', () => {
 
   it('still proxies hosts that do not match', async () => {
     process.env.NO_PROXY = 'api.example.com';
-    applyProxyUrl('http://proxy:8080');
+    applyProxyUrl('http://127.0.0.1:9');
     expect(await dispatcherFor('https://api.groq.com/v1')).toBeDefined();
   });
 
@@ -458,7 +466,7 @@ describe('NO_PROXY bypass (#353)', () => {
 
   it('does not let a suffix rule match an unrelated host that merely ends with it', async () => {
     process.env.NO_PROXY = 'example.com';
-    applyProxyUrl('http://proxy:8080');
+    applyProxyUrl('http://127.0.0.1:9');
     expect(await dispatcherFor('https://notexample.com/v1')).toBeDefined();
   });
 
@@ -511,12 +519,12 @@ describe('proxyFetch routing', () => {
   });
 
   it('routes through the dispatcher for an HTTP proxy', async () => {
-    applyProxyUrl('http://proxy:8080');
-    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
-    await proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq');
-    expect(spy).toHaveBeenCalledTimes(1);
-    const [, init] = spy.mock.calls[0];
-    expect((init as any)?.dispatcher).toBeDefined();
+    applyProxyUrl('http://127.0.0.1:9');
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
+    await expect(proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq'))
+      .rejects.toThrow(/fetch failed|ECONNREFUSED/i);
+    // npm-undici fetch, not the global spy — otherwise this would have resolved.
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('bypasses the proxy for a platform on the bypass list', async () => {
@@ -641,25 +649,32 @@ describe('opt-in required proxy transport (fail closed)', () => {
 describe('local and LAN destinations bypass the proxy (#951)', () => {
   /** Run one request through the SOCKS-configured proxy and report the route. */
   const routeOf = async (url: string): Promise<'direct' | 'proxied'> => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
     const httpsSpy = stubHttpsRequest();
     const httpSpy = stubHttpRequest();
-    await proxyFetch(url, { method: 'POST' }, 'custom');
+    let fetchError: unknown;
+    try {
+      await proxyFetch(url, { method: 'POST' }, 'custom');
+    } catch (e) {
+      fetchError = e;
+    }
     // A SOCKS route never touches fetch(): it goes out through http/https.request
     // with a SocksProxyAgent attached.
     if (httpsSpy.mock.calls.length + httpSpy.mock.calls.length > 0) {
       expect(fetchSpy).not.toHaveBeenCalled();
       return 'proxied';
     }
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
     // Direct means no proxy dispatcher was injected. *.localhost names get a
-    // plain undici Agent that only pins DNS to loopback (RFC 6761).
-    const dispatcher = (fetchSpy.mock.calls[0]?.[1] as any)?.dispatcher;
+    // plain undici Agent that only pins DNS to loopback (RFC 6761), driven by
+    // npm-undici fetch (#2155) so the global spy does not see them.
     if (new URL(url).hostname.replace(/\.$/, '').endsWith('.localhost')) {
-      expect(dispatcher?.constructor?.name).toBe('Agent');
-    } else {
-      expect(dispatcher).toBeUndefined();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(String((fetchError as Error)?.message ?? '')).toMatch(/fetch failed|ECONNREFUSED/i);
+      return 'direct';
     }
+    expect(fetchError).toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect((fetchSpy.mock.calls[0]?.[1] as { dispatcher?: unknown })?.dispatcher).toBeUndefined();
     return 'direct';
   };
 
@@ -1042,27 +1057,28 @@ describe('probeProxyUrl (#863)', () => {
 
   it('prefers the draft URL over the saved value, without persisting it', async () => {
     applyProxyUrl('http://saved-proxy:8080');
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
 
     // Draft value wins: an HTTP(S) proxy URL builds an undici dispatcher, so
-    // the fetch call must carry that dispatcher rather than going direct.
-    const result = await probeProxyUrl('http://draft-proxy:8080');
+    // npm-undici fetch tries that proxy rather than going direct (#2155).
+    const result = await probeProxyUrl('http://127.0.0.1:9');
 
-    expect(result.ok).toBe(true);
-    const dispatcher = (fetchSpy.mock.calls[0]?.[1] as any)?.dispatcher;
-    expect(dispatcher).toBeDefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(result.error ?? '').toMatch(/fetch failed|ECONNREFUSED/i);
     // The saved value must be untouched.
     expect(getProxyUrl()).toBe('http://saved-proxy:8080');
   });
 
   it('falls back to the saved proxy URL when the draft is empty', async () => {
-    applyProxyUrl('http://saved-proxy:8080');
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
+    applyProxyUrl('http://127.0.0.1:9');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
 
     const result = await probeProxyUrl('');
 
-    expect(result.ok).toBe(true);
-    expect((fetchSpy.mock.calls[0]?.[1] as any)?.dispatcher).toBeDefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(result.error ?? '').toMatch(/fetch failed|ECONNREFUSED/i);
   });
 
   it('routes SOCKS draft URLs through socksFetch, not undici', async () => {
@@ -1225,11 +1241,11 @@ describe('scheme-less proxy values (#1373)', () => {
   });
 
   it('routes through the dispatcher for a scheme-less dashboard value', async () => {
-    applyProxyUrl('proxy:8080');
-    const spy = vi.spyOn(global, 'fetch').mockResolvedValue(okResponse());
-    await proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq');
-    const [, init] = spy.mock.calls[0];
-    expect((init as any)?.dispatcher).toBeDefined();
+    applyProxyUrl('127.0.0.1:9');
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
+    await expect(proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq'))
+      .rejects.toThrow(/fetch failed|ECONNREFUSED/i);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('falls back to the https= entry of a per-scheme Windows ProxyServer', () => {
@@ -1259,10 +1275,9 @@ describe('fetch failed carries its cause (#1373)', () => {
   });
 
   it('says when the request went through the proxy', async () => {
-    applyProxyUrl('http://127.0.0.1:7890');
-    vi.spyOn(global, 'fetch').mockRejectedValue(fetchFailed(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:7890'), { code: 'ECONNREFUSED' })));
+    applyProxyUrl('http://127.0.0.1:9');
     await expect(proxyFetch('https://api.groq.com/v1', undefined, 'groq'))
-      .rejects.toThrow('fetch failed (ECONNREFUSED api.groq.com via proxy)');
+      .rejects.toThrow(/fetch failed \(ECONNREFUSED api\.groq\.com via proxy\)/);
   });
 
   it('finds a code nested deeper in the cause chain', async () => {
@@ -1412,6 +1427,119 @@ describe('*.localhost pinning cannot be turned on another host', () => {
       applyProxyUrl('');
       proxy.close();
       upstream.close();
+    }
+  });
+});
+
+// #2155: a Dispatcher constructed from the npm `undici` package cannot be
+// driven by Node's bundled `fetch` once the majors diverge (Node 26 ships
+// undici v8; the dep is v6). The failure is `InvalidArgumentError: invalid
+// onError method` at dispatcher-base.js — every HTTP/HTTPS proxy request, and
+// every *.localhost pin, dies before a socket opens. Direct (no-proxy) traffic
+// stays on global fetch so the laptop-lid reconnect path (flushProxyCache /
+// undici.globalDispatcher.1) is unchanged.
+//
+// npm `undici`'s `fetch` export is not spy-able under Vitest ESM, so these
+// cases mock global fetch (the buggy call site) and require the request to
+// go elsewhere — npm-undici fetch hitting a closed local port, or a real
+// CONNECT proxy.
+describe('npm-undici dispatcher is driven by npm-undici fetch (#2155)', () => {
+  async function assertNotGlobalNpmDispatcher(
+    run: () => Promise<unknown>,
+  ): Promise<{ error: unknown }> {
+    const undici = await import('undici');
+    const globalFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
+    let error: unknown;
+    try {
+      await run();
+    } catch (e) {
+      error = e;
+    }
+    const handedNpmDispatcher = globalFetch.mock.calls.some(call => {
+      const dispatcher = (call[1] as { dispatcher?: unknown } | undefined)?.dispatcher;
+      return dispatcher instanceof undici.ProxyAgent || dispatcher instanceof undici.Agent;
+    });
+    expect(handedNpmDispatcher, 'global fetch was given an npm-undici Dispatcher').toBe(false);
+    expect(globalFetch, 'proxied / *.localhost traffic must not use global fetch').not.toHaveBeenCalled();
+    return { error };
+  }
+
+  it('does not hand an npm ProxyAgent to global fetch', async () => {
+    applyProxyUrl('http://127.0.0.1:9');
+    const { error } = await assertNotGlobalNpmDispatcher(() =>
+      proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq'));
+    // Closed proxy port: npm-undici fetch must have tried to use the ProxyAgent.
+    expect(error).toBeDefined();
+    expect(String((error as Error).message)).toMatch(/fetch failed|ECONNREFUSED/i);
+  });
+
+  it('pins *.localhost without handing an npm Agent to global fetch', async () => {
+    const { error } = await assertNotGlobalNpmDispatcher(() =>
+      proxyFetch('http://ollama.localhost:1/v1', { method: 'POST' }, 'custom'));
+    expect(error).toBeDefined();
+    expect(String((error as Error).message)).toMatch(/fetch failed|ECONNREFUSED/i);
+  });
+
+  it('drives a per-key HTTP ProxyAgent without global fetch', async () => {
+    const { error } = await assertNotGlobalNpmDispatcher(() =>
+      withKeyProxy('http://127.0.0.1:9', () =>
+        proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq')));
+    expect(error).toBeDefined();
+    expect(String((error as Error).message)).toMatch(/fetch failed|ECONNREFUSED/i);
+  });
+
+  it('probeProxyUrl does not hand an npm ProxyAgent to global fetch', async () => {
+    const undici = await import('undici');
+    const globalFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
+    const result = await probeProxyUrl('http://127.0.0.1:9');
+    const handedNpmDispatcher = globalFetch.mock.calls.some(call =>
+      (call[1] as { dispatcher?: unknown } | undefined)?.dispatcher instanceof undici.ProxyAgent);
+    expect(handedNpmDispatcher).toBe(false);
+    expect(globalFetch).not.toHaveBeenCalled();
+    expect(result.ok).toBe(false);
+    expect(result.error ?? '').toMatch(/fetch failed|ECONNREFUSED/i);
+  });
+
+  it('keeps the no-proxy path on global fetch (laptop-lid reconnect)', async () => {
+    const globalFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okResponse());
+    await proxyFetch('https://api.example.com/v1', { method: 'POST' }, 'groq');
+    expect(globalFetch).toHaveBeenCalledTimes(1);
+    expect((globalFetch.mock.calls[0][1] as { dispatcher?: unknown } | undefined)?.dispatcher)
+      .toBeUndefined();
+  });
+
+  it('an HTTP forward proxy delivers the request without invalid onError', async () => {
+    const seen: string[] = [];
+    const origin = http.createServer((_req, res) => res.end('from-origin'));
+    // undici ProxyAgent tunnels HTTP with CONNECT by default (proxyTunnel: true).
+    const proxy = http.createServer((_req, res) => { res.writeHead(400); res.end(); });
+    proxy.on('connect', (req, clientSock, head) => {
+      seen.push(`CONNECT ${req.url}`);
+      const [host, port] = (req.url ?? '').split(':');
+      const originSock = net.connect(Number(port), host, () => {
+        clientSock.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+        if (head.length) originSock.write(head);
+        originSock.pipe(clientSock);
+        clientSock.pipe(originSock);
+      });
+      originSock.on('error', () => clientSock.destroy());
+      clientSock.on('error', () => originSock.destroy());
+    });
+    await new Promise<void>(r => origin.listen(0, '127.0.0.1', () => r()));
+    await new Promise<void>(r => proxy.listen(0, '127.0.0.1', () => r()));
+    const originPort = (origin.address() as { port: number }).port;
+    const proxyPort = (proxy.address() as { port: number }).port;
+    process.env.FREEAPI_PROXY_LOCAL_DESTINATIONS = 'true';
+    applyProxyUrl(`http://127.0.0.1:${proxyPort}`);
+    try {
+      const res = await proxyFetch(`http://127.0.0.1:${originPort}/v1`, undefined, 'groq');
+      expect(await res.text()).toBe('from-origin');
+      expect(seen).toEqual([`CONNECT 127.0.0.1:${originPort}`]);
+    } finally {
+      applyProxyUrl('');
+      delete process.env.FREEAPI_PROXY_LOCAL_DESTINATIONS;
+      proxy.close();
+      origin.close();
     }
   });
 });
