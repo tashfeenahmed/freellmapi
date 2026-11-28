@@ -1621,8 +1621,10 @@ export interface FallbackHooks {
 export async function runFallbackLoop(hooks: FallbackHooks): Promise<void> {
   // Durable per-attempt trace (P2 #15): every dispatched attempt — including
   // the successful final one — is recorded with timing and outcome, then
-  // persisted as one insert batch into `request_attempts`, keyed to the
-  // terminal `requests` row of this ladder. The trace rides AsyncLocalStorage
+  // persisted as one insert batch into `request_attempts`, duplicated against
+  // every `requests` row this ladder wrote (per-attempt error rows and the
+  // terminal row, #44206: opening a mid-ladder error row in the dashboard
+  // shows the same trail). The trace rides AsyncLocalStorage
   // so logRequest() (called deep inside the surfaces' dispatch closures) can
   // report back the row ids it writes without any surface changing. The flush
   // runs after the loop returns — i.e. after the response is finished — so it

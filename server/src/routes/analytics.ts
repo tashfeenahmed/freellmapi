@@ -774,8 +774,9 @@ analyticsRouter.get('/requests', (req: Request, res: Response) => {
       // provider in the recent-calls list. Null when the key was deleted or
       // never labelled.
       keyLabel: r.key_label ?? null,
-      // Failover-ladder length for this row. Attempts hang off the TERMINAL
-      // row of a proxied request; mid-ladder failure rows report 0.
+      // Failover-ladder length for this row. Since #44206 the batch is
+      // persisted against EVERY row the ladder wrote, so mid-ladder failure
+      // rows report the same count as the terminal row.
       attemptCount: r.attempt_count,
     })),
   });
@@ -785,9 +786,9 @@ analyticsRouter.get('/requests', (req: Request, res: Response) => {
 // dispatched attempt (including the successful final one), ordinal-ordered,
 // with the failure class and timing of each hop. keyOrdinal is the per-request
 // key ordinal (key1, key2…), same anonymization as X-Fallback-Trail — internal
-// key ids are never exposed. Attempts are keyed to the ladder's terminal row
-// (the success row, or the last failure row when it exhausted), so mid-ladder
-// error rows legitimately return an empty attempts array.
+// key ids are never exposed. Since #44206 the attempt batch is persisted
+// against every `requests` row the ladder wrote (per-attempt error rows and
+// the terminal row), so opening any row of the ladder shows the full trail.
 analyticsRouter.get('/requests/:id', (req: Request, res: Response) => {
   const id = Number.parseInt(req.params.id as string, 10);
   if (!Number.isInteger(id) || id <= 0) {

@@ -5,13 +5,13 @@
 // into `request_attempts`, keyed to the terminal `requests` row.
 //
 // The trace travels on AsyncLocalStorage (same pattern as client-context.ts)
-// so logRequest() can report back the id of each `requests` row it writes
+// so logRequest() can report back the ids of the `requests` rows it writes
 // without threading a parameter through every surface's dispatch closure.
-// The LAST id noted during a loop run is the terminal row — the success row,
-// a committed mid-stream error row, or the final per-attempt failure row —
-// and that is the row the batch is keyed to. Calls to logRequest outside a
-// fallback-loop run (fusion sub-calls, embeddings, media) see no trace and
-// are unaffected.
+// EVERY id noted during a loop run is kept — the per-attempt error rows of
+// failed hops plus the terminal row — and the batch is persisted against each
+// of them, so opening any row of the ladder in the dashboard shows the full
+// failover trail. Calls to logRequest outside a fallback-loop run (fusion
+// sub-calls, embeddings, media) see no trace and are unaffected.
 
 import { AsyncLocalStorage } from 'async_hooks';
 import type { AttemptErrorClass } from './fallback-loop.js';
@@ -53,15 +53,19 @@ export interface AttemptTraceRecord {
 
 export interface RequestTrace {
   records: AttemptTraceRecord[];
-  // Rowid of the most recent `requests` row logged during this trace's run;
-  // null until the first logRequest lands (e.g. a client abort on attempt 1).
-  lastRequestRowId: number | null;
+  // Rowids of EVERY `requests` row logged during this trace's run (in order).
+  // The ladder can write several rows — one per failed attempt plus the
+  // terminal one — and the attempt batch is persisted against each of them so
+  // opening ANY row of the ladder (including a mid-ladder error row) shows the
+  // full failover trail in the dashboard. Empty until the first logRequest
+  // lands (e.g. a client abort on attempt 1).
+  requestRowIds: number[];
 }
 
 const storage = new AsyncLocalStorage<RequestTrace>();
 
 export function newRequestTrace(): RequestTrace {
-  return { records: [], lastRequestRowId: null };
+  return { records: [], requestRowIds: [] };
 }
 
 export function runWithRequestTrace<T>(trace: RequestTrace, fn: () => T): T {
@@ -75,5 +79,8 @@ export function getRequestTrace(): RequestTrace | undefined {
 /** Called by logRequest() after inserting a `requests` row; no-op outside a trace. */
 export function noteRequestRowId(id: number | bigint): void {
   const trace = storage.getStore();
-  if (trace) trace.lastRequestRowId = Number(id);
+  if (trace) {
+    const n = Number(id);
+    if (!trace.requestRowIds.includes(n)) trace.requestRowIds.push(n);
+  }
 }

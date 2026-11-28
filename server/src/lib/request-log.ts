@@ -170,17 +170,19 @@ export function logRequest(
   }
 }
 
-// Persist a finished attempt trace as one small insert batch keyed to the
-// terminal `requests` row of the failover ladder (the success row, a committed
-// mid-stream error row, or the last per-attempt failure row). Called once per
-// request by the fallback loop AFTER the response is finished, so the write is
-// off the client's latency path. Zero-failure single-attempt successes write
-// exactly one 'ok' row. A trace with no parent row writes nothing — since the
+// Persist a finished attempt trace as one small insert batch, duplicated
+// against EVERY `requests` row the ladder wrote (each failed attempt's error
+// row plus the terminal row — the success row, a committed mid-stream error
+// row, or the last per-attempt failure row). Called once per request by the
+// fallback loop AFTER the response is finished, so the write is off the
+// client's latency path. Zero-failure single-attempt successes write exactly
+// one 'ok' row. A trace with no parent row writes nothing — since the
 // fallback loop logs a 'canceled' row for pure client aborts (#752), that is
 // now only the loop-top stop paths, whose failed attempts each wrote their own
-// row already.
+// row already. Duplicating the batch per row is what makes a mid-ladder error
+// row show the same failover trail as the terminal row in the dashboard.
 export function persistRequestAttempts(trace: RequestTrace): void {
-  if (trace.records.length === 0 || trace.lastRequestRowId == null) return;
+  if (trace.records.length === 0 || trace.requestRowIds.length === 0) return;
   try {
     const db = getDb();
     const insert = db.prepare(`
@@ -188,8 +190,10 @@ export function persistRequestAttempts(trace: RequestTrace): void {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const tx = db.transaction(() => {
-      for (const r of trace.records) {
-        insert.run(trace.lastRequestRowId, r.ordinal, r.platform, r.modelId, r.keyOrdinal, r.keyLabel, r.outcome, r.startOffsetMs, r.durationMs, r.errorSummary);
+      for (const rowId of trace.requestRowIds) {
+        for (const r of trace.records) {
+          insert.run(rowId, r.ordinal, r.platform, r.modelId, r.keyOrdinal, r.keyLabel, r.outcome, r.startOffsetMs, r.durationMs, r.errorSummary);
+        }
       }
     });
     tx();
